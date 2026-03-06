@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY package*.json yarn.lock* ./
 RUN npm install --legacy-peer-deps
-RUN npm install ajv@^8.0.0 --legacy-peer-deps
+RUN npm install ajv@^8.0.0 html5-qrcode --legacy-peer-deps
 
 COPY . .
 
