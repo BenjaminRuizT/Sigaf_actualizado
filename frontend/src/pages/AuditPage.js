@@ -50,35 +50,38 @@ function useSortable(defaultKey, defaultDir = "asc") {
 }
 
 // ── Barcode Scanner Component ──
-// Modo A: BarcodeDetector nativo (Chrome/Android/iOS 17+) — escaneo continuo sin librerías
-// Modo B: Foto → backend Gemini Vision → lee el número de la etiqueta
-// La imagen NUNCA se guarda en el dispositivo — solo existe en memoria JS y se descarta
+// Modo A: BarcodeDetector nativo — escaneo continuo (Chrome Android / iOS 17+)
+// Modo B: Foto → Gemini Vision → muestra número detectado para confirmar/editar
+// Imagen nunca guardada en disco — solo en memoria JS, descartada al terminar
 function BarcodeScanner({ onDetected, onClose }) {
   const { api } = useAuth();
 
-  // screen: "menu" | "live" | "photo"
-  const [screen, setScreen] = useState("menu");
+  // Pantallas: "menu" | "live" | "photo"
+  const [screen, setScreen]       = useState("menu");
 
-  // Estado explícito para controlar el render del video — refs solos no disparan re-render
-  const [liveReady, setLiveReady]     = useState(false);
-  const [photoReady, setPhotoReady]   = useState(false);
-  const [liveError, setLiveError]     = useState(null);
-  const [photoError, setPhotoError]   = useState(null);
+  // --- Estado modo LIVE ---
+  const [liveReady, setLiveReady] = useState(false);
+  const [liveError, setLiveError] = useState(null);
 
-  // Foto mode sub-steps: "cam" | "preview" | "processing"
-  const [photoStep, setPhotoStep]     = useState("cam");
-  const [previewSrc, setPreviewSrc]   = useState(null);
+  // --- Estado modo FOTO ---
+  // pasos: "cam" | "preview" | "processing" | "result"
+  const [photoStep, setPhotoStep]   = useState("cam");
+  const [photoReady, setPhotoReady] = useState(false);
+  const [photoError, setPhotoError] = useState(null);
+  const [previewSrc, setPreviewSrc] = useState(null);
+  // Resultado: número detectado por IA, editable por usuario
+  const [detectedCode, setDetectedCode] = useState("");
 
-  const liveVideoRef   = useRef(null);
-  const liveStreamRef  = useRef(null);
-  const detectorRef    = useRef(null);
-  const rafRef         = useRef(null);
+  const liveVideoRef  = useRef(null);
+  const liveStreamRef = useRef(null);
+  const detectorRef   = useRef(null);
+  const rafRef        = useRef(null);
 
   const photoVideoRef  = useRef(null);
   const photoStreamRef = useRef(null);
-  const capturedB64    = useRef(null); // imagen en memoria, nunca en disco
+  const capturedB64    = useRef(null);
 
-  // ── cleanup al desmontar ──
+  // cleanup al desmontar
   useEffect(() => () => { _stopLive(); _stopPhoto(); }, []); // eslint-disable-line
 
   function _stopLive() {
@@ -88,57 +91,59 @@ function BarcodeScanner({ onDetected, onClose }) {
   function _stopPhoto() {
     if (photoStreamRef.current) { photoStreamRef.current.getTracks().forEach(t => t.stop()); photoStreamRef.current = null; }
   }
+  function _goMenu() {
+    _stopLive(); _stopPhoto();
+    setScreen("menu"); setLiveReady(false); setLiveError(null);
+    setPhotoStep("cam"); setPhotoReady(false); setPhotoError(null);
+    setPreviewSrc(null); setDetectedCode("");
+  }
 
-  // ────────────────────────────────────────
-  // MODO LIVE: useEffect arranca la cámara DESPUÉS de que React renderizó el <video>
-  // ────────────────────────────────────────
+  // ══════════════════════════════════════
+  // MODO LIVE — useEffect inicia cámara DESPUÉS de que el <video> está en el DOM
+  // ══════════════════════════════════════
   useEffect(() => {
     if (screen !== "live") return;
     let cancelled = false;
+    setLiveReady(false); setLiveError(null);
 
     (async () => {
       try {
-        // 1. Obtener stream
+        if (!("BarcodeDetector" in window)) {
+          setLiveError("BarcodeDetector no disponible en este navegador. Usa el modo Foto.");
+          return;
+        }
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
         });
         if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
         liveStreamRef.current = stream;
-
-        // 2. Asignar al elemento <video> que ya está en el DOM
         if (liveVideoRef.current) {
           liveVideoRef.current.srcObject = stream;
           await liveVideoRef.current.play();
-        }
-
-        // 3. Inicializar BarcodeDetector
-        if (!("BarcodeDetector" in window)) {
-          setLiveError("Este navegador no soporta escaneo en vivo. Usa el modo Foto.");
-          return;
         }
         const supported = await window.BarcodeDetector.getSupportedFormats();
         const wanted = ["code_128","code_39","code_93","ean_13","ean_8","upc_a","upc_e","itf","qr_code","data_matrix"];
         const formats = wanted.filter(f => supported.includes(f));
         detectorRef.current = new window.BarcodeDetector({ formats: formats.length ? formats : supported });
-
-        if (!cancelled) {
-          setLiveReady(true);
-          rafRef.current = requestAnimationFrame(function frame() {
-            const video = liveVideoRef.current;
-            const det   = detectorRef.current;
-            if (!video || !det || cancelled) return;
-            det.detect(video).then(results => {
-              if (cancelled) return;
-              if (results.length > 0) {
-                const code = results[0].rawValue.trim();
-                _stopLive();
-                onDetected(code);
-              } else {
-                rafRef.current = requestAnimationFrame(frame);
-              }
-            }).catch(() => { rafRef.current = requestAnimationFrame(frame); });
-          });
-        }
+        if (cancelled) return;
+        setLiveReady(true);
+        const detect = async () => {
+          if (cancelled) return;
+          const video = liveVideoRef.current;
+          const det   = detectorRef.current;
+          if (!video || !det || video.readyState < 2) { rafRef.current = requestAnimationFrame(detect); return; }
+          try {
+            const results = await det.detect(video);
+            if (results.length > 0) {
+              const code = results[0].rawValue.trim();
+              _stopLive();
+              onDetected(code);
+              return;
+            }
+          } catch {}
+          rafRef.current = requestAnimationFrame(detect);
+        };
+        rafRef.current = requestAnimationFrame(detect);
       } catch (err) {
         if (!cancelled) setLiveError("Cámara no disponible: " + (err.message || "verifica permisos"));
       }
@@ -147,23 +152,21 @@ function BarcodeScanner({ onDetected, onClose }) {
     return () => { cancelled = true; _stopLive(); setLiveReady(false); };
   }, [screen]); // eslint-disable-line
 
-  // ────────────────────────────────────────
-  // MODO FOTO: useEffect arranca la cámara DESPUÉS de que React renderizó el <video>
-  // ────────────────────────────────────────
+  // ══════════════════════════════════════
+  // MODO FOTO — useEffect inicia cámara DESPUÉS de que el <video> está en el DOM
+  // ══════════════════════════════════════
   useEffect(() => {
     if (screen !== "photo" || photoStep !== "cam") return;
     let cancelled = false;
+    setPhotoReady(false); setPhotoError(null);
 
     (async () => {
-      setPhotoReady(false);
-      setPhotoError(null);
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }
         });
         if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
         photoStreamRef.current = stream;
-
         if (photoVideoRef.current) {
           photoVideoRef.current.srcObject = stream;
           await photoVideoRef.current.play();
@@ -177,7 +180,7 @@ function BarcodeScanner({ onDetected, onClose }) {
     return () => { cancelled = true; _stopPhoto(); setPhotoReady(false); };
   }, [screen, photoStep]); // eslint-disable-line
 
-  // ── Capturar foto ──
+  // ── Capturar foto del video ──
   function capturePhoto() {
     const video = photoVideoRef.current;
     if (!video || video.readyState < 2) return;
@@ -186,14 +189,14 @@ function BarcodeScanner({ onDetected, onClose }) {
     canvas.height = video.videoHeight || 720;
     canvas.getContext("2d").drawImage(video, 0, 0);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
-    canvas.width = 0; canvas.height = 0; // liberar canvas de memoria
+    canvas.width = 0; canvas.height = 0;
     _stopPhoto();
     capturedB64.current = dataUrl;
     setPreviewSrc(dataUrl);
     setPhotoStep("preview");
   }
 
-  // ── Enviar al backend ──
+  // ── Enviar foto al backend Gemini ──
   async function analyzePhoto() {
     const b64 = capturedB64.current;
     if (!b64) return;
@@ -202,37 +205,46 @@ function BarcodeScanner({ onDetected, onClose }) {
     try {
       const res = await api.post("/scan-image", { image_base64: b64 });
       capturedB64.current = null;
-      setPreviewSrc(null);
-      onDetected(res.data.barcode);
+      // *** NO llamamos onDetected directamente ***
+      // Mostramos el resultado para que el usuario lo confirme o edite
+      setDetectedCode(res.data.barcode || "");
+      setPhotoStep("result");
     } catch (err) {
       capturedB64.current = null;
-      setPreviewSrc(null);
       const d = err.response?.data?.detail;
-      setPhotoError(typeof d === "string" ? d : "No se detectó número. Acércate más y asegúrate de que la etiqueta esté bien iluminada.");
-      setPhotoStep("cam"); // vuelve a la cámara automáticamente
+      const msg = typeof d === "string" ? d : "No se detectó número en la imagen.";
+      // En caso de error, mostramos pantalla de resultado vacía para que el usuario escriba
+      setDetectedCode("");
+      setPhotoError(msg);
+      setPhotoStep("result");
     }
   }
 
-  // ═══════════════════════════════════════
-  // RENDER
-  // ═══════════════════════════════════════
+  // ── Confirmar y usar el código ──
+  function confirmCode() {
+    const code = detectedCode.trim();
+    if (!code) return;
+    setPreviewSrc(null);
+    setDetectedCode("");
+    onDetected(code);
+  }
 
-  // ── MENÚ principal ──
+  // ══════════════════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════════════════
+
+  // ── MENÚ ──
   if (screen === "menu") {
     const hasDetector = "BarcodeDetector" in window;
     return (
       <div className="space-y-3 py-1">
         <p className="text-sm text-center text-muted-foreground">¿Cómo quieres capturar el código?</p>
         <div className="space-y-2">
-
-          {/* Opción A: escaneo en vivo */}
           <button
-            onClick={() => { setLiveError(null); setLiveReady(false); setScreen("live"); }}
-            className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all
-              ${hasDetector
-                ? "border-primary/30 hover:border-primary hover:bg-primary/5"
-                : "border-muted/40 opacity-50 cursor-not-allowed"}`}
+            onClick={() => setScreen("live")}
             disabled={!hasDetector}
+            className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all
+              ${hasDetector ? "border-primary/30 hover:border-primary hover:bg-primary/5" : "border-muted/40 opacity-50 cursor-not-allowed"}`}
           >
             <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
               <Scan className="h-5 w-5 text-primary" />
@@ -240,14 +252,13 @@ function BarcodeScanner({ onDetected, onClose }) {
             <div>
               <p className="font-semibold text-sm">Escaneo en vivo</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {hasDetector ? "Apunta la cámara y el código se detecta solo" : "No disponible en este navegador — usa el modo Foto"}
+                {hasDetector ? "Apunta la cámara — el código se detecta solo" : "No disponible en este navegador"}
               </p>
             </div>
           </button>
 
-          {/* Opción B: foto */}
           <button
-            onClick={() => { setPhotoError(null); setPhotoReady(false); setPhotoStep("cam"); setPreviewSrc(null); setScreen("photo"); }}
+            onClick={() => { setPhotoStep("cam"); setPreviewSrc(null); setDetectedCode(""); setPhotoError(null); setScreen("photo"); }}
             className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-blue-400/40 hover:border-blue-500 hover:bg-blue-50/50 text-left transition-all"
           >
             <div className="h-11 w-11 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
@@ -255,7 +266,7 @@ function BarcodeScanner({ onDetected, onClose }) {
             </div>
             <div>
               <p className="font-semibold text-sm">Tomar foto de etiqueta</p>
-              <p className="text-xs text-muted-foreground mt-0.5">La IA lee el número de la foto. Funciona en todos los dispositivos.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">La IA lee el número. Funciona en todos los dispositivos.</p>
             </div>
           </button>
         </div>
@@ -271,36 +282,26 @@ function BarcodeScanner({ onDetected, onClose }) {
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between mb-1">
-          <button onClick={() => { _stopLive(); setScreen("menu"); setLiveReady(false); }}
-            className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground">
+          <button onClick={_goMenu} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground">
             <ArrowLeft className="h-3.5 w-3.5" /> Menú
           </button>
           <span className="text-xs font-semibold">Escaneo en vivo</span>
         </div>
 
-        {/* El <video> siempre está en el DOM cuando screen==="live" — el useEffect lo conecta */}
         <div className="relative rounded-xl overflow-hidden bg-black border border-primary/40" style={{ minHeight: 230 }}>
-          <video
-            ref={liveVideoRef}
-            className="w-full block"
-            style={{ maxHeight: 280 }}
-            playsInline muted autoPlay
-          />
+          {/* video SIEMPRE en el DOM — useEffect lo conecta al stream */}
+          <video ref={liveVideoRef} className="w-full block" style={{ maxHeight: 280 }} playsInline muted autoPlay />
 
-          {/* Spinner mientras carga */}
           {!liveReady && !liveError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+            <div className="absolute inset-0 flex items-center justify-center bg-black/80">
               <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full" />
             </div>
           )}
-
-          {/* Overlay de encuadre cuando está listo */}
           {liveReady && (
             <div className="absolute inset-0 pointer-events-none">
               <div className="absolute inset-0 bg-black/40" />
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-                style={{ width:"78%", height:"28%",
-                  boxShadow:"0 0 0 9999px rgba(0,0,0,0.45)",
+                style={{ width:"78%", height:"28%", boxShadow:"0 0 0 9999px rgba(0,0,0,0.45)",
                   border:"2px solid rgba(99,102,241,0.9)", borderRadius:6 }}>
                 <div className="absolute left-2 right-2 h-px bg-primary/80 animate-bounce" style={{ top:"50%" }} />
               </div>
@@ -309,20 +310,17 @@ function BarcodeScanner({ onDetected, onClose }) {
               </p>
             </div>
           )}
-
-          {/* Error */}
           {liveError && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 p-4">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/85 p-4">
               <CameraOff className="h-8 w-8 text-red-400" />
               <p className="text-xs text-red-300 text-center">{liveError}</p>
               <Button size="sm" variant="outline" className="gap-2 bg-white/10 text-white border-white/20"
-                onClick={() => { _stopLive(); setPhotoError(null); setPhotoReady(false); setPhotoStep("cam"); setPreviewSrc(null); setScreen("photo"); }}>
+                onClick={() => { _stopLive(); setPhotoStep("cam"); setPreviewSrc(null); setDetectedCode(""); setPhotoError(null); setScreen("photo"); }}>
                 <Camera className="h-4 w-4" /> Usar modo Foto
               </Button>
             </div>
           )}
         </div>
-
         <Button variant="outline" size="sm" className="w-full" onClick={() => { _stopLive(); onClose(); }}>
           <X className="h-4 w-4 mr-1" /> Cancelar
         </Button>
@@ -335,18 +333,18 @@ function BarcodeScanner({ onDetected, onClose }) {
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between mb-1">
-          <button onClick={() => { _stopPhoto(); setScreen("menu"); setPhotoStep("cam"); setPreviewSrc(null); setPhotoReady(false); }}
-            className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground">
+          <button onClick={_goMenu} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground">
             <ArrowLeft className="h-3.5 w-3.5" /> Menú
           </button>
           <span className="text-xs font-semibold">
-            {photoStep === "cam" && "Encuadra la etiqueta"}
-            {photoStep === "preview" && "Confirmar foto"}
+            {photoStep === "cam"        && "Encuadra la etiqueta"}
+            {photoStep === "preview"    && "Confirmar foto"}
             {photoStep === "processing" && "Analizando..."}
+            {photoStep === "result"     && "Número detectado"}
           </span>
         </div>
 
-        {/* ── SUB-PASO: cámara ── */}
+        {/* ── PASO 1: cámara ── */}
         {photoStep === "cam" && (
           <div className="space-y-2">
             {photoError && (
@@ -354,30 +352,19 @@ function BarcodeScanner({ onDetected, onClose }) {
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />{photoError}
               </div>
             )}
-
-            {/* <video> siempre en DOM — useEffect lo conecta */}
             <div className="relative rounded-xl overflow-hidden bg-black border" style={{ minHeight: 230 }}>
-              <video
-                ref={photoVideoRef}
-                className="w-full block"
-                style={{ maxHeight: 300 }}
-                playsInline muted autoPlay
-              />
-
-              {/* Spinner mientras carga */}
+              {/* video SIEMPRE en el DOM — useEffect lo conecta */}
+              <video ref={photoVideoRef} className="w-full block" style={{ maxHeight: 300 }} playsInline muted autoPlay />
               {!photoReady && !photoError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/80">
                   <div className="animate-spin h-10 w-10 border-4 border-yellow-400 border-t-transparent rounded-full" />
                 </div>
               )}
-
-              {/* Marco guía cuando está lista */}
               {photoReady && (
                 <div className="absolute inset-0 pointer-events-none">
                   <div className="absolute inset-0 bg-black/30" />
                   <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-                    style={{ width:"84%", height:"42%",
-                      boxShadow:"0 0 0 9999px rgba(0,0,0,0.35)",
+                    style={{ width:"84%", height:"42%", boxShadow:"0 0 0 9999px rgba(0,0,0,0.35)",
                       border:"2px solid rgba(234,179,8,0.9)", borderRadius:6 }} />
                   <p className="absolute bottom-2 left-0 right-0 text-center text-xs text-white/90">
                     Centra la etiqueta en el recuadro y toca Capturar
@@ -385,30 +372,21 @@ function BarcodeScanner({ onDetected, onClose }) {
                 </div>
               )}
             </div>
-
-            <Button
-              className="w-full h-11 gap-2"
-              disabled={!photoReady}
-              onClick={capturePhoto}
-            >
+            <Button className="w-full h-11 gap-2" disabled={!photoReady} onClick={capturePhoto}>
               <Camera className="h-5 w-5" />
               {photoReady ? "Capturar foto" : "Iniciando cámara..."}
             </Button>
           </div>
         )}
 
-        {/* ── SUB-PASO: preview ── */}
+        {/* ── PASO 2: preview ── */}
         {photoStep === "preview" && (
           <div className="space-y-3">
-            {previewSrc && (
-              <img src={previewSrc} alt="Etiqueta" className="w-full rounded-xl border object-contain max-h-52" />
-            )}
-            <p className="text-xs text-muted-foreground text-center">
-              ¿La etiqueta se ve clara? Si es así, analízala.
-            </p>
+            {previewSrc && <img src={previewSrc} alt="Etiqueta" className="w-full rounded-xl border object-contain max-h-52" />}
+            <p className="text-xs text-muted-foreground text-center">¿La etiqueta se ve clara y completa?</p>
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" className="gap-1" onClick={() => { setPreviewSrc(null); setPhotoStep("cam"); }}>
-                <Camera className="h-4 w-4" /> Nueva foto
+              <Button variant="outline" className="gap-1" onClick={() => { setPreviewSrc(null); capturedB64.current = null; setPhotoStep("cam"); }}>
+                <Camera className="h-4 w-4" /> Repetir foto
               </Button>
               <Button className="gap-1" onClick={analyzePhoto}>
                 <Scan className="h-4 w-4" /> Analizar
@@ -417,7 +395,7 @@ function BarcodeScanner({ onDetected, onClose }) {
           </div>
         )}
 
-        {/* ── SUB-PASO: procesando ── */}
+        {/* ── PASO 3: procesando ── */}
         {photoStep === "processing" && (
           <div className="flex flex-col items-center justify-center py-10 gap-4">
             <div className="relative">
@@ -426,7 +404,48 @@ function BarcodeScanner({ onDetected, onClose }) {
             </div>
             <div className="text-center">
               <p className="font-semibold text-sm">Analizando etiqueta...</p>
-              <p className="text-xs text-muted-foreground mt-1">La IA está leyendo el código</p>
+              <p className="text-xs text-muted-foreground mt-1">La IA está leyendo el número</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── PASO 4: resultado — editable antes de confirmar ── */}
+        {photoStep === "result" && (
+          <div className="space-y-3">
+            {previewSrc && <img src={previewSrc} alt="Etiqueta" className="w-full rounded-xl border object-contain max-h-36" />}
+
+            {photoError ? (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700">{photoError}</p>
+              </div>
+            ) : (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-green-700">Número detectado. Verifica que sea correcto o edítalo.</p>
+              </div>
+            )}
+
+            {/* Campo editable — usuario puede corregir si la IA se equivocó */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Código / Número de activo</label>
+              <input
+                type="text"
+                value={detectedCode}
+                onChange={e => setDetectedCode(e.target.value)}
+                placeholder="Escribe o edita el número..."
+                className="w-full border rounded-lg px-3 py-2.5 font-mono text-lg text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-primary"
+                autoFocus
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" className="gap-1" onClick={() => { setPreviewSrc(null); capturedB64.current = null; setDetectedCode(""); setPhotoError(null); setPhotoStep("cam"); }}>
+                <Camera className="h-4 w-4" /> Nueva foto
+              </Button>
+              <Button className="gap-1" disabled={!detectedCode.trim()} onClick={confirmCode}>
+                <CheckCircle className="h-4 w-4" /> Usar este código
+              </Button>
             </div>
           </div>
         )}
