@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ============ PROFESSIONAL LIGHT ============ */
+  :root {
+    --background: 220 20% 97%;
+    --foreground: 220 30% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 30% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 30% 15%;
+    --primary: 220 70% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 15% 92%;
+    --secondary-foreground: 220 30% 15%;
+    --muted: 220 15% 94%;
+    --muted-foreground: 220 10% 50%;
+    --accent: 220 70% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 15% 90%;
+    --input: 220 15% 90%;
+    --ring: 220 70% 50%;
+    --radius: 0.5rem;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 0 72% 51%;
+    --chart-5: 280 60% 55%;
+    --success: 160 60% 40%;
+    --warning: 38 92% 50%;
+  }
+
+  /* ============ PROFESSIONAL DARK ============ */
+  .dark {
+    --background: 224 30% 8%;
+    --foreground: 220 15% 92%;
+    --card: 224 25% 11%;
+    --card-foreground: 220 15% 92%;
+    --popover: 224 25% 11%;
+    --popover-foreground: 220 15% 92%;
+    --primary: 217 80% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 224 20% 18%;
+    --secondary-foreground: 220 15% 85%;
+    --muted: 224 20% 16%;
+    --muted-foreground: 220 10% 55%;
+    --accent: 217 80% 60%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 224 18% 18%;
+    --input: 224 18% 18%;
+    --ring: 217 80% 60%;
+    --chart-1: 217 80% 60%;
+    --chart-2: 160 55% 50%;
+    --chart-3: 38 80% 55%;
+    --chart-4: 0 65% 55%;
+    --chart-5: 280 55% 60%;
+    --success: 160 55% 50%;
+    --warning: 38 80% 55%;
+  }
+
+  /* ============ OXXO LIGHT ============ */
+  [data-palette="oxxo"] {
+    --background: 40 30% 97%;
+    --foreground: 0 0% 12%;
+    --card: 40 40% 99%;
+    --card-foreground: 0 0% 12%;
+    --popover: 40 40% 99%;
+    --popover-foreground: 0 0% 12%;
+    --primary: 354 70% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 44 95% 52%;
+    --secondary-foreground: 0 0% 8%;
+    --muted: 35 20% 93%;
+    --muted-foreground: 0 0% 42%;
+    --accent: 354 70% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 60% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 35 15% 88%;
+    --input: 35 15% 88%;
+    --ring: 354 70% 45%;
+    --chart-1: 354 70% 45%;
+    --chart-2: 44 95% 52%;
+    --chart-3: 160 55% 42%;
+    --chart-4: 220 65% 50%;
+    --chart-5: 280 55% 50%;
+    --success: 160 55% 42%;
+    --warning: 44 95% 52%;
+  }
+
+  /* ============ OXXO DARK ============ */
+  .dark[data-palette="oxxo"] {
+    --background: 0 5% 9%;
+    --foreground: 35 20% 92%;
+    --card: 0 5% 13%;
+    --card-foreground: 35 20% 92%;
+    --popover: 0 5% 13%;
+    --popover-foreground: 35 20% 92%;
+    --primary: 354 75% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 44 90% 50%;
+    --secondary-foreground: 0 0% 8%;
+    --muted: 0 5% 17%;
+    --muted-foreground: 35 10% 55%;
+    --accent: 354 75% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 5% 20%;
+    --input: 0 5% 20%;
+    --ring: 354 75% 55%;
+    --chart-1: 354 75% 55%;
+    --chart-2: 44 90% 50%;
+    --chart-3: 160 50% 48%;
+    --chart-4: 217 70% 60%;
+    --chart-5: 280 55% 58%;
+    --success: 160 50% 48%;
+    --warning: 44 90% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Manrope', sans-serif;
+  }
+}
+
+@layer base {
+  [data-debug-wrapper="true"] {
+    display: contents !important;
+  }
+  [data-debug-wrapper="true"] > * {
+    margin-left: inherit; margin-right: inherit;
+    margin-top: inherit; margin-bottom: inherit;
+    padding-left: inherit; padding-right: inherit;
+    padding-top: inherit; padding-bottom: inherit;
+    column-gap: inherit; row-gap: inherit; gap: inherit;
+    border-left-width: inherit; border-right-width: inherit;
+    border-top-width: inherit; border-bottom-width: inherit;
+    border-left-style: inherit; border-right-style: inherit;
+    border-top-style: inherit; border-bottom-style: inherit;
+    border-left-color: inherit; border-right-color: inherit;
+    border-top-color: inherit; border-bottom-color: inherit;
+  }
+}
