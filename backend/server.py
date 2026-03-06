@@ -591,6 +591,67 @@ class MovementInputExtended(BaseModel):
     to_cr_tienda: Optional[str] = None
     extra_data: Optional[dict] = None
 
+class ScanImageInput(BaseModel):
+    image_base64: str
+
+@api_router.post("/scan-image")
+async def scan_image_barcode(input: ScanImageInput, user=Depends(get_current_user)):
+    """
+    Receive base64 image from mobile camera, use Gemini Vision to extract
+    the barcode number from an equipment label.
+    Image processed in memory only — never saved to disk.
+    """
+    try:
+        import base64 as _b64
+        import re as _re
+
+        gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
+        if not gemini_key:
+            raise HTTPException(status_code=503, detail="Servicio de lectura de imagen no configurado. Agrega GEMINI_API_KEY en variables de entorno de Railway.")
+
+        image_data = input.image_base64
+        if "," in image_data:
+            image_data = image_data.split(",", 1)[1]
+        try:
+            image_bytes = _b64.b64decode(image_data)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Imagen invalida o mal formateada")
+
+        import google.generativeai as genai
+        from PIL import Image
+        import io
+
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        img = Image.open(io.BytesIO(image_bytes))
+
+        prompt = (
+            "Esta es una etiqueta de activo fijo de una empresa. "
+            "Lee el NUMERO que aparece debajo o encima del codigo de barras en la etiqueta. "
+            "El numero generalmente es de 8 digitos, ejemplo: 03739671, 04847556. "
+            "Responde UNICAMENTE con el numero, sin espacios ni texto adicional. "
+            "Si no puedes leer ningun numero, responde exactamente: NO_DETECTADO"
+        )
+
+        response = model.generate_content([prompt, img])
+        raw = (response.text or "").strip()
+        cleaned = _re.sub(r"[^A-Za-z0-9]", "", raw)
+
+        if not cleaned or cleaned.upper() == "NODETECTADO":
+            raise HTTPException(
+                status_code=422,
+                detail="No se detecto numero en la imagen. Intenta con mejor iluminacion o acercate mas a la etiqueta."
+            )
+
+        logger.info(f"scan-image detected: '{cleaned}'")
+        return {"barcode": cleaned, "raw": raw}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"scan-image error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error al procesar imagen: {str(e)}")
+
 @api_router.post("/audits/{audit_id}/photos")
 async def upload_audit_photos(audit_id: str, photo_ab: Optional[UploadFile] = File(None), photo_transf: Optional[UploadFile] = File(None), user=Depends(get_current_user)):
     audit = await db.audits.find_one({"id": audit_id}, {"_id": 0})
