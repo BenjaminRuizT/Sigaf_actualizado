@@ -467,23 +467,25 @@ async def register_unknown_surplus(audit_id: str, input: UnknownSurplusInput, us
         "registered_at": now_iso, "registered_by": user["nombre"]
     }
     await db.equipment.insert_one(new_eq)
+    # Strip MongoDB _id (ObjectId) added in-place by insert_one — not JSON serializable
+    new_eq_clean = {k: v for k, v in new_eq.items() if k != "_id"}
     # Update the existing sobrante_desconocido scan
     await db.audit_scans.update_one(
         {"audit_id": audit_id, "codigo_barras": input.codigo_barras.strip(), "classification": "sobrante_desconocido"},
-        {"$set": {"equipment_id": new_eq["id"], "equipment_data": new_eq, "registered_manually": True}}
+        {"$set": {"equipment_id": new_eq_clean["id"], "equipment_data": new_eq_clean, "registered_manually": True}}
     )
     # Create ALTA movement
     alta_movement = {
-        "id": str(uuid.uuid4()), "audit_id": audit_id, "equipment_id": new_eq["id"],
+        "id": str(uuid.uuid4()), "audit_id": audit_id, "equipment_id": new_eq_clean["id"],
         "type": "alta", "from_cr_tienda": None, "to_cr_tienda": cr_tienda,
         "status": "pending", "created_at": now_iso,
         "created_by": user["nombre"], "created_by_id": user["sub"],
-        "equipment_data": new_eq, "from_tienda": None, "to_tienda": audit["tienda"],
+        "equipment_data": new_eq_clean, "from_tienda": None, "to_tienda": audit["tienda"],
         "plaza": audit.get("plaza", "")
     }
     await db.movements.insert_one(alta_movement)
     await db.stores.update_one({"cr_tienda": cr_tienda}, {"$inc": {"total_equipment": 1}})
-    return {"message": "Equipo registrado como ALTA", "equipment": new_eq, "movement": {k: v for k, v in alta_movement.items() if k != "_id"}}
+    return {"message": "Equipo registrado como ALTA", "equipment": new_eq_clean, "movement": {k: v for k, v in alta_movement.items() if k != "_id"}}
 
 @api_router.get("/audits/{audit_id}/summary")
 async def get_audit_summary(audit_id: str, user=Depends(get_current_user)):
