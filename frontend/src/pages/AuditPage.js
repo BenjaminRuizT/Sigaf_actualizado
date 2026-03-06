@@ -553,17 +553,23 @@ export default function AuditPage() {
     try {
       const res = await api.post(`/audits/${auditId}/register-unknown-surplus`, { ...unknownForm });
       const { equipment, movement } = res.data;
-      // Update the scan in local state with the registered data
+      // Update scan in local state — match by barcode only (classification may vary)
       setScans(prev => prev.map(s =>
-        s.codigo_barras === unknownForm.codigo_barras && s.classification === "sobrante_desconocido"
-          ? { ...s, equipment_id: equipment.id, equipment_data: equipment, registered_manually: true }
+        s.codigo_barras === unknownForm.codigo_barras
+          ? { ...s, equipment_id: equipment.id, equipment_data: equipment, registered_manually: true, classification: "sobrante_desconocido" }
           : s
       ));
       toast.success(`Equipo registrado: ${equipment.descripcion} · ${equipment.marca} ${equipment.modelo}`);
       setUnknownSurplusDialog(null);
       setUnknownForm({ codigo_barras: "", descripcion: "", marca: "", modelo: "" });
     } catch (err) {
-      toast.error(err.response?.data?.detail || t("common.error"));
+      // Handle FastAPI validation errors (array) and string errors
+      const detail = err.response?.data?.detail;
+      let msg = "Error al registrar el equipo";
+      if (typeof detail === "string") msg = detail;
+      else if (Array.isArray(detail)) msg = detail.map(d => d.msg || d.message || JSON.stringify(d)).join(", ");
+      else if (err.message) msg = err.message;
+      toast.error(msg);
     } finally {
       setSavingUnknown(false);
     }
@@ -598,7 +604,13 @@ export default function AuditPage() {
       } else {
         toast.success(t("audit.auditCompleted"));
       }
-    } catch (err) { toast.error(err.response?.data?.detail || t("common.error")); }
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      let msg = "Error al finalizar la auditoría";
+      if (typeof detail === "string") msg = detail;
+      else if (Array.isArray(detail)) msg = detail.map(d => d.msg || JSON.stringify(d)).join(", ");
+      toast.error(msg);
+    }
   };
 
   const handleSaveNotes = async () => {
