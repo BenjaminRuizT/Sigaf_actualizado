@@ -49,7 +49,67 @@ function useSortable(defaultKey, defaultDir = "asc") {
   return { sorted, SortHeader };
 }
 
-// Photo capture component — uses camera only, no gallery
+// ── QR/Barcode Scanner Component using html5-qrcode ──
+function BarcodeScanner({ onDetected, onClose }) {
+  const containerRef = useRef(null);
+  const scannerRef = useRef(null);
+  const [error, setError] = useState(null);
+  const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    let html5QrCode = null;
+    const startScanner = async () => {
+      try {
+        const { Html5Qrcode } = await import("html5-qrcode");
+        html5QrCode = new Html5Qrcode("qr-reader-container");
+        scannerRef.current = html5QrCode;
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 15, qrbox: { width: 250, height: 150 }, aspectRatio: 1.5 },
+          (decodedText) => {
+            html5QrCode.stop().catch(() => {});
+            onDetected(decodedText.trim());
+          },
+          () => {} // ignore errors during scan frames
+        );
+        setStarted(true);
+      } catch (err) {
+        setError("No se pudo acceder a la cámara. Verifica los permisos del navegador.");
+      }
+    };
+    startScanner();
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current.clear().catch(() => {});
+      }
+    };
+  }, [onDetected]);
+
+  return (
+    <div className="space-y-3">
+      <div className="relative rounded-lg overflow-hidden border border-primary/30 bg-black" style={{ minHeight: 220 }}>
+        <div id="qr-reader-container" ref={containerRef} style={{ width: "100%" }} />
+        {!started && !error && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+          </div>
+        )}
+        {started && (
+          <div className="absolute bottom-2 left-0 right-0 text-center pointer-events-none">
+            <span className="text-xs text-white bg-black/60 px-3 py-1 rounded-full">Apunta al código de barras del dispositivo</span>
+          </div>
+        )}
+      </div>
+      {error && <p className="text-xs text-red-500 flex items-center gap-1"><CameraOff className="h-3.5 w-3.5" />{error}</p>}
+      <Button variant="outline" className="w-full" onClick={onClose}>
+        <CameraOff className="h-4 w-4 mr-2" /> Cerrar cámara
+      </Button>
+    </div>
+  );
+}
+
+// ── Photo capture component — camera only, no gallery ──
 function PhotoCapture({ label, icon, onCapture, captured, testId }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -65,7 +125,6 @@ function PhotoCapture({ label, icon, onCapture, captured, testId }) {
       });
       streamRef.current = stream;
       setCameraOpen(true);
-      // give DOM time to render video element
       setTimeout(() => {
         if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
       }, 100);
@@ -102,33 +161,26 @@ function PhotoCapture({ label, icon, onCapture, captured, testId }) {
             <Camera className="h-4 w-4" /> Volver a tomar foto
           </Button>
         </div>
-      ) : (
+      ) : !cameraOpen ? (
         <div>
-          {!cameraOpen ? (
-            <div>
-              <Button variant="outline" className="w-full h-24 flex-col gap-2 border-dashed border-2" onClick={startCam} data-testid={`${testId}-open-cam`}>
-                <Camera className="h-8 w-8 opacity-50" />
-                <span className="text-sm">Tomar foto con cámara</span>
-              </Button>
-              {camError && <p className="text-xs text-red-500 mt-1">{camError}</p>}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="relative rounded-lg overflow-hidden bg-black border">
-                <video ref={videoRef} className="w-full" style={{ maxHeight: 240 }} playsInline muted autoPlay />
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="border-2 border-white/80 rounded-lg" style={{ width: "80%", height: "60%", boxShadow: "0 0 0 9999px rgba(0,0,0,0.4)" }} />
-                </div>
-              </div>
-              <canvas ref={canvasRef} className="hidden" />
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={stopCam}>Cancelar</Button>
-                <Button className="flex-1 gap-2" onClick={capture} data-testid={`${testId}-capture`}>
-                  <Camera className="h-4 w-4" /> Capturar
-                </Button>
-              </div>
-            </div>
-          )}
+          <Button variant="outline" className="w-full h-24 flex-col gap-2 border-dashed border-2" onClick={startCam} data-testid={`${testId}-open-cam`}>
+            <Camera className="h-8 w-8 opacity-50" />
+            <span className="text-sm">Tomar foto con cámara</span>
+          </Button>
+          {camError && <p className="text-xs text-red-500 mt-1">{camError}</p>}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="relative rounded-lg overflow-hidden bg-black border" style={{ minHeight: 200 }}>
+            <video ref={videoRef} className="w-full" style={{ maxHeight: 240, display: "block" }} playsInline muted autoPlay />
+          </div>
+          <canvas ref={canvasRef} className="hidden" />
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={stopCam}>Cancelar</Button>
+            <Button className="flex-1 gap-2" onClick={capture} data-testid={`${testId}-capture`}>
+              <Camera className="h-4 w-4" /> Capturar
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -141,8 +193,6 @@ export default function AuditPage() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const inputRef = useRef(null);
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
 
   const { isOnline, syncing, addToQueue, getQueueForAudit, syncQueue, removeFromQueue } = useOfflineSync(api);
 
@@ -169,11 +219,11 @@ export default function AuditPage() {
 
   // Camera barcode scanner
   const [cameraActive, setCameraActive] = useState(false);
-  const [cameraError, setCameraError] = useState(null);
 
   // Unknown surplus
   const [unknownSurplusDialog, setUnknownSurplusDialog] = useState(null);
   const [unknownForm, setUnknownForm] = useState({ codigo_barras: "", descripcion: "", marca: "", modelo: "" });
+  const [savingUnknown, setSavingUnknown] = useState(false);
   const unknownDescOptions = ["COMPUTADORA","LAPTOP","IMPRESORA","MONITOR","SERVIDOR","SWITCH","ROUTER","UPS","SCANNER","TABLET","PROYECTOR","TELEFONO IP","CAMARA","DVR/NVR","DISCO DURO EXTERNO","ACCESS POINT","IMPRESORA FISCAL","TECLADO/MOUSE","OTRO"];
   const unknownMarcaOptions = ["EPSON","HP","DELL","LENOVO","ACER","ASUS","SAMSUNG","LG","CISCO","BROTHER","CANON","ZEBRA","HONEYWELL","APC","TOSHIBA","APPLE","HUAWEI","OTRO"];
 
@@ -223,48 +273,8 @@ export default function AuditPage() {
     }
   }, [isOnline, audit?.status, offlineQueue.length, syncing, syncQueue, auditId]);
 
-  useEffect(() => { return () => stopCamera(); }, []);
-
-  // ── Camera barcode scanner ──
-  const stopCamera = () => {
-    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
-    if (videoRef.current) { videoRef.current.srcObject = null; }
-    setCameraActive(false);
-  };
-
-  const startCamera = async () => {
-    setCameraError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      streamRef.current = stream;
-      setCameraActive(true);
-      setTimeout(() => {
-        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
-      }, 100);
-      startBarcodeLoop(stream);
-    } catch {
-      setCameraError("No se pudo acceder a la cámara. Verifica los permisos del navegador.");
-    }
-  };
-
-  const startBarcodeLoop = async (stream) => {
-    try {
-      const { BrowserMultiFormatReader } = await import("@zxing/library");
-      const reader = new BrowserMultiFormatReader();
-      reader.decodeFromStream(stream, videoRef.current, (result, err) => {
-        if (result && result.getText()) {
-          const text = result.getText().trim();
-          reader.reset();
-          stopCamera();
-          setBarcode(text);
-          setTimeout(() => performScan(text).then(() => setBarcode("")), 300);
-        }
-      });
-    } catch { /* ZXing unavailable */ }
-  };
-
   // ── Scan Logic ──
-  const performScan = async (bc) => {
+  const performScan = useCallback(async (bc) => {
     if (!bc || scanning) return;
     setScanning(true);
     if (!navigator.onLine) {
@@ -286,6 +296,7 @@ export default function AuditPage() {
       } else if (status === "sobrante_desconocido") {
         setFlashClass("flash-error"); toast.warning(`${t("audit.surplusUnknown")}: ${bc}`);
         setAudit(p => p ? { ...p, surplus_count: (p.surplus_count || 0) + 1 } : p);
+        // Open registration dialog immediately with the barcode
         setUnknownForm({ codigo_barras: bc, descripcion: "", marca: "", modelo: "" });
         setUnknownSurplusDialog(scan);
       } else if (status === "already_scanned") { toast.info(t("audit.alreadyScanned")); }
@@ -298,9 +309,16 @@ export default function AuditPage() {
       setScanning(false);
       if (inputRef.current && !cameraActive) inputRef.current.focus();
     }
-  };
+  }, [scanning, api, auditId, t, addToQueue, cameraActive]);
 
   const handleScan = async () => { const bc = barcode.trim(); if (!bc) return; await performScan(bc); setBarcode(""); };
+
+  const handleCameraDetected = useCallback(async (detectedBarcode) => {
+    setCameraActive(false);
+    setBarcode(detectedBarcode);
+    await performScan(detectedBarcode);
+    setBarcode("");
+  }, [performScan]);
 
   const handleDeleteScan = async (scanId) => {
     try {
@@ -328,12 +346,27 @@ export default function AuditPage() {
   };
 
   const handleRegisterUnknown = async () => {
-    if (!unknownForm.descripcion || !unknownForm.marca || !unknownForm.modelo) { toast.error("Completa todos los campos obligatorios"); return; }
+    if (!unknownForm.descripcion || !unknownForm.marca || !unknownForm.modelo) {
+      toast.error("Completa todos los campos obligatorios"); return;
+    }
+    setSavingUnknown(true);
     try {
-      await api.post(`/audits/${auditId}/register-unknown-surplus`, { ...unknownForm });
-      toast.success("Equipo registrado como ALTA en la tienda"); setUnknownSurplusDialog(null);
-      await fetchScans();
-    } catch (err) { toast.error(err.response?.data?.detail || t("common.error")); }
+      const res = await api.post(`/audits/${auditId}/register-unknown-surplus`, { ...unknownForm });
+      const { equipment, movement } = res.data;
+      // Update the scan in local state with the registered data
+      setScans(prev => prev.map(s =>
+        s.codigo_barras === unknownForm.codigo_barras && s.classification === "sobrante_desconocido"
+          ? { ...s, equipment_id: equipment.id, equipment_data: equipment, registered_manually: true }
+          : s
+      ));
+      toast.success(`Equipo registrado: ${equipment.descripcion} · ${equipment.marca} ${equipment.modelo}`);
+      setUnknownSurplusDialog(null);
+      setUnknownForm({ codigo_barras: "", descripcion: "", marca: "", modelo: "" });
+    } catch (err) {
+      toast.error(err.response?.data?.detail || t("common.error"));
+    } finally {
+      setSavingUnknown(false);
+    }
   };
 
   const handleCancelAudit = async () => {
@@ -374,26 +407,20 @@ export default function AuditPage() {
   };
 
   const handleSavePhotos = async () => {
-    // Validate required photos
     if (pendingFinalize?.hasAB && !photoABCapture) {
-      toast.error("Debes tomar la foto del formato de ALTAS/BAJAS antes de continuar");
-      return;
+      toast.error("Debes tomar la foto del formato de ALTAS/BAJAS antes de continuar"); return;
     }
     if (pendingFinalize?.hasTransf && !photoTransfCapture) {
-      toast.error("Debes tomar la foto del formato de TRANSFERENCIAS antes de continuar");
-      return;
+      toast.error("Debes tomar la foto del formato de TRANSFERENCIAS antes de continuar"); return;
     }
     try {
-      // Convert base64 to blob and upload
       const fd = new FormData();
       if (photoABCapture) {
-        const res = await fetch(photoABCapture);
-        const blob = await res.blob();
+        const res = await fetch(photoABCapture); const blob = await res.blob();
         fd.append("photo_ab", blob, "foto_ab.jpg");
       }
       if (photoTransfCapture) {
-        const res = await fetch(photoTransfCapture);
-        const blob = await res.blob();
+        const res = await fetch(photoTransfCapture); const blob = await res.blob();
         fd.append("photo_transf", blob, "foto_transf.jpg");
       }
       fd.append("audit_id", auditId);
@@ -414,23 +441,21 @@ export default function AuditPage() {
   const totalEq = audit?.total_equipment || 0;
   const realTimeNotFound = Math.max(0, totalEq - locatedCount);
   const userScans = scans.filter(s => s.scanned_by !== "system");
-
-  // Unknown surplus scans that haven't been registered yet
   const unknownPendingScans = userScans.filter(s => s.classification === "sobrante_desconocido" && !s.registered_manually);
 
   return (
     <div className={`space-y-4 ${flashClass}`} data-testid="audit-page">
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/")} data-testid="audit-back-btn"><ArrowLeft className="h-5 w-5" /></Button>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="h-5 w-5" /></Button>
         <div className="flex-1 min-w-0">
           <h1 className="font-heading text-2xl md:text-3xl font-bold uppercase tracking-tight truncate">{audit?.tienda}</h1>
           <p className="text-sm text-muted-foreground">CR: {audit?.cr_tienda} &middot; {audit?.plaza}</p>
         </div>
         <div className="flex gap-2 flex-wrap justify-end">
-          <Button variant="outline" size="icon" onClick={() => setNotesDialog(true)} data-testid="notes-btn" title="Notas"><StickyNote className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" onClick={() => setNotesDialog(true)} title="Notas"><StickyNote className="h-4 w-4" /></Button>
           {isActive && (
-            <Button variant="outline" size="sm" onClick={() => setCancelDialog(true)} data-testid="cancel-audit-btn" className="gap-1.5 text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-950">
+            <Button variant="outline" size="sm" onClick={() => setCancelDialog(true)} className="gap-1.5 text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-950">
               <Ban className="h-4 w-4" /> Cancelar
             </Button>
           )}
@@ -449,40 +474,39 @@ export default function AuditPage() {
 
       {/* Scanner Input */}
       {isActive && (
-        <Card className="border-primary/30" data-testid="scanner-card">
+        <Card className="border-primary/30">
           <CardContent className="p-4 space-y-3">
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Scan className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-primary" />
                 <Input ref={inputRef} value={barcode} onChange={e => setBarcode(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleScan()}
-                  placeholder={t("audit.enterBarcode")} className="pl-11 h-14 text-lg font-mono scan-active"
+                  placeholder={t("audit.enterBarcode")} className="pl-11 h-14 text-lg font-mono"
                   data-testid="barcode-input" autoComplete="off" />
               </div>
-              <Button onClick={handleScan} disabled={scanning || !barcode.trim()} className="h-14 px-6" data-testid="scan-btn"><Scan className="h-5 w-5" /></Button>
-              <Button variant={cameraActive ? "destructive" : "outline"} className="h-14 px-4" onClick={cameraActive ? stopCamera : startCamera} data-testid="camera-btn" title={cameraActive ? "Cerrar cámara" : "Escanear con cámara"}>
+              <Button onClick={handleScan} disabled={scanning || !barcode.trim()} className="h-14 px-6"><Scan className="h-5 w-5" /></Button>
+              <Button
+                variant={cameraActive ? "destructive" : "outline"}
+                className="h-14 px-4"
+                onClick={() => setCameraActive(v => !v)}
+                title={cameraActive ? "Cerrar cámara" : "Escanear con cámara"}
+              >
                 {cameraActive ? <CameraOff className="h-5 w-5" /> : <Camera className="h-5 w-5" />}
               </Button>
             </div>
             {cameraActive && (
-              <div className="relative rounded-lg overflow-hidden bg-black border border-primary/30" style={{ minHeight: 200 }}>
-                <video ref={videoRef} className="w-full" style={{ maxHeight: 280, display: "block" }} playsInline muted autoPlay />
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="border-2 border-primary/80 rounded-lg animate-pulse" style={{ width: "75%", height: "38%", boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)" }} />
-                </div>
-                <div className="absolute bottom-2 left-0 right-0 text-center">
-                  <span className="text-xs text-white bg-black/60 px-3 py-1 rounded-full">Apunta al código de barras del dispositivo</span>
-                </div>
-              </div>
+              <BarcodeScanner
+                onDetected={handleCameraDetected}
+                onClose={() => setCameraActive(false)}
+              />
             )}
-            {cameraError && <p className="text-xs text-red-500 flex items-center gap-1"><CameraOff className="h-3.5 w-3.5" /> {cameraError}</p>}
           </CardContent>
         </Card>
       )}
 
       {/* Offline/Sync Banners */}
       {isActive && !isOnline && (
-        <Card className="border-amber-500/50 bg-amber-500/10" data-testid="offline-banner">
+        <Card className="border-amber-500/50 bg-amber-500/10">
           <CardContent className="p-3 flex items-center gap-3">
             <WifiOff className="h-5 w-5 text-amber-600 shrink-0" />
             <div className="flex-1"><p className="text-sm font-medium text-amber-700">Modo sin conexión</p><p className="text-xs text-amber-600/80">Los escaneos se guardarán localmente y se sincronizarán al recuperar la conexión</p></div>
@@ -525,7 +549,8 @@ export default function AuditPage() {
               {unknownPendingScans.map(scan => (
                 <div key={scan.id} className="flex items-center justify-between bg-orange-500/10 rounded px-2 py-1">
                   <span className="font-mono text-xs text-orange-700">{scan.codigo_barras}</span>
-                  <Button size="sm" variant="outline" className="h-6 text-xs gap-1 border-orange-400" onClick={() => { setUnknownForm({ codigo_barras: scan.codigo_barras, descripcion: "", marca: "", modelo: "" }); setUnknownSurplusDialog(scan); }}>
+                  <Button size="sm" variant="outline" className="h-6 text-xs gap-1 border-orange-400"
+                    onClick={() => { setUnknownForm({ codigo_barras: scan.codigo_barras, descripcion: "", marca: "", modelo: "" }); setUnknownSurplusDialog(scan); }}>
                     <PlusCircle className="h-3 w-3" /> Registrar
                   </Button>
                 </div>
@@ -539,15 +564,25 @@ export default function AuditPage() {
       {isActive && (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-            <TabsList><TabsTrigger value="scans">{t("audit.scanHistory")} ({userScans.length + offlineQueue.length})</TabsTrigger><TabsTrigger value="equipment">{t("audit.storeEquipment")} ({totalEq})</TabsTrigger></TabsList>
-            <Button variant="destructive" size="sm" onClick={() => setFinalizeDialog(true)} data-testid="finalize-btn" className="gap-2"><FileCheck className="h-4 w-4" /> {t("audit.finalize")}</Button>
+            <TabsList>
+              <TabsTrigger value="scans">{t("audit.scanHistory")} ({userScans.length + offlineQueue.length})</TabsTrigger>
+              <TabsTrigger value="equipment">{t("audit.storeEquipment")} ({totalEq})</TabsTrigger>
+            </TabsList>
+            <Button variant="destructive" size="sm" onClick={() => setFinalizeDialog(true)} data-testid="finalize-btn" className="gap-2">
+              <FileCheck className="h-4 w-4" /> {t("audit.finalize")}
+            </Button>
           </div>
           <TabsContent value="scans">
             <ScrollArea className="h-[400px]">
               <div className="space-y-2">
                 {offlineQueue.map((entry) => (
                   <Card key={entry.id} className="border-amber-500/30 bg-amber-500/5">
-                    <CardContent className="p-3 flex items-center gap-3"><CloudOff className="h-5 w-5 shrink-0 text-amber-500" /><div className="flex-1 min-w-0"><p className="font-mono text-sm font-medium">{entry.barcode}</p><p className="text-xs text-amber-600">Pendiente de sincronización</p></div><Badge variant="outline" className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/30">Offline</Badge><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeFromQueue(entry.id)}><X className="h-3.5 w-3.5 text-muted-foreground" /></Button></CardContent>
+                    <CardContent className="p-3 flex items-center gap-3">
+                      <CloudOff className="h-5 w-5 shrink-0 text-amber-500" />
+                      <div className="flex-1 min-w-0"><p className="font-mono text-sm font-medium">{entry.barcode}</p><p className="text-xs text-amber-600">Pendiente de sincronización</p></div>
+                      <Badge variant="outline" className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/30">Offline</Badge>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeFromQueue(entry.id)}><X className="h-3.5 w-3.5 text-muted-foreground" /></Button>
+                    </CardContent>
                   </Card>
                 ))}
                 {userScans.map((scan, i) => {
@@ -558,24 +593,37 @@ export default function AuditPage() {
                         <Icon className={`h-5 w-5 shrink-0 ${scan.classification==="localizado"?"text-emerald-500":scan.classification==="sobrante"?"text-amber-500":"text-orange-500"}`} />
                         <div className="flex-1 min-w-0">
                           <p className="font-mono text-sm font-medium">{scan.codigo_barras}</p>
-                          <p className="text-xs text-muted-foreground truncate">{scan.equipment_data?.descripcion||"—"}{scan.equipment_data?.marca?` · ${scan.equipment_data.marca}`:""}</p>
-                          {scan.classification === "sobrante_desconocido" && scan.registered_manually && (
-                            <p className="text-xs text-emerald-600 font-medium">✓ Registrado: {scan.equipment_data?.descripcion} · {scan.equipment_data?.marca}</p>
+                          {scan.registered_manually && scan.equipment_data ? (
+                            <p className="text-xs text-emerald-600 font-medium">
+                              ✓ {scan.equipment_data.descripcion} · {scan.equipment_data.marca} {scan.equipment_data.modelo}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {scan.equipment_data?.descripcion || (scan.classification === "sobrante_desconocido" ? "Pendiente de registrar" : "—")}
+                              {scan.equipment_data?.marca ? ` · ${scan.equipment_data.marca}` : ""}
+                            </p>
                           )}
                         </div>
                         <Badge className={`text-[10px] ${classColors[scan.classification]||""}`}>
                           {scan.classification==="localizado"?t("audit.located"):scan.classification==="sobrante"?t("audit.surplus"):t("audit.surplusUnknown")}
                         </Badge>
-                        {scan.classification==="sobrante" && <Button variant="outline" size="sm" onClick={()=>setTransferDialog(scan)}><ArrowRightLeft className="h-3.5 w-3.5"/></Button>}
+                        {scan.classification==="sobrante" && (
+                          <Button variant="outline" size="sm" onClick={()=>setTransferDialog(scan)}><ArrowRightLeft className="h-3.5 w-3.5"/></Button>
+                        )}
                         {scan.classification==="sobrante_desconocido" && !scan.registered_manually && (
-                          <Button variant="outline" size="sm" onClick={()=>{setUnknownForm({codigo_barras:scan.codigo_barras,descripcion:"",marca:"",modelo:""});setUnknownSurplusDialog(scan);}} title="Registrar equipo"><PlusCircle className="h-3.5 w-3.5"/></Button>
+                          <Button variant="outline" size="sm" className="border-orange-400"
+                            onClick={()=>{setUnknownForm({codigo_barras:scan.codigo_barras,descripcion:"",marca:"",modelo:""});setUnknownSurplusDialog(scan);}}>
+                            <PlusCircle className="h-3.5 w-3.5"/>
+                          </Button>
                         )}
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={()=>handleDeleteScan(scan.id)}><X className="h-3.5 w-3.5 text-muted-foreground"/></Button>
                       </CardContent>
                     </Card>
                   );
                 })}
-                {userScans.length===0&&offlineQueue.length===0&&<div className="text-center py-8 text-muted-foreground"><Scan className="h-10 w-10 mx-auto mb-2 opacity-30"/><p className="text-sm">{t("audit.scanOrType")}</p></div>}
+                {userScans.length===0&&offlineQueue.length===0&&(
+                  <div className="text-center py-8 text-muted-foreground"><Scan className="h-10 w-10 mx-auto mb-2 opacity-30"/><p className="text-sm">{t("audit.scanOrType")}</p></div>
+                )}
               </div>
             </ScrollArea>
           </TabsContent>
@@ -699,8 +747,8 @@ export default function AuditPage() {
           <div className="space-y-3">
             <div className="bg-muted rounded-lg p-3 space-y-1"><p className="text-xs text-muted-foreground uppercase">Auditoría</p><p className="text-sm font-medium">{audit?.tienda}</p><p className="text-xs text-muted-foreground">CR: {audit?.cr_tienda} · {audit?.plaza}</p></div>
             <div className="space-y-1.5">
-              <Label htmlFor="cancel-reason">Motivo de cancelación <span className="text-red-500">*</span></Label>
-              <Textarea id="cancel-reason" value={cancelReason} onChange={e=>setCancelReason(e.target.value)} placeholder="Describe el motivo de cancelación..." rows={3}/>
+              <Label>Motivo de cancelación <span className="text-red-500">*</span></Label>
+              <Textarea value={cancelReason} onChange={e=>setCancelReason(e.target.value)} placeholder="Describe el motivo de cancelación..." rows={3}/>
             </div>
           </div>
           <DialogFooter className="gap-2">
@@ -718,21 +766,44 @@ export default function AuditPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!unknownSurplusDialog} onOpenChange={()=>setUnknownSurplusDialog(null)}>
+      <Dialog open={!!unknownSurplusDialog} onOpenChange={(open) => { if (!open && !savingUnknown) setUnknownSurplusDialog(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle className="font-heading uppercase tracking-tight flex items-center gap-2"><PlusCircle className="h-5 w-5 text-orange-500"/>Sobrante Desconocido — Registrar ALTA</DialogTitle><DialogDescription>Este equipo no está en el MAF. Registra sus datos para catalogarlo como ALTA en {audit?.tienda}.</DialogDescription></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="font-heading uppercase tracking-tight flex items-center gap-2">
+              <PlusCircle className="h-5 w-5 text-orange-500"/>Sobrante Desconocido — Registrar ALTA
+            </DialogTitle>
+            <DialogDescription>Este equipo no está en el MAF. Registra sus datos para catalogarlo como ALTA en {audit?.tienda}.</DialogDescription>
+          </DialogHeader>
           <div className="space-y-4">
-            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3"><p className="text-xs text-muted-foreground uppercase mb-0.5">Código de barras detectado</p><p className="font-mono text-sm font-bold text-orange-600">{unknownSurplusDialog?.codigo_barras}</p></div>
-            <div className="space-y-1.5"><Label>Código de barras <span className="text-red-500">*</span></Label><Input value={unknownForm.codigo_barras} onChange={e=>setUnknownForm(f=>({...f,codigo_barras:e.target.value}))} placeholder="Código de barras"/></div>
+            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+              <p className="text-xs text-muted-foreground uppercase mb-0.5">Código de barras detectado</p>
+              <p className="font-mono text-sm font-bold text-orange-600">{unknownForm.codigo_barras}</p>
+            </div>
+            <div className="space-y-1.5"><Label>Código de barras <span className="text-red-500">*</span></Label>
+              <Input value={unknownForm.codigo_barras} onChange={e=>setUnknownForm(f=>({...f,codigo_barras:e.target.value}))} placeholder="Código de barras"/>
+            </div>
             <div className="space-y-1.5"><Label>Descripción del equipo <span className="text-red-500">*</span></Label>
-              <Select value={unknownForm.descripcion} onValueChange={v=>setUnknownForm(f=>({...f,descripcion:v}))}><SelectTrigger><SelectValue placeholder="Seleccionar tipo de equipo..."/></SelectTrigger><SelectContent>{unknownDescOptions.map(d=><SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select>
+              <Select value={unknownForm.descripcion} onValueChange={v=>setUnknownForm(f=>({...f,descripcion:v}))}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar tipo de equipo..."/></SelectTrigger>
+                <SelectContent>{unknownDescOptions.map(d=><SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5"><Label>Marca <span className="text-red-500">*</span></Label>
-              <Select value={unknownForm.marca} onValueChange={v=>setUnknownForm(f=>({...f,marca:v}))}><SelectTrigger><SelectValue placeholder="Seleccionar marca..."/></SelectTrigger><SelectContent>{unknownMarcaOptions.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select>
+              <Select value={unknownForm.marca} onValueChange={v=>setUnknownForm(f=>({...f,marca:v}))}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar marca..."/></SelectTrigger>
+                <SelectContent>{unknownMarcaOptions.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+              </Select>
             </div>
-            <div className="space-y-1.5"><Label>Modelo <span className="text-red-500">*</span></Label><Input value={unknownForm.modelo} onChange={e=>setUnknownForm(f=>({...f,modelo:e.target.value}))} placeholder="Ej. FX890II, LaserJet Pro..."/></div>
+            <div className="space-y-1.5"><Label>Modelo <span className="text-red-500">*</span></Label>
+              <Input value={unknownForm.modelo} onChange={e=>setUnknownForm(f=>({...f,modelo:e.target.value}))} placeholder="Ej. FX890II, LaserJet Pro..."/>
+            </div>
           </div>
-          <DialogFooter className="gap-2"><Button variant="outline" onClick={()=>setUnknownSurplusDialog(null)}>{t("common.cancel")}</Button><Button onClick={handleRegisterUnknown} className="gap-2"><TrendingUp className="h-4 w-4"/>Registrar como ALTA</Button></DialogFooter>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={()=>setUnknownSurplusDialog(null)} disabled={savingUnknown}>{t("common.cancel")}</Button>
+            <Button onClick={handleRegisterUnknown} disabled={savingUnknown} className="gap-2">
+              <TrendingUp className="h-4 w-4"/>{savingUnknown ? "Registrando..." : "Registrar como ALTA"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -744,8 +815,14 @@ export default function AuditPage() {
             <p className="text-sm">{t("audit.equipment")}: <span className="font-mono font-bold">{totalEq}</span></p>
             <p className="text-sm text-amber-600">{t("audit.notFound")}: <span className="font-mono font-bold">{realTimeNotFound}</span></p>
             {realTimeNotFound>0&&<p className="text-xs text-muted-foreground">Los equipos no localizados serán dados de BAJA automáticamente.</p>}
+            {unknownPendingScans.length > 0 && (
+              <p className="text-sm text-orange-600 font-medium">⚠ {unknownPendingScans.length} sobrante(s) desconocido(s) sin registrar. Puedes finalizar igualmente.</p>
+            )}
           </div>
-          <DialogFooter className="gap-2"><Button variant="outline" onClick={()=>setFinalizeDialog(false)}>{t("common.cancel")}</Button><Button variant="destructive" onClick={handleFinalizeCheck} className="gap-2"><FileCheck className="h-4 w-4"/>{t("audit.finalize")}</Button></DialogFooter>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={()=>setFinalizeDialog(false)}>{t("common.cancel")}</Button>
+            <Button variant="destructive" onClick={handleFinalizeCheck} className="gap-2"><FileCheck className="h-4 w-4"/>{t("audit.finalize")}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -773,7 +850,7 @@ export default function AuditPage() {
               <Camera className="h-5 w-5 text-primary" /> Foto de Formato de Movimiento
             </DialogTitle>
             <DialogDescription>
-              Se detectaron movimientos. Es <strong>obligatorio</strong> tomar foto del formato de movimiento de activo correspondiente para poder finalizar.
+              Es <strong>obligatorio</strong> tomar foto del formato de movimiento de activo para poder finalizar.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5">
@@ -799,12 +876,8 @@ export default function AuditPage() {
           <DialogFooter>
             <Button
               onClick={handleSavePhotos}
-              data-testid="save-photos-btn"
               className="w-full gap-2"
-              disabled={
-                (pendingFinalize?.hasAB && !photoABCapture) ||
-                (pendingFinalize?.hasTransf && !photoTransfCapture)
-              }
+              disabled={(pendingFinalize?.hasAB && !photoABCapture) || (pendingFinalize?.hasTransf && !photoTransfCapture)}
             >
               <Camera className="h-4 w-4" /> Guardar Fotos y Finalizar
             </Button>
