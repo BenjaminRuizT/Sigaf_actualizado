@@ -446,46 +446,98 @@ async def cancel_audit(audit_id: str, input: AuditCancelInput, user=Depends(get_
 
 @api_router.post("/audits/{audit_id}/register-unknown-surplus")
 async def register_unknown_surplus(audit_id: str, input: UnknownSurplusInput, user=Depends(get_current_user)):
-    audit = await db.audits.find_one({"id": audit_id}, {"_id": 0})
-    if not audit:
-        raise HTTPException(404, "Auditoría no encontrada")
-    if audit["status"] != "in_progress":
-        raise HTTPException(400, "Solo se puede registrar en auditorías activas")
-    now_iso = datetime.now(timezone.utc).isoformat()
-    cr_tienda = audit["cr_tienda"]
-    # Create new equipment record
-    new_eq = {
-        "id": str(uuid.uuid4()), "cr_plaza": audit.get("cr_plaza", ""),
-        "plaza": audit.get("plaza", ""), "cr_tienda": cr_tienda, "tienda": audit["tienda"],
-        "codigo_barras": input.codigo_barras.strip(), "no_activo": input.no_activo or "",
-        "mes_adquisicion": datetime.now().month, "año_adquisicion": datetime.now().year,
-        "factura": "", "costo": 0.0, "depreciacion": 0.0,
-        "vida_util": 0, "remanente": 0, "descripcion": input.descripcion.strip(),
-        "marca": input.marca.strip(), "modelo": input.modelo.strip(),
-        "serie": input.serie or "", "meses_transcurridos": 0, "vida_util_restante": 0,
-        "valor_real": 0.0, "depreciado": False, "alta_manual": True,
-        "registered_at": now_iso, "registered_by": user["nombre"]
-    }
-    await db.equipment.insert_one(new_eq)
-    # Strip MongoDB _id (ObjectId) added in-place by insert_one — not JSON serializable
-    new_eq_clean = {k: v for k, v in new_eq.items() if k != "_id"}
-    # Update the existing sobrante_desconocido scan
-    await db.audit_scans.update_one(
-        {"audit_id": audit_id, "codigo_barras": input.codigo_barras.strip(), "classification": "sobrante_desconocido"},
-        {"$set": {"equipment_id": new_eq_clean["id"], "equipment_data": new_eq_clean, "registered_manually": True}}
-    )
-    # Create ALTA movement
-    alta_movement = {
-        "id": str(uuid.uuid4()), "audit_id": audit_id, "equipment_id": new_eq_clean["id"],
-        "type": "alta", "from_cr_tienda": None, "to_cr_tienda": cr_tienda,
-        "status": "pending", "created_at": now_iso,
-        "created_by": user["nombre"], "created_by_id": user["sub"],
-        "equipment_data": new_eq_clean, "from_tienda": None, "to_tienda": audit["tienda"],
-        "plaza": audit.get("plaza", "")
-    }
-    await db.movements.insert_one(alta_movement)
-    await db.stores.update_one({"cr_tienda": cr_tienda}, {"$inc": {"total_equipment": 1}})
-    return {"message": "Equipo registrado como ALTA", "equipment": new_eq_clean, "movement": {k: v for k, v in alta_movement.items() if k != "_id"}}
+    try:
+        audit = await db.audits.find_one({"id": audit_id}, {"_id": 0})
+        if not audit:
+            raise HTTPException(status_code=404, detail="Auditoría no encontrada")
+        if audit["status"] != "in_progress":
+            raise HTTPException(status_code=400, detail="Solo se puede registrar en auditorías activas")
+
+        barcode = input.codigo_barras.strip()
+        cr_tienda = audit["cr_tienda"]
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        # Check if already registered in a previous attempt (idempotent)
+        existing_eq = await db.equipment.find_one(
+            {"cr_tienda": cr_tienda, "codigo_barras": barcode, "alta_manual": True},
+            {"_id": 0}
+        )
+        if existing_eq:
+            # Already inserted — just ensure scan and movement are updated
+            new_eq_clean = existing_eq
+        else:
+            # Build equipment dict BEFORE insert to avoid _id contamination
+            new_eq_clean = {
+                "id": str(uuid.uuid4()),
+                "cr_plaza": audit.get("cr_plaza", ""),
+                "plaza": audit.get("plaza", ""),
+                "cr_tienda": cr_tienda,
+                "tienda": audit["tienda"],
+                "codigo_barras": barcode,
+                "no_activo": (input.no_activo or "").strip(),
+                "mes_adquisicion": datetime.now().month,
+                "año_adquisicion": datetime.now().year,
+                "factura": "", "costo": 0.0, "depreciacion": 0.0,
+                "vida_util": 0, "remanente": 0,
+                "descripcion": input.descripcion.strip(),
+                "marca": input.marca.strip(),
+                "modelo": input.modelo.strip(),
+                "serie": (input.serie or "").strip(),
+                "meses_transcurridos": 0, "vida_util_restante": 0,
+                "valor_real": 0.0, "depreciado": False, "alta_manual": True,
+                "registered_at": now_iso, "registered_by": user["nombre"]
+            }
+            # Insert a COPY so insert_one does not pollute new_eq_clean with _id
+            await db.equipment.insert_one(dict(new_eq_clean))
+            await db.stores.update_one({"cr_tienda": cr_tienda}, {"$inc": {"total_equipment": 1}})
+
+        # Update scan — find by audit+barcode only (classification may have changed on retry)
+        await db.audit_scans.update_one(
+            {"audit_id": audit_id, "codigo_barras": barcode},
+            {"$set": {
+                "equipment_id": new_eq_clean["id"],
+                "equipment_data": new_eq_clean,
+                "registered_manually": True,
+                "classification": "sobrante_desconocido"
+            }}
+        )
+
+        # Create ALTA movement only if one doesn't exist yet
+        existing_mov = await db.movements.find_one(
+            {"audit_id": audit_id, "equipment_id": new_eq_clean["id"], "type": "alta"},
+            {"_id": 0}
+        )
+        if not existing_mov:
+            alta_movement = {
+                "id": str(uuid.uuid4()),
+                "audit_id": audit_id,
+                "equipment_id": new_eq_clean["id"],
+                "type": "alta",
+                "from_cr_tienda": None,
+                "to_cr_tienda": cr_tienda,
+                "status": "pending",
+                "created_at": now_iso,
+                "created_by": user["nombre"],
+                "created_by_id": user["sub"],
+                "equipment_data": new_eq_clean,
+                "from_tienda": None,
+                "to_tienda": audit["tienda"],
+                "plaza": audit.get("plaza", "")
+            }
+            await db.movements.insert_one(dict(alta_movement))
+        else:
+            alta_movement = existing_mov
+
+        return {
+            "message": "Equipo registrado como ALTA",
+            "equipment": new_eq_clean,
+            "movement": {k: v for k, v in alta_movement.items() if k != "_id"}
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error en register-unknown-surplus: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error interno al registrar el equipo: {str(e)}")
 
 @api_router.get("/audits/{audit_id}/summary")
 async def get_audit_summary(audit_id: str, user=Depends(get_current_user)):
@@ -531,9 +583,6 @@ async def delete_audit(audit_id: str, user=Depends(get_current_user)):
 class NotesInput(BaseModel):
     notes: str
 
-class CancelInput(BaseModel):
-    reason: str
-
 class MovementInputExtended(BaseModel):
     audit_id: str
     equipment_id: Optional[str] = None
@@ -541,29 +590,6 @@ class MovementInputExtended(BaseModel):
     from_cr_tienda: Optional[str] = None
     to_cr_tienda: Optional[str] = None
     extra_data: Optional[dict] = None
-
-@api_router.post("/audits/{audit_id}/cancel")
-async def cancel_audit(audit_id: str, input: CancelInput, user=Depends(get_current_user)):
-    audit = await db.audits.find_one({"id": audit_id}, {"_id": 0})
-    if not audit:
-        raise HTTPException(404, "Audit not found")
-    if audit["status"] != "in_progress":
-        raise HTTPException(400, "Solo se puede cancelar una auditoría en progreso")
-    if not input.reason.strip():
-        raise HTTPException(400, "Debes proporcionar un motivo de cancelación")
-    await db.audits.update_one({"id": audit_id}, {"$set": {
-        "status": "cancelada",
-        "cancel_reason": input.reason.strip(),
-        "cancelled_at": datetime.now(timezone.utc).isoformat(),
-        "cancelled_by": user["nombre"]
-    }})
-    # Reset store audit status
-    cr_tienda = audit.get("cr_tienda")
-    if cr_tienda:
-        await db.stores.update_one({"cr_tienda": cr_tienda}, {"$set": {
-            "audited": False, "last_audit_date": None, "last_audit_id": None, "audit_status": None
-        }})
-    return {"message": "Audit cancelled", "reason": input.reason.strip()}
 
 @api_router.post("/audits/{audit_id}/photos")
 async def upload_audit_photos(audit_id: str, photo_ab: Optional[UploadFile] = File(None), photo_transf: Optional[UploadFile] = File(None), user=Depends(get_current_user)):
