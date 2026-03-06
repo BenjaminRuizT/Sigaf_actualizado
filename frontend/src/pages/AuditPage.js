@@ -49,32 +49,63 @@ function useSortable(defaultKey, defaultDir = "asc") {
   return { sorted, SortHeader };
 }
 
-// ── QR/Barcode Scanner Component using html5-qrcode ──
+// ── QR/Barcode Scanner Component ──
+// Mode "barcode": uses html5-qrcode with all 1D/2D formats
+// Mode "ocr": captures a frame and uses Tesseract.js to read digits from the label
 function BarcodeScanner({ onDetected, onClose }) {
-  const containerRef = useRef(null);
-  const scannerRef = useRef(null);
+  const [mode, setMode] = useState("barcode"); // "barcode" | "ocr"
   const [error, setError] = useState(null);
   const [started, setStarted] = useState(false);
+  const [ocrCapturing, setOcrCapturing] = useState(false);
+  const [ocrPreview, setOcrPreview] = useState(null);
+  const [ocrText, setOcrText] = useState("");
+  const [ocrRunning, setOcrRunning] = useState(false);
+  const scannerRef = useRef(null);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const canvasRef = useRef(null);
 
+  // Barcode mode — html5-qrcode with 1D formats explicitly enabled
   useEffect(() => {
+    if (mode !== "barcode") return;
     let html5QrCode = null;
     const startScanner = async () => {
       try {
-        const { Html5Qrcode } = await import("html5-qrcode");
-        html5QrCode = new Html5Qrcode("qr-reader-container");
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
+        // Enable all common 1D barcode formats + QR
+        const formatsToSupport = [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODE_93,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.QR_CODE,
+        ];
+        html5QrCode = new Html5Qrcode("qr-reader-container", {
+          formatsToSupport,
+          verbose: false,
+        });
         scannerRef.current = html5QrCode;
         await html5QrCode.start(
           { facingMode: "environment" },
-          { fps: 15, qrbox: { width: 250, height: 150 }, aspectRatio: 1.5 },
+          {
+            fps: 15,
+            qrbox: { width: 260, height: 120 },
+            aspectRatio: 1.7778,
+            disableFlip: false,
+          },
           (decodedText) => {
             html5QrCode.stop().catch(() => {});
             onDetected(decodedText.trim());
           },
-          () => {} // ignore errors during scan frames
+          () => {}
         );
         setStarted(true);
       } catch (err) {
-        setError("No se pudo acceder a la cámara. Verifica los permisos del navegador.");
+        setError("No se pudo iniciar el escáner. Verifica los permisos de cámara.");
       }
     };
     startScanner();
@@ -84,23 +115,192 @@ function BarcodeScanner({ onDetected, onClose }) {
         scannerRef.current.clear().catch(() => {});
       }
     };
-  }, [onDetected]);
+  }, [mode, onDetected]);
+
+  // OCR mode — open camera manually, capture frame, run Tesseract
+  useEffect(() => {
+    if (mode !== "ocr") return;
+    const startOcrCam = async () => {
+      setError(null);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
+        });
+        streamRef.current = stream;
+        setOcrCapturing(true);
+        setTimeout(() => {
+          if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
+        }, 100);
+      } catch {
+        setError("No se pudo acceder a la cámara para OCR.");
+      }
+    };
+    startOcrCam();
+    return () => {
+      if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+    };
+  }, [mode]);
+
+  const captureForOcr = async () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+    setOcrPreview(dataUrl);
+    // Stop camera
+    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+    setOcrCapturing(false);
+    // Run OCR
+    setOcrRunning(true);
+    try {
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("eng", 1, {
+        logger: () => {},
+        workerPath: "https://unpkg.com/tesseract.js@5/dist/worker.min.js",
+        langPath: "https://tessdata.projectnaptha.com/4.0.0",
+        corePath: "https://unpkg.com/tesseract.js-core@5/tesseract-core-simd-lstm.wasm.js",
+      });
+      await worker.setParameters({
+        tessedit_char_whitelist: "0123456789",
+        tessedit_pageseg_mode: "7",
+      });
+      const { data: { text } } = await worker.recognize(dataUrl);
+      await worker.terminate();
+      // Extract digits only, remove spaces
+      const digits = text.replace(/\D/g, "").trim();
+      setOcrText(digits);
+    } catch {
+      setOcrText("");
+      setError("No se pudo leer el número. Intenta con mejor iluminación o escribe el código manualmente.");
+    } finally {
+      setOcrRunning(false);
+    }
+  };
+
+  const retakeOcr = () => {
+    setOcrPreview(null);
+    setOcrText("");
+    setError(null);
+    // Restart camera
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(stream => {
+        streamRef.current = stream;
+        setOcrCapturing(true);
+        setTimeout(() => {
+          if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
+        }, 100);
+      });
+  };
 
   return (
     <div className="space-y-3">
-      <div className="relative rounded-lg overflow-hidden border border-primary/30 bg-black" style={{ minHeight: 220 }}>
-        <div id="qr-reader-container" ref={containerRef} style={{ width: "100%" }} />
-        {!started && !error && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-          </div>
-        )}
-        {started && (
-          <div className="absolute bottom-2 left-0 right-0 text-center pointer-events-none">
-            <span className="text-xs text-white bg-black/60 px-3 py-1 rounded-full">Apunta al código de barras del dispositivo</span>
-          </div>
-        )}
+      {/* Mode toggle */}
+      <div className="flex gap-2">
+        <Button
+          size="sm" variant={mode === "barcode" ? "default" : "outline"}
+          className="flex-1 gap-1.5 text-xs"
+          onClick={() => { setMode("barcode"); setOcrPreview(null); setOcrText(""); setError(null); setStarted(false); }}
+        >
+          <Scan className="h-3.5 w-3.5" /> Leer código de barras
+        </Button>
+        <Button
+          size="sm" variant={mode === "ocr" ? "default" : "outline"}
+          className="flex-1 gap-1.5 text-xs"
+          onClick={() => { setMode("ocr"); setOcrPreview(null); setOcrText(""); setError(null); }}
+        >
+          <Camera className="h-3.5 w-3.5" /> Leer número (OCR)
+        </Button>
       </div>
+
+      {/* Barcode scanner */}
+      {mode === "barcode" && (
+        <div className="relative rounded-lg overflow-hidden border border-primary/30 bg-black" style={{ minHeight: 200 }}>
+          <div id="qr-reader-container" style={{ width: "100%" }} />
+          {!started && !error && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+            </div>
+          )}
+          {started && (
+            <div className="absolute bottom-2 left-0 right-0 text-center pointer-events-none">
+              <span className="text-xs text-white bg-black/60 px-3 py-1 rounded-full">Centra el código de barras en el rectángulo</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* OCR mode */}
+      {mode === "ocr" && (
+        <div className="space-y-2">
+          {ocrCapturing && !ocrPreview && (
+            <div>
+              <div className="relative rounded-lg overflow-hidden bg-black border" style={{ minHeight: 200 }}>
+                <video ref={videoRef} className="w-full" style={{ maxHeight: 260, display: "block" }} playsInline muted autoPlay />
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div className="border-2 border-yellow-400 rounded" style={{ width: "70%", height: "35%", boxShadow: "0 0 0 9999px rgba(0,0,0,0.5)" }} />
+                </div>
+                <div className="absolute bottom-2 left-0 right-0 text-center pointer-events-none">
+                  <span className="text-xs text-white bg-black/60 px-3 py-1 rounded-full">Centra los números de la etiqueta y captura</span>
+                </div>
+              </div>
+              <canvas ref={canvasRef} className="hidden" />
+              <Button className="w-full gap-2 mt-2" onClick={captureForOcr}>
+                <Camera className="h-4 w-4" /> Capturar y leer número
+              </Button>
+            </div>
+          )}
+          {ocrRunning && (
+            <div className="flex flex-col items-center justify-center py-6 gap-3">
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+              <p className="text-sm text-muted-foreground">Leyendo número...</p>
+            </div>
+          )}
+          {ocrPreview && !ocrRunning && (
+            <div className="space-y-3">
+              <img src={ocrPreview} alt="Captura" className="w-full rounded-lg border object-contain max-h-40" />
+              {ocrText ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Número detectado — edítalo si es necesario:</p>
+                  <input
+                    type="text"
+                    value={ocrText}
+                    onChange={e => setOcrText(e.target.value.replace(/\D/g, ""))}
+                    className="w-full border rounded-lg px-3 py-2 font-mono text-lg text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Número"
+                  />
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" onClick={retakeOcr}>Volver a capturar</Button>
+                    <Button className="flex-1 gap-2" onClick={() => { if (ocrText.trim()) onDetected(ocrText.trim()); }}>
+                      <CheckCircle className="h-4 w-4" /> Usar este número
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-red-500">No se detectó número. Puedes escribirlo manualmente:</p>
+                  <input
+                    type="text"
+                    value={ocrText}
+                    onChange={e => setOcrText(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 font-mono text-lg text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Escribe el número"
+                  />
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" onClick={retakeOcr}>Volver a capturar</Button>
+                    <Button className="flex-1 gap-2" disabled={!ocrText.trim()} onClick={() => { if (ocrText.trim()) onDetected(ocrText.trim()); }}>
+                      <CheckCircle className="h-4 w-4" /> Usar este número
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {error && <p className="text-xs text-red-500 flex items-center gap-1"><CameraOff className="h-3.5 w-3.5" />{error}</p>}
       <Button variant="outline" className="w-full" onClick={onClose}>
         <CameraOff className="h-4 w-4 mr-2" /> Cerrar cámara
