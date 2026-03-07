@@ -887,15 +887,16 @@ async def export_to_excel(export_type: str, token: Optional[str] = None, authori
             ]
         items = await db.audit_scans.find(query, {"_id": 0}).sort("scanned_at", -1).to_list(100000)
 
-        style_title_row(ws, 1, "SIGAF - Reporte de Clasificaciones de Auditoría", 7)
+        style_title_row(ws, 1, "SIGAF - Reporte de Clasificaciones de Auditoría", 9)
         ws.cell(row=2, column=1, value=f"Fecha de exportación: {today_display}")
         ws.cell(row=2, column=1).font = Font(size=9, italic=True, name="Calibri", color="666666")
-        ws.merge_cells("A2:G2")
+        ws.merge_cells("A2:I2")
         ws.row_dimensions[2].height = 15
 
-        style_header_row(ws, 3, ["Fecha", "Código Barras", "Clasificación", "Descripción", "Marca", "Modelo", "Tienda"])
+        style_header_row(ws, 3, ["Fecha", "Código Barras", "Clasificación", "Descripción", "Marca", "Modelo", "Serie", "Depreciado", "Tienda"])
         for i, item in enumerate(items):
             eq = item.get("equipment_data") or {}
+            dep = eq.get("depreciado", False)
             style_data_row(ws, i + 4, [
                 item.get("scanned_at", "")[:19].replace("T", " ") if item.get("scanned_at") else "",
                 item.get("codigo_barras", ""),
@@ -903,10 +904,12 @@ async def export_to_excel(export_type: str, token: Optional[str] = None, authori
                 eq.get("descripcion", ""),
                 eq.get("marca", ""),
                 eq.get("modelo", ""),
+                eq.get("serie", ""),
+                "Sí" if dep else "No",
                 eq.get("tienda", ""),
             ], alt=(i % 2 == 0))
 
-        for col, width in zip(range(1, 8), [18, 14, 16, 30, 14, 16, 24]):
+        for col, width in zip(range(1, 10), [18, 14, 16, 30, 14, 16, 18, 10, 24]):
             ws.column_dimensions[get_column_letter(col)].width = width
 
     elif export_type in ("movements-ab", "movements-transferencias", "movements"):
