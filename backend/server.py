@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-import os, logging, uuid, io
+import os, logging, uuid, io, base64
 from pathlib import Path
 from pydantic import BaseModel
 from typing import List, Optional
@@ -591,67 +591,6 @@ class MovementInputExtended(BaseModel):
     to_cr_tienda: Optional[str] = None
     extra_data: Optional[dict] = None
 
-class ScanImageInput(BaseModel):
-    image_base64: str
-
-@api_router.post("/scan-image")
-async def scan_image_barcode(input: ScanImageInput, user=Depends(get_current_user)):
-    """
-    Receive base64 image from mobile camera, use Gemini Vision to extract
-    the barcode number from an equipment label.
-    Image processed in memory only — never saved to disk.
-    """
-    try:
-        import base64 as _b64
-        import re as _re
-
-        gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
-        if not gemini_key:
-            raise HTTPException(status_code=503, detail="Servicio de lectura de imagen no configurado. Agrega GEMINI_API_KEY en variables de entorno de Railway.")
-
-        image_data = input.image_base64
-        if "," in image_data:
-            image_data = image_data.split(",", 1)[1]
-        try:
-            image_bytes = _b64.b64decode(image_data)
-        except Exception:
-            raise HTTPException(status_code=400, detail="Imagen invalida o mal formateada")
-
-        import google.generativeai as genai
-        from PIL import Image
-        import io
-
-        genai.configure(api_key=gemini_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        img = Image.open(io.BytesIO(image_bytes))
-
-        prompt = (
-            "Esta es una etiqueta de activo fijo de una empresa. "
-            "Lee el NUMERO que aparece debajo o encima del codigo de barras en la etiqueta. "
-            "El numero generalmente es de 8 digitos, ejemplo: 03739671, 04847556. "
-            "Responde UNICAMENTE con el numero, sin espacios ni texto adicional. "
-            "Si no puedes leer ningun numero, responde exactamente: NO_DETECTADO"
-        )
-
-        response = model.generate_content([prompt, img])
-        raw = (response.text or "").strip()
-        cleaned = _re.sub(r"[^A-Za-z0-9]", "", raw)
-
-        if not cleaned or cleaned.upper() == "NODETECTADO":
-            raise HTTPException(
-                status_code=422,
-                detail="No se detecto numero en la imagen. Intenta con mejor iluminacion o acercate mas a la etiqueta."
-            )
-
-        logger.info(f"scan-image detected: '{cleaned}'")
-        return {"barcode": cleaned, "raw": raw}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"scan-image error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error al procesar imagen: {str(e)}")
-
 @api_router.post("/audits/{audit_id}/photos")
 async def upload_audit_photos(audit_id: str, photo_ab: Optional[UploadFile] = File(None), photo_transf: Optional[UploadFile] = File(None), user=Depends(get_current_user)):
     audit = await db.audits.find_one({"id": audit_id}, {"_id": 0})
@@ -660,12 +599,10 @@ async def upload_audit_photos(audit_id: str, photo_ab: Optional[UploadFile] = Fi
     update = {}
     if photo_ab:
         content = await photo_ab.read()
-        import base64
         update["photo_ab"] = base64.b64encode(content).decode()
         update["photo_ab_filename"] = photo_ab.filename
     if photo_transf:
         content = await photo_transf.read()
-        import base64
         update["photo_transf"] = base64.b64encode(content).decode()
         update["photo_transf_filename"] = photo_transf.filename
     if update:
@@ -975,12 +912,19 @@ async def export_to_excel(export_type: str, token: Optional[str] = None, authori
     elif export_type in ("movements-ab", "movements-transferencias", "movements"):
         # Determine movement types to export
         if export_type == "movements-ab":
-            query = {"type": {"$in": ["alta", "baja", "disposal"]}}
+            # Base query: altas, bajas, disposal
+            base_types = ["alta", "baja", "disposal"]
+            # Apply type filter if provided (from active filter in UI)
+            if type == "bajas":
+                query = {"type": {"$in": ["baja", "disposal"]}}
+            elif type == "altas":
+                query = {"type": "alta"}
+            else:
+                query = {"type": {"$in": base_types}}
             ws.title = "Altas y Bajas"
             doc_title = "Formato de Movimiento de AF — ALTAS y BAJAS"
             plaza_name = plaza or "General"
             filename = f"SIGAF_AB_{plaza_name}_{today_str}.xlsx"
-            # Plaza Origen | Tipo | No Activo | Codigo Barras | Descripcion | Valor Real | Marca | Modelo | Año | Serie | CR Tienda Origen | Tienda Origen
             headers = ["Plaza Origen", "Tipo de Movimiento", "Número de Activo", "Código de Barras",
                        "Descripción del Equipo", "Valor Real", "Marca", "Modelo", "Año",
                        "Número de Serie", "CR Tienda Origen", "Tienda Origen"]
@@ -1082,6 +1026,53 @@ async def export_to_excel(export_type: str, token: Optional[str] = None, authori
         col_widths = [16, 16, 14, 14, 34, 12, 14, 16, 8, 18, 14, 26, 14, 26]
         for col, width in enumerate(col_widths[:merge_cols], 1):
             ws.column_dimensions[get_column_letter(col)].width = width
+
+        # ── Agregar hoja de imágenes de formatos de movimiento ──
+        # Recolectar audit_ids únicos de los movimientos exportados
+        if export_type in ("movements-ab", "movements-transferencias"):
+            audit_ids = list({item.get("audit_id") for item in items if item.get("audit_id")})
+            if audit_ids:
+                photo_field = "photo_ab" if export_type == "movements-ab" else "photo_transf"
+                photo_label = "Formato ALTAS/BAJAS" if export_type == "movements-ab" else "Formato TRANSFERENCIAS"
+                audits_with_photos = await db.audits.find(
+                    {"id": {"$in": audit_ids}, photo_field: {"$exists": True, "$ne": None}},
+                    {"_id": 0, "id": 1, "tienda": 1, "cr_tienda": 1, "finished_at": 1, photo_field: 1}
+                ).to_list(1000)
+                if audits_with_photos:
+                    ws_photos = wb.create_sheet(title="Imágenes Formatos")
+                    ws_photos.column_dimensions["A"].width = 20
+                    ws_photos.column_dimensions["B"].width = 20
+                    ws_photos.column_dimensions["C"].width = 20
+                    ws_photos.column_dimensions["D"].width = 80
+                    style_title_row(ws_photos, 1, f"Imágenes — {photo_label}", 4)
+                    style_header_row(ws_photos, 2, ["CR Tienda", "Tienda", "Fecha", photo_label])
+                    img_row = 3
+                    for audit_doc in audits_with_photos:
+                        photo_b64 = audit_doc.get(photo_field)
+                        tienda_name = audit_doc.get("tienda", "")
+                        cr = audit_doc.get("cr_tienda", "")
+                        fecha = (audit_doc.get("finished_at") or "")[:10]
+                        ws_photos.cell(row=img_row, column=1, value=cr)
+                        ws_photos.cell(row=img_row, column=2, value=tienda_name)
+                        ws_photos.cell(row=img_row, column=3, value=fecha)
+                        try:
+                            import base64 as _b64i, io as _ioi
+                            from openpyxl.drawing.image import Image as XLImage
+                            img_bytes = _b64i.b64decode(photo_b64)
+                            img_stream = _ioi.BytesIO(img_bytes)
+                            xl_img = XLImage(img_stream)
+                            # Escalar imagen a máximo 400x300 manteniendo proporción
+                            max_w, max_h = 400, 300
+                            if xl_img.width > max_w or xl_img.height > max_h:
+                                ratio = min(max_w / xl_img.width, max_h / xl_img.height)
+                                xl_img.width = int(xl_img.width * ratio)
+                                xl_img.height = int(xl_img.height * ratio)
+                            cell_ref = f"D{img_row}"
+                            ws_photos.add_image(xl_img, cell_ref)
+                            ws_photos.row_dimensions[img_row].height = xl_img.height * 0.75 + 10
+                        except Exception:
+                            ws_photos.cell(row=img_row, column=4, value="[Imagen no disponible]")
+                        img_row += 1
 
     elif export_type == "audits":
         ws.title = "Auditorías"
