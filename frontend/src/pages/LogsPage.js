@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import {
   Download, ChevronLeft, ChevronRight, ClipboardList, ArrowRightLeft, History,
   DollarSign, ArrowUpDown, Search, Eye, Trash2, StickyNote, CheckCircle,
-  AlertTriangle, XCircle, TrendingUp, TrendingDown, RefreshCw
+  AlertTriangle, XCircle, TrendingUp, TrendingDown, RefreshCw, Printer, ImageDown
 } from "lucide-react";
 
 function useSortable(defaultKey, defaultDir = "desc") {
@@ -195,6 +195,74 @@ export default function LogsPage() {
 
   const fmtMoney = (n) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
   const fmtDate = (d) => d ? new Date(d).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }) : "—";
+
+  // Descargar imagen de formato
+  const handleDownloadPhoto = (base64Data, filename) => {
+    const a = document.createElement("a");
+    a.href = `data:image/jpeg;base64,${base64Data}`;
+    a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+
+  // Generar PDF ejecutivo de auditoría (una página, usa ventana de impresión)
+  const handlePrintReport = () => {
+    if (!selectedAudit) return;
+    const a = selectedAudit;
+    const s = auditSummary?.stats || {};
+    const fmtD = (d) => d ? new Date(d).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }) : "—";
+    const fmtM = (n) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
+
+    const photoAB = a.photo_ab ? `<div style="margin-top:12px"><p style="font-size:10px;font-weight:600;color:#555;margin-bottom:4px">FORMATO ALTAS / BAJAS</p><img src="data:image/jpeg;base64,${a.photo_ab}" style="max-width:100%;max-height:200px;border:1px solid #ddd;border-radius:4px"/></div>` : "";
+    const photoT = a.photo_transf ? `<div style="margin-top:12px"><p style="font-size:10px;font-weight:600;color:#555;margin-bottom:4px">FORMATO TRANSFERENCIAS</p><img src="data:image/jpeg;base64,${a.photo_transf}" style="max-width:100%;max-height:200px;border:1px solid #ddd;border-radius:4px"/></div>` : "";
+    const notFound = (auditSummary?.not_found || []).slice(0, 20).map(sc => {
+      const eq = sc.equipment_data || {};
+      return `<tr><td style="border:1px solid #ddd;padding:3px 6px;font-size:9px;font-family:monospace">${sc.codigo_barras}</td><td style="border:1px solid #ddd;padding:3px 6px;font-size:9px">${eq.descripcion||"—"}</td><td style="border:1px solid #ddd;padding:3px 6px;font-size:9px">${eq.marca||"—"} ${eq.modelo||""}</td><td style="border:1px solid #ddd;padding:3px 6px;font-size:9px;text-align:right">${fmtM(eq.valor_real)}</td><td style="border:1px solid #ddd;padding:3px 6px;font-size:9px;text-align:center">${eq.depreciado?"Sí":"No"}</td></tr>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Reporte Auditoría — ${a.tienda}</title>
+    <style>
+      body{font-family:Calibri,Arial,sans-serif;margin:0;padding:16px;color:#222;font-size:11px}
+      h1{font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 2px}
+      .header{background:#1E3C78;color:#fff;padding:12px 16px;border-radius:6px;margin-bottom:12px}
+      .header p{margin:2px 0;font-size:11px;opacity:.9}
+      .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600}
+      .grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+      .stat{border:1px solid #ddd;border-radius:6px;padding:8px;text-align:center}
+      .stat .num{font-size:20px;font-weight:700;font-family:monospace}
+      .stat .lbl{font-size:9px;color:#666;text-transform:uppercase;margin-top:2px}
+      .stat.green .num{color:#16a34a} .stat.amber .num{color:#d97706} .stat.red .num{color:#dc2626}
+      .row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0}
+      .photos{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+      table{width:100%;border-collapse:collapse;margin-top:6px}
+      th{background:#1E3C78;color:#fff;padding:4px 6px;font-size:9px;text-align:left;border:1px solid #1E3C78}
+      @media print{body{padding:8px}@page{size:A4;margin:10mm}}
+    </style></head><body>
+    <div class="header">
+      <h1>${a.tienda}</h1>
+      <p>CR: ${a.cr_tienda} · Plaza: ${a.plaza} · Auditor: ${a.auditor_name}</p>
+      <p>Inicio: ${fmtD(a.started_at)}${a.finished_at ? "  ·  Fin: " + fmtD(a.finished_at) : ""}</p>
+    </div>
+    <div class="grid">
+      <div class="stat"><div class="num">${a.total_equipment||0}</div><div class="lbl">Total Equipos</div></div>
+      <div class="stat green"><div class="num">${s.located_count||0}</div><div class="lbl">Localizados</div></div>
+      <div class="stat amber"><div class="num">${s.surplus_count||0}</div><div class="lbl">Sobrantes</div></div>
+      <div class="stat red"><div class="num">${s.not_found_count||0}</div><div class="lbl">No Localizados</div></div>
+    </div>
+    <div style="border:1px solid #eee;border-radius:6px;padding:10px;margin-bottom:12px">
+      <div class="row"><span style="color:#555">Valor Equipos No Localizados</span><span style="font-weight:700;color:#dc2626;font-family:monospace">${fmtM(s.not_found_value)}</span></div>
+      <div class="row"><span style="color:#555">Movimientos Generados</span><span style="font-weight:700;font-family:monospace">${s.movements_count||0}</span></div>
+      ${a.notes ? `<div style="margin-top:6px;padding:6px;background:#f9f9f9;border-radius:4px;font-size:10px;color:#555"><strong>Notas:</strong> ${a.notes}</div>` : ""}
+    </div>
+    ${(auditSummary?.not_found||[]).length > 0 ? `
+    <p style="font-weight:700;font-size:11px;margin:0 0 4px;text-transform:uppercase">Equipos No Localizados (${Math.min(20,(auditSummary?.not_found||[]).length)}${(auditSummary?.not_found||[]).length>20?" de "+(auditSummary?.not_found||[]).length:""})</p>
+    <table><thead><tr><th>Código Barras</th><th>Descripción</th><th>Marca / Modelo</th><th style="text-align:right">Valor</th><th style="text-align:center">Depr.</th></tr></thead><tbody>${notFound}</tbody></table>` : ""}
+    ${(a.photo_ab || a.photo_transf) ? `<div style="margin-top:14px"><p style="font-weight:700;font-size:11px;text-transform:uppercase;margin-bottom:6px">Formatos de Movimiento</p><div class="photos">${photoAB}${photoT}</div></div>` : ""}
+    <p style="margin-top:16px;font-size:8px;color:#999;text-align:right">Generado por SIGAF · ${new Date().toLocaleString("es-MX")}</p>
+    <script>window.onload=()=>{window.print();}</script></body></html>`;
+
+    const w = window.open("", "_blank", "width=800,height=900");
+    if (w) { w.document.write(html); w.document.close(); }
+  };
 
   const classLabels = { localizado: t("audit.located"), sobrante: t("audit.surplus"), sobrante_desconocido: t("audit.surplusUnknown"), no_localizado: t("audit.notFound") };
   const classColors = {
@@ -479,9 +547,18 @@ export default function LogsPage() {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Card><CardContent className="p-3 text-center"><p className="text-xs text-muted-foreground uppercase">{t("audit.equipment")}</p><p className="font-mono text-xl font-bold">{selectedAudit.total_equipment || 0}</p></CardContent></Card>
-                <Card><CardContent className="p-3 text-center"><CheckCircle className="h-4 w-4 text-emerald-500 mx-auto mb-0.5" /><p className="font-mono text-xl font-bold text-emerald-500">{auditSummary?.stats?.located_count ?? selectedAudit.located_count ?? 0}</p><p className="text-xs text-muted-foreground uppercase">{t("audit.located")}</p></CardContent></Card>
-                <Card><CardContent className="p-3 text-center"><AlertTriangle className="h-4 w-4 text-amber-500 mx-auto mb-0.5" /><p className="font-mono text-xl font-bold text-amber-500">{auditSummary?.stats?.surplus_count ?? selectedAudit.surplus_count ?? 0}</p><p className="text-xs text-muted-foreground uppercase">{t("audit.surplus")}</p></CardContent></Card>
-                <Card><CardContent className="p-3 text-center"><XCircle className="h-4 w-4 text-red-500 mx-auto mb-0.5" /><p className="font-mono text-xl font-bold text-red-500">{auditSummary?.stats?.not_found_count ?? selectedAudit.not_found_count ?? 0}</p><p className="text-xs text-muted-foreground uppercase">{t("audit.notFound")}</p></CardContent></Card>
+                <Card
+                  className={`cursor-pointer transition-all ${summaryFilter === "located" ? "ring-2 ring-emerald-500 bg-emerald-500/5" : "hover:ring-1 hover:ring-emerald-400"}`}
+                  onClick={() => auditSummary && setSummaryFilter("located")}
+                ><CardContent className="p-3 text-center"><CheckCircle className="h-4 w-4 text-emerald-500 mx-auto mb-0.5" /><p className="font-mono text-xl font-bold text-emerald-500">{auditSummary?.stats?.located_count ?? selectedAudit.located_count ?? 0}</p><p className="text-xs text-muted-foreground uppercase">{t("audit.located")}</p></CardContent></Card>
+                <Card
+                  className={`cursor-pointer transition-all ${summaryFilter === "surplus" ? "ring-2 ring-amber-500 bg-amber-500/5" : "hover:ring-1 hover:ring-amber-400"}`}
+                  onClick={() => auditSummary && setSummaryFilter("surplus")}
+                ><CardContent className="p-3 text-center"><AlertTriangle className="h-4 w-4 text-amber-500 mx-auto mb-0.5" /><p className="font-mono text-xl font-bold text-amber-500">{auditSummary?.stats?.surplus_count ?? selectedAudit.surplus_count ?? 0}</p><p className="text-xs text-muted-foreground uppercase">{t("audit.surplus")}</p></CardContent></Card>
+                <Card
+                  className={`cursor-pointer transition-all ${summaryFilter === "not_found" ? "ring-2 ring-red-500 bg-red-500/5" : "hover:ring-1 hover:ring-red-400"}`}
+                  onClick={() => auditSummary && setSummaryFilter("not_found")}
+                ><CardContent className="p-3 text-center"><XCircle className="h-4 w-4 text-red-500 mx-auto mb-0.5" /><p className="font-mono text-xl font-bold text-red-500">{auditSummary?.stats?.not_found_count ?? selectedAudit.not_found_count ?? 0}</p><p className="text-xs text-muted-foreground uppercase">{t("audit.notFound")}</p></CardContent></Card>
               </div>
 
               {selectedAudit.status !== "in_progress" && selectedAudit.status !== "cancelada" && (
@@ -499,37 +576,8 @@ export default function LogsPage() {
                 </CardContent></Card>
               )}
 
-              {auditSummary && (
-                <Card><CardContent className="p-4 space-y-3">
-                  {/* Botones filtro — misma apariencia que los del panel */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      onClick={() => setSummaryFilter("located")}
-                      className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${summaryFilter === "located" ? "border-emerald-500 bg-emerald-500/10" : "border-muted hover:border-emerald-400"}`}
-                    >
-                      <CheckCircle className={`h-5 w-5 mb-1 ${summaryFilter === "located" ? "text-emerald-500" : "text-muted-foreground"}`}/>
-                      <span className="font-mono font-bold text-lg text-emerald-500">{auditSummary?.stats?.located_count ?? 0}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase">{t("audit.located")}</span>
-                    </button>
-                    <button
-                      onClick={() => setSummaryFilter("surplus")}
-                      className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${summaryFilter === "surplus" ? "border-amber-500 bg-amber-500/10" : "border-muted hover:border-amber-400"}`}
-                    >
-                      <AlertTriangle className={`h-5 w-5 mb-1 ${summaryFilter === "surplus" ? "text-amber-500" : "text-muted-foreground"}`}/>
-                      <span className="font-mono font-bold text-lg text-amber-500">{auditSummary?.stats?.surplus_count ?? 0}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase">{t("audit.surplus")}</span>
-                    </button>
-                    <button
-                      onClick={() => setSummaryFilter("not_found")}
-                      className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${summaryFilter === "not_found" ? "border-red-500 bg-red-500/10" : "border-muted hover:border-red-400"}`}
-                    >
-                      <XCircle className={`h-5 w-5 mb-1 ${summaryFilter === "not_found" ? "text-red-500" : "text-muted-foreground"}`}/>
-                      <span className="font-mono font-bold text-lg text-red-500">{auditSummary?.stats?.not_found_count ?? 0}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase">{t("audit.notFound")}</span>
-                    </button>
-                  </div>
-
-                  {/* Tabla de detalle según filtro */}
+              {auditSummary && summaryFilter && (
+                <Card><CardContent className="p-4 space-y-2">
                   {(() => {
                     const items = summaryFilter === "located" ? (auditSummary.located || [])
                       : summaryFilter === "surplus" ? (auditSummary.surplus || [])
@@ -537,43 +585,45 @@ export default function LogsPage() {
                     const label = summaryFilter === "located" ? t("audit.located")
                       : summaryFilter === "surplus" ? t("audit.surplus")
                       : t("audit.notFound");
-                    return items.length > 0 ? (
+                    return (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground mb-2 uppercase">{label} ({items.length})</p>
-                        <div className="overflow-x-auto rounded border">
-                          <ScrollArea className="h-[220px]">
-                            <Table style={{ minWidth: 560 }}>
-                              <TableHeader><TableRow>
-                                <TableHead className="whitespace-nowrap">{t("audit.barcode")}</TableHead>
-                                <TableHead className="whitespace-nowrap">{t("audit.description")}</TableHead>
-                                <TableHead className="whitespace-nowrap">{t("audit.brand")}</TableHead>
-                                <TableHead className="whitespace-nowrap">Modelo</TableHead>
-                                <TableHead className="whitespace-nowrap">Serie</TableHead>
-                                <TableHead className="text-right whitespace-nowrap">{t("audit.realValue")}</TableHead>
-                                <TableHead className="whitespace-nowrap">{t("audit.deprecated")}</TableHead>
-                              </TableRow></TableHeader>
-                              <TableBody>
-                                {items.slice(0, 100).map(scan => {
-                                  const eq = scan.equipment_data || {};
-                                  return (
-                                    <TableRow key={scan.id}>
-                                      <TableCell className="font-mono text-xs whitespace-nowrap">{scan.codigo_barras}</TableCell>
-                                      <TableCell className="text-sm whitespace-nowrap max-w-[140px] truncate">{eq.descripcion || "—"}</TableCell>
-                                      <TableCell className="text-sm whitespace-nowrap">{eq.marca || "—"}</TableCell>
-                                      <TableCell className="text-sm whitespace-nowrap">{eq.modelo || "—"}</TableCell>
-                                      <TableCell className="text-xs font-mono whitespace-nowrap">{eq.serie || "—"}</TableCell>
-                                      <TableCell className="text-right font-mono text-sm whitespace-nowrap">{fmtMoney(eq.valor_real)}</TableCell>
-                                      <TableCell><Badge variant={eq.depreciado ? "destructive" : "outline"} className="text-[10px]">{eq.depreciado ? "Sí" : "No"}</Badge></TableCell>
-                                    </TableRow>
-                                  );
-                                })}
-                              </TableBody>
-                            </Table>
-                          </ScrollArea>
-                        </div>
+                        {items.length > 0 ? (
+                          <div className="overflow-x-auto rounded border">
+                            <ScrollArea className="h-[220px]">
+                              <Table style={{ minWidth: 560 }}>
+                                <TableHeader><TableRow>
+                                  <TableHead className="whitespace-nowrap">{t("audit.barcode")}</TableHead>
+                                  <TableHead className="whitespace-nowrap">{t("audit.description")}</TableHead>
+                                  <TableHead className="whitespace-nowrap">{t("audit.brand")}</TableHead>
+                                  <TableHead className="whitespace-nowrap">Modelo</TableHead>
+                                  <TableHead className="whitespace-nowrap">Serie</TableHead>
+                                  <TableHead className="text-right whitespace-nowrap">{t("audit.realValue")}</TableHead>
+                                  <TableHead className="whitespace-nowrap">{t("audit.deprecated")}</TableHead>
+                                </TableRow></TableHeader>
+                                <TableBody>
+                                  {items.slice(0, 100).map(scan => {
+                                    const eq = scan.equipment_data || {};
+                                    return (
+                                      <TableRow key={scan.id}>
+                                        <TableCell className="font-mono text-xs whitespace-nowrap">{scan.codigo_barras}</TableCell>
+                                        <TableCell className="text-sm whitespace-nowrap max-w-[140px] truncate">{eq.descripcion || "—"}</TableCell>
+                                        <TableCell className="text-sm whitespace-nowrap">{eq.marca || "—"}</TableCell>
+                                        <TableCell className="text-sm whitespace-nowrap">{eq.modelo || "—"}</TableCell>
+                                        <TableCell className="text-xs font-mono whitespace-nowrap">{eq.serie || "—"}</TableCell>
+                                        <TableCell className="text-right font-mono text-sm whitespace-nowrap">{fmtMoney(eq.valor_real)}</TableCell>
+                                        <TableCell><Badge variant={eq.depreciado ? "destructive" : "outline"} className="text-[10px]">{eq.depreciado ? "Sí" : "No"}</Badge></TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </ScrollArea>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-center text-muted-foreground py-4">{t("common.noResults")}</p>
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-sm text-center text-muted-foreground py-4">{t("common.noResults")}</p>
                     );
                   })()}
                 </CardContent></Card>
@@ -601,13 +651,30 @@ export default function LogsPage() {
               )}
             </div>
           )}
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:gap-0 flex-wrap">
             {isSuperAdmin && selectedAudit && (
               <Button variant="destructive" size="sm" onClick={() => setDeleteDialog(selectedAudit)} data-testid="dialog-delete-audit" className="gap-2 mr-auto">
                 <Trash2 className="h-4 w-4" /> Eliminar Auditoría
               </Button>
             )}
-            <Button variant="outline" onClick={() => { setSelectedAudit(null); setAuditSummary(null); }}>{t("common.close")}</Button>
+            <div className="flex gap-2 flex-wrap justify-end">
+              {selectedAudit?.photo_ab && (
+                <Button variant="outline" size="sm" onClick={() => handleDownloadPhoto(selectedAudit.photo_ab, `formato_AB_${selectedAudit.cr_tienda}.jpg`)} className="gap-1.5">
+                  <ImageDown className="h-4 w-4" /> AB
+                </Button>
+              )}
+              {selectedAudit?.photo_transf && (
+                <Button variant="outline" size="sm" onClick={() => handleDownloadPhoto(selectedAudit.photo_transf, `formato_TRANSF_${selectedAudit.cr_tienda}.jpg`)} className="gap-1.5">
+                  <ImageDown className="h-4 w-4" /> Transf.
+                </Button>
+              )}
+              {selectedAudit?.status === "completed" && auditSummary && (
+                <Button variant="outline" size="sm" onClick={handlePrintReport} className="gap-1.5">
+                  <Printer className="h-4 w-4" /> Reporte PDF
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => { setSelectedAudit(null); setAuditSummary(null); }}>{t("common.close")}</Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
