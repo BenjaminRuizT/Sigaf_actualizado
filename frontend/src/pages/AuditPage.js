@@ -145,6 +145,7 @@ export default function AuditPage() {
   const [summary, setSummary] = useState(null);
   const [transferDialog, setTransferDialog] = useState(null);
   const [finalizeDialog, setFinalizeDialog] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [disposalDialog, setDisposalDialog] = useState(null);
   const [notesDialog, setNotesDialog] = useState(false);
   const [notes, setNotes] = useState("");
@@ -160,7 +161,7 @@ export default function AuditPage() {
 
   // Unknown surplus
   const [unknownSurplusDialog, setUnknownSurplusDialog] = useState(null);
-  const [unknownForm, setUnknownForm] = useState({ codigo_barras: "", descripcion: "", marca: "", modelo: "" });
+  const [unknownForm, setUnknownForm] = useState({ codigo_barras: "", descripcion: "", marca: "", modelo: "", serie: "" });
   const [savingUnknown, setSavingUnknown] = useState(false);
   const unknownDescOptions = ["COMPUTADORA","LAPTOP","IMPRESORA","MONITOR","SERVIDOR","SWITCH","ROUTER","UPS","SCANNER","TABLET","PROYECTOR","TELEFONO IP","CAMARA","DVR/NVR","DISCO DURO EXTERNO","ACCESS POINT","IMPRESORA FISCAL","TECLADO/MOUSE","OTRO"];
   const unknownMarcaOptions = ["EPSON","HP","DELL","LENOVO","ACER","ASUS","SAMSUNG","LG","CISCO","BROTHER","CANON","ZEBRA","HONEYWELL","APC","TOSHIBA","APPLE","HUAWEI","OTRO"];
@@ -235,7 +236,7 @@ export default function AuditPage() {
         setFlashClass("flash-error"); toast.warning(`${t("audit.surplusUnknown")}: ${bc}`);
         setAudit(p => p ? { ...p, surplus_count: (p.surplus_count || 0) + 1 } : p);
         // Open registration dialog immediately with the barcode
-        setUnknownForm({ codigo_barras: bc, descripcion: "", marca: "", modelo: "" });
+        setUnknownForm({ codigo_barras: bc, descripcion: "", marca: "", modelo: "", serie: "" });
         setUnknownSurplusDialog(scan);
       } else if (status === "already_scanned") { toast.info(t("audit.alreadyScanned")); }
       setTimeout(() => setFlashClass(""), 600);
@@ -292,7 +293,7 @@ export default function AuditPage() {
       ));
       toast.success(`Equipo registrado: ${equipment.descripcion} · ${equipment.marca} ${equipment.modelo}`);
       setUnknownSurplusDialog(null);
-      setUnknownForm({ codigo_barras: "", descripcion: "", marca: "", modelo: "" });
+      setUnknownForm({ codigo_barras: "", descripcion: "", marca: "", modelo: "", serie: "" });
     } catch (err) {
       // Handle FastAPI validation errors (array) and string errors
       const detail = err.response?.data?.detail;
@@ -318,6 +319,7 @@ export default function AuditPage() {
 
   const handleFinalizeCheck = async () => {
     setFinalizeDialog(false);
+    setFinalizing(true);
     try {
       await api.post(`/audits/${auditId}/finalize`);
       const [auditRes, sumRes, scansRes] = await Promise.all([
@@ -341,6 +343,8 @@ export default function AuditPage() {
       if (typeof detail === "string") msg = detail;
       else if (Array.isArray(detail)) msg = detail.map(d => d.msg || JSON.stringify(d)).join(", ");
       toast.error(msg);
+    } finally {
+      setFinalizing(false);
     }
   };
 
@@ -388,6 +392,16 @@ export default function AuditPage() {
 
   return (
     <div className={`space-y-4 ${flashClass}`} data-testid="audit-page">
+      {/* Overlay de carga al finalizar */}
+      {finalizing && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
+          <div className="animate-spin h-14 w-14 border-4 border-primary border-t-transparent rounded-full" />
+          <div className="text-center text-white">
+            <p className="font-semibold text-lg">Procesando auditoría...</p>
+            <p className="text-sm text-white/70 mt-1">Aplicando bajas y preparando formatos</p>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="h-5 w-5" /></Button>
@@ -481,7 +495,7 @@ export default function AuditPage() {
                 <div key={scan.id} className="flex items-center justify-between bg-orange-500/10 rounded px-2 py-1">
                   <span className="font-mono text-xs text-orange-700">{scan.codigo_barras}</span>
                   <Button size="sm" variant="outline" className="h-6 text-xs gap-1 border-orange-400"
-                    onClick={() => { setUnknownForm({ codigo_barras: scan.codigo_barras, descripcion: "", marca: "", modelo: "" }); setUnknownSurplusDialog(scan); }}>
+                    onClick={() => { setUnknownForm({ codigo_barras: scan.codigo_barras, descripcion: "", marca: "", modelo: "", serie: "" }); setUnknownSurplusDialog(scan); }}>
                     <PlusCircle className="h-3 w-3" /> Registrar
                   </Button>
                 </div>
@@ -543,7 +557,7 @@ export default function AuditPage() {
                         )}
                         {scan.classification==="sobrante_desconocido" && !scan.registered_manually && (
                           <Button variant="outline" size="sm" className="border-orange-400"
-                            onClick={()=>{setUnknownForm({codigo_barras:scan.codigo_barras,descripcion:"",marca:"",modelo:""});setUnknownSurplusDialog(scan);}}>
+                            onClick={()=>{setUnknownForm({codigo_barras:scan.codigo_barras,descripcion:"",marca:"",modelo:"",serie:""});setUnknownSurplusDialog(scan);}}>
                             <PlusCircle className="h-3.5 w-3.5"/>
                           </Button>
                         )}
@@ -617,6 +631,34 @@ export default function AuditPage() {
               <div className="flex justify-between text-sm"><span className="text-muted-foreground">{t("audit.movementsPending")}</span><span className="font-mono font-bold">{summary.stats?.movements_count||0}</span></div>
             </CardContent></Card>
             <Button className="mt-4" onClick={()=>navigate("/")}><ArrowLeft className="h-4 w-4 mr-2"/>{t("audit.backToDashboard")}</Button>
+            {/* Fotos de formatos si las hay */}
+            {(audit?.photo_ab || audit?.photo_transf) && (
+              <div className="mt-4 space-y-3">
+                <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Formatos de Movimiento</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {audit?.photo_ab && (
+                    <Card>
+                      <CardContent className="p-3 space-y-2">
+                        <p className="text-xs font-medium flex items-center gap-1.5">
+                          <TrendingUp className="h-3.5 w-3.5 text-emerald-500"/><TrendingDown className="h-3.5 w-3.5 text-red-500"/> Formato ALTAS / BAJAS
+                        </p>
+                        <img src={`data:image/jpeg;base64,${audit.photo_ab}`} alt="Formato AB" className="w-full rounded border object-contain max-h-48"/>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {audit?.photo_transf && (
+                    <Card>
+                      <CardContent className="p-3 space-y-2">
+                        <p className="text-xs font-medium flex items-center gap-1.5">
+                          <ArrowRightLeft className="h-3.5 w-3.5 text-blue-500"/> Formato TRANSFERENCIAS
+                        </p>
+                        <img src={`data:image/jpeg;base64,${audit.photo_transf}`} alt="Formato Transferencias" className="w-full rounded border object-contain max-h-48"/>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="notfound">
             <div className="rounded-md border overflow-x-auto">
@@ -729,6 +771,9 @@ export default function AuditPage() {
             </div>
             <div className="space-y-1.5"><Label>Modelo <span className="text-red-500">*</span></Label>
               <Input value={unknownForm.modelo} onChange={e=>setUnknownForm(f=>({...f,modelo:e.target.value}))} placeholder="Ej. FX890II, LaserJet Pro..."/>
+            </div>
+            <div className="space-y-1.5"><Label>Número de Serie</Label>
+              <Input value={unknownForm.serie} onChange={e=>setUnknownForm(f=>({...f,serie:e.target.value}))} placeholder="Número de serie (opcional)"/>
             </div>
           </div>
           <DialogFooter className="gap-2">

@@ -74,6 +74,7 @@ export default function LogsPage() {
   const [selectedAudit, setSelectedAudit] = useState(null);
   const [auditSummary, setAuditSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryFilter, setSummaryFilter] = useState("not_found"); // "located" | "surplus" | "not_found"
   const [deleteDialog, setDeleteDialog] = useState(null);
 
   const classSort = useSortable("scanned_at");
@@ -165,9 +166,18 @@ export default function LogsPage() {
 
   const handleViewAudit = async (audit) => {
     setSelectedAudit(audit);
+    setSummaryFilter("not_found");
     if (audit.status !== "in_progress") {
       setSummaryLoading(true);
-      try { const res = await api.get(`/audits/${audit.id}/summary`); setAuditSummary(res.data); }
+      try {
+        const [sumRes, auditRes] = await Promise.all([
+          api.get(`/audits/${audit.id}/summary`),
+          api.get(`/audits/${audit.id}`)
+        ]);
+        setAuditSummary(sumRes.data);
+        // Actualizar selectedAudit con datos completos (incluyendo fotos)
+        setSelectedAudit(auditRes.data);
+      }
       catch { toast.error(t("common.error")); }
       finally { setSummaryLoading(false); }
     } else { setAuditSummary(null); }
@@ -489,33 +499,103 @@ export default function LogsPage() {
                 </CardContent></Card>
               )}
 
-              {auditSummary?.not_found && auditSummary.not_found.length > 0 && (
-                <Card><CardContent className="p-4">
-                  <p className="text-sm font-medium mb-3">{t("audit.notFound")} ({auditSummary.not_found.length}) — BAJA Aplicada</p>
-                  <div className="overflow-x-auto">
-                    <ScrollArea className="h-[200px]">
-                      <Table style={{ minWidth: "500px" }}>
-                        <TableHeader><TableRow>
-                          <TableHead>{t("audit.barcode")}</TableHead>
-                          <TableHead>{t("audit.description")}</TableHead>
-                          <TableHead>{t("audit.brand")}</TableHead>
-                          <TableHead className="text-right">{t("audit.realValue")}</TableHead>
-                        </TableRow></TableHeader>
-                        <TableBody>
-                          {auditSummary.not_found.slice(0, 50).map(scan => {
-                            const eq = scan.equipment_data || {};
-                            return (
-                              <TableRow key={scan.id}>
-                                <TableCell className="font-mono text-xs">{scan.codigo_barras}</TableCell>
-                                <TableCell className="text-sm whitespace-nowrap">{eq.descripcion || "—"}</TableCell>
-                                <TableCell className="text-sm whitespace-nowrap">{eq.marca} {eq.modelo}</TableCell>
-                                <TableCell className="text-right font-mono text-sm whitespace-nowrap">{fmtMoney(eq.valor_real)}</TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
+              {auditSummary && (
+                <Card><CardContent className="p-4 space-y-3">
+                  {/* Botones filtro — misma apariencia que los del panel */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => setSummaryFilter("located")}
+                      className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${summaryFilter === "located" ? "border-emerald-500 bg-emerald-500/10" : "border-muted hover:border-emerald-400"}`}
+                    >
+                      <CheckCircle className={`h-5 w-5 mb-1 ${summaryFilter === "located" ? "text-emerald-500" : "text-muted-foreground"}`}/>
+                      <span className="font-mono font-bold text-lg text-emerald-500">{auditSummary?.stats?.located_count ?? 0}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase">{t("audit.located")}</span>
+                    </button>
+                    <button
+                      onClick={() => setSummaryFilter("surplus")}
+                      className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${summaryFilter === "surplus" ? "border-amber-500 bg-amber-500/10" : "border-muted hover:border-amber-400"}`}
+                    >
+                      <AlertTriangle className={`h-5 w-5 mb-1 ${summaryFilter === "surplus" ? "text-amber-500" : "text-muted-foreground"}`}/>
+                      <span className="font-mono font-bold text-lg text-amber-500">{auditSummary?.stats?.surplus_count ?? 0}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase">{t("audit.surplus")}</span>
+                    </button>
+                    <button
+                      onClick={() => setSummaryFilter("not_found")}
+                      className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${summaryFilter === "not_found" ? "border-red-500 bg-red-500/10" : "border-muted hover:border-red-400"}`}
+                    >
+                      <XCircle className={`h-5 w-5 mb-1 ${summaryFilter === "not_found" ? "text-red-500" : "text-muted-foreground"}`}/>
+                      <span className="font-mono font-bold text-lg text-red-500">{auditSummary?.stats?.not_found_count ?? 0}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase">{t("audit.notFound")}</span>
+                    </button>
+                  </div>
+
+                  {/* Tabla de detalle según filtro */}
+                  {(() => {
+                    const items = summaryFilter === "located" ? (auditSummary.located || [])
+                      : summaryFilter === "surplus" ? (auditSummary.surplus || [])
+                      : (auditSummary.not_found || []);
+                    const label = summaryFilter === "located" ? t("audit.located")
+                      : summaryFilter === "surplus" ? t("audit.surplus")
+                      : t("audit.notFound");
+                    return items.length > 0 ? (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-2 uppercase">{label} ({items.length})</p>
+                        <div className="overflow-x-auto rounded border">
+                          <ScrollArea className="h-[220px]">
+                            <Table style={{ minWidth: 560 }}>
+                              <TableHeader><TableRow>
+                                <TableHead className="whitespace-nowrap">{t("audit.barcode")}</TableHead>
+                                <TableHead className="whitespace-nowrap">{t("audit.description")}</TableHead>
+                                <TableHead className="whitespace-nowrap">{t("audit.brand")}</TableHead>
+                                <TableHead className="whitespace-nowrap">Modelo</TableHead>
+                                <TableHead className="whitespace-nowrap">Serie</TableHead>
+                                <TableHead className="text-right whitespace-nowrap">{t("audit.realValue")}</TableHead>
+                                <TableHead className="whitespace-nowrap">{t("audit.deprecated")}</TableHead>
+                              </TableRow></TableHeader>
+                              <TableBody>
+                                {items.slice(0, 100).map(scan => {
+                                  const eq = scan.equipment_data || {};
+                                  return (
+                                    <TableRow key={scan.id}>
+                                      <TableCell className="font-mono text-xs whitespace-nowrap">{scan.codigo_barras}</TableCell>
+                                      <TableCell className="text-sm whitespace-nowrap max-w-[140px] truncate">{eq.descripcion || "—"}</TableCell>
+                                      <TableCell className="text-sm whitespace-nowrap">{eq.marca || "—"}</TableCell>
+                                      <TableCell className="text-sm whitespace-nowrap">{eq.modelo || "—"}</TableCell>
+                                      <TableCell className="text-xs font-mono whitespace-nowrap">{eq.serie || "—"}</TableCell>
+                                      <TableCell className="text-right font-mono text-sm whitespace-nowrap">{fmtMoney(eq.valor_real)}</TableCell>
+                                      <TableCell><Badge variant={eq.depreciado ? "destructive" : "outline"} className="text-[10px]">{eq.depreciado ? "Sí" : "No"}</Badge></TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </ScrollArea>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-center text-muted-foreground py-4">{t("common.noResults")}</p>
+                    );
+                  })()}
+                </CardContent></Card>
+              )}
+
+              {/* Fotos de formatos (solo auditorías completadas) */}
+              {selectedAudit?.status === "completed" && (selectedAudit?.photo_ab || selectedAudit?.photo_transf) && (
+                <Card><CardContent className="p-4 space-y-3">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Formatos de Movimiento</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {selectedAudit?.photo_ab && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">Formato ALTAS / BAJAS</p>
+                        <img src={`data:image/jpeg;base64,${selectedAudit.photo_ab}`} alt="Formato AB" className="w-full rounded border object-contain max-h-48"/>
+                      </div>
+                    )}
+                    {selectedAudit?.photo_transf && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">Formato TRANSFERENCIAS</p>
+                        <img src={`data:image/jpeg;base64,${selectedAudit.photo_transf}`} alt="Formato Transferencias" className="w-full rounded border object-contain max-h-48"/>
+                      </div>
+                    )}
                   </div>
                 </CardContent></Card>
               )}

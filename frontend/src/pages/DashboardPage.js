@@ -302,31 +302,35 @@ export default function DashboardPage() {
               {eqLoading ? (
                 <div className="flex items-center justify-center py-8"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>
               ) : (
-                <ScrollArea className="h-[350px]">
-                  <Table>
-                    <TableHeader><TableRow>
-                      <TableHead><eqSort.SortHeader col="codigo_barras">{t("audit.barcode")}</eqSort.SortHeader></TableHead>
-                      <TableHead><eqSort.SortHeader col="descripcion">{t("audit.description")}</eqSort.SortHeader></TableHead>
-                      <TableHead><eqSort.SortHeader col="marca">{t("audit.brand")}</eqSort.SortHeader></TableHead>
-                      <TableHead><eqSort.SortHeader col="modelo">{t("audit.model")}</eqSort.SortHeader></TableHead>
-                      <TableHead className="text-right"><eqSort.SortHeader col="valor_real">{t("audit.realValue")}</eqSort.SortHeader></TableHead>
-                      <TableHead><eqSort.SortHeader col="depreciado">{t("audit.deprecated")}</eqSort.SortHeader></TableHead>
-                    </TableRow></TableHeader>
-                    <TableBody>
-                      {eqSort.sorted(storeEquipment).map(eq => (
-                        <TableRow key={eq.id}>
-                          <TableCell className="font-mono text-xs">{eq.codigo_barras}</TableCell>
-                          <TableCell className="text-sm">{eq.descripcion}</TableCell>
-                          <TableCell className="text-sm">{eq.marca}</TableCell>
-                          <TableCell className="text-sm">{eq.modelo}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmtMoney(eq.valor_real)}</TableCell>
-                          <TableCell><Badge variant={eq.depreciado ? "destructive" : "outline"} className="text-[10px]">{eq.depreciado ? "Si" : "No"}</Badge></TableCell>
-                        </TableRow>
-                      ))}
-                      {storeEquipment.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-4 text-muted-foreground">{t("common.noResults")}</TableCell></TableRow>}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
+                <div className="overflow-x-auto rounded-md border">
+                  <ScrollArea className="h-[320px]">
+                    <Table style={{ minWidth: 680 }}>
+                      <TableHeader><TableRow>
+                        <TableHead className="whitespace-nowrap"><eqSort.SortHeader col="codigo_barras">{t("audit.barcode")}</eqSort.SortHeader></TableHead>
+                        <TableHead className="whitespace-nowrap"><eqSort.SortHeader col="descripcion">{t("audit.description")}</eqSort.SortHeader></TableHead>
+                        <TableHead className="whitespace-nowrap"><eqSort.SortHeader col="marca">{t("audit.brand")}</eqSort.SortHeader></TableHead>
+                        <TableHead className="whitespace-nowrap"><eqSort.SortHeader col="modelo">{t("audit.model")}</eqSort.SortHeader></TableHead>
+                        <TableHead className="whitespace-nowrap"><eqSort.SortHeader col="serie">Serie</eqSort.SortHeader></TableHead>
+                        <TableHead className="text-right whitespace-nowrap"><eqSort.SortHeader col="valor_real">{t("audit.realValue")}</eqSort.SortHeader></TableHead>
+                        <TableHead className="whitespace-nowrap"><eqSort.SortHeader col="depreciado">{t("audit.deprecated")}</eqSort.SortHeader></TableHead>
+                      </TableRow></TableHeader>
+                      <TableBody>
+                        {eqSort.sorted(storeEquipment).map(eq => (
+                          <TableRow key={eq.id}>
+                            <TableCell className="font-mono text-xs whitespace-nowrap">{eq.codigo_barras}</TableCell>
+                            <TableCell className="text-sm whitespace-nowrap max-w-[140px] truncate">{eq.descripcion}</TableCell>
+                            <TableCell className="text-sm whitespace-nowrap">{eq.marca}</TableCell>
+                            <TableCell className="text-sm whitespace-nowrap">{eq.modelo}</TableCell>
+                            <TableCell className="text-xs font-mono whitespace-nowrap">{eq.serie || "—"}</TableCell>
+                            <TableCell className="text-right font-mono text-sm whitespace-nowrap">{fmtMoney(eq.valor_real)}</TableCell>
+                            <TableCell><Badge variant={eq.depreciado ? "destructive" : "outline"} className="text-[10px]">{eq.depreciado ? "Sí" : "No"}</Badge></TableCell>
+                          </TableRow>
+                        ))}
+                        {storeEquipment.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-4 text-muted-foreground">{t("common.noResults")}</TableCell></TableRow>}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </div>
               )}
             </TabsContent>
           </Tabs>
