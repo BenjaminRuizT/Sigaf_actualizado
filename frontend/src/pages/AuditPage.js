@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import {
   Scan, CheckCircle, AlertTriangle, XCircle, ArrowRightLeft, Trash2, ArrowLeft,
   FileCheck, Package, HelpCircle, StickyNote, ArrowUpDown, X, WifiOff, RefreshCw,
-  CloudOff, Cloud, Camera, CameraOff, PlusCircle, Ban, TrendingDown, TrendingUp
+  CloudOff, Cloud, Camera, PlusCircle, Ban, TrendingDown, TrendingUp
 } from "lucide-react";
 
 const classColors = {
@@ -47,419 +47,6 @@ function useSortable(defaultKey, defaultDir = "asc") {
     </button>
   );
   return { sorted, SortHeader };
-}
-
-// ── Barcode Scanner Component ──
-// Modo A: BarcodeDetector nativo — escaneo continuo (Chrome Android / iOS 17+)
-// Modo B: Foto → Gemini Vision → muestra número detectado para confirmar/editar
-// Imagen nunca guardada en disco — solo en memoria JS, descartada al terminar
-function BarcodeScanner({ onDetected, onClose }) {
-  const { api } = useAuth();
-
-  // Pantallas: "menu" | "live" | "photo"
-  const [screen, setScreen]       = useState("menu");
-
-  // --- Estado modo LIVE ---
-  const [liveReady, setLiveReady] = useState(false);
-  const [liveError, setLiveError] = useState(null);
-
-  // --- Estado modo FOTO ---
-  // pasos: "cam" | "preview" | "processing" | "result"
-  const [photoStep, setPhotoStep]   = useState("cam");
-  const [photoReady, setPhotoReady] = useState(false);
-  const [photoError, setPhotoError] = useState(null);
-  const [previewSrc, setPreviewSrc] = useState(null);
-  // Resultado: número detectado por IA, editable por usuario
-  const [detectedCode, setDetectedCode] = useState("");
-
-  const liveVideoRef  = useRef(null);
-  const liveStreamRef = useRef(null);
-  const detectorRef   = useRef(null);
-  const rafRef        = useRef(null);
-
-  const photoVideoRef  = useRef(null);
-  const photoStreamRef = useRef(null);
-  const capturedB64    = useRef(null);
-
-  // cleanup al desmontar
-  useEffect(() => () => { _stopLive(); _stopPhoto(); }, []); // eslint-disable-line
-
-  function _stopLive() {
-    if (rafRef.current)        { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-    if (liveStreamRef.current) { liveStreamRef.current.getTracks().forEach(t => t.stop()); liveStreamRef.current = null; }
-  }
-  function _stopPhoto() {
-    if (photoStreamRef.current) { photoStreamRef.current.getTracks().forEach(t => t.stop()); photoStreamRef.current = null; }
-  }
-  function _goMenu() {
-    _stopLive(); _stopPhoto();
-    setScreen("menu"); setLiveReady(false); setLiveError(null);
-    setPhotoStep("cam"); setPhotoReady(false); setPhotoError(null);
-    setPreviewSrc(null); setDetectedCode("");
-  }
-
-  // ══════════════════════════════════════
-  // MODO LIVE — useEffect inicia cámara DESPUÉS de que el <video> está en el DOM
-  // ══════════════════════════════════════
-  useEffect(() => {
-    if (screen !== "live") return;
-    let cancelled = false;
-    setLiveReady(false); setLiveError(null);
-
-    (async () => {
-      try {
-        if (!("BarcodeDetector" in window)) {
-          setLiveError("BarcodeDetector no disponible en este navegador. Usa el modo Foto.");
-          return;
-        }
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
-        });
-        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
-        liveStreamRef.current = stream;
-        if (liveVideoRef.current) {
-          liveVideoRef.current.srcObject = stream;
-          await liveVideoRef.current.play();
-        }
-        const supported = await window.BarcodeDetector.getSupportedFormats();
-        const wanted = ["code_128","code_39","code_93","ean_13","ean_8","upc_a","upc_e","itf","qr_code","data_matrix"];
-        const formats = wanted.filter(f => supported.includes(f));
-        detectorRef.current = new window.BarcodeDetector({ formats: formats.length ? formats : supported });
-        if (cancelled) return;
-        setLiveReady(true);
-        const detect = async () => {
-          if (cancelled) return;
-          const video = liveVideoRef.current;
-          const det   = detectorRef.current;
-          if (!video || !det || video.readyState < 2) { rafRef.current = requestAnimationFrame(detect); return; }
-          try {
-            const results = await det.detect(video);
-            if (results.length > 0) {
-              const code = results[0].rawValue.trim();
-              _stopLive();
-              onDetected(code);
-              return;
-            }
-          } catch {}
-          rafRef.current = requestAnimationFrame(detect);
-        };
-        rafRef.current = requestAnimationFrame(detect);
-      } catch (err) {
-        if (!cancelled) setLiveError("Cámara no disponible: " + (err.message || "verifica permisos"));
-      }
-    })();
-
-    return () => { cancelled = true; _stopLive(); setLiveReady(false); };
-  }, [screen]); // eslint-disable-line
-
-  // ══════════════════════════════════════
-  // MODO FOTO — useEffect inicia cámara DESPUÉS de que el <video> está en el DOM
-  // ══════════════════════════════════════
-  useEffect(() => {
-    if (screen !== "photo" || photoStep !== "cam") return;
-    let cancelled = false;
-    setPhotoReady(false); setPhotoError(null);
-
-    (async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-        });
-        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
-        photoStreamRef.current = stream;
-        if (photoVideoRef.current) {
-          photoVideoRef.current.srcObject = stream;
-          await photoVideoRef.current.play();
-        }
-        if (!cancelled) setPhotoReady(true);
-      } catch (err) {
-        if (!cancelled) setPhotoError("Cámara no disponible: " + (err.message || "verifica permisos"));
-      }
-    })();
-
-    return () => { cancelled = true; _stopPhoto(); setPhotoReady(false); };
-  }, [screen, photoStep]); // eslint-disable-line
-
-  // ── Capturar foto del video ──
-  function capturePhoto() {
-    const video = photoVideoRef.current;
-    if (!video || video.readyState < 2) return;
-    const canvas = document.createElement("canvas");
-    canvas.width  = video.videoWidth  || 1280;
-    canvas.height = video.videoHeight || 720;
-    canvas.getContext("2d").drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
-    canvas.width = 0; canvas.height = 0;
-    _stopPhoto();
-    capturedB64.current = dataUrl;
-    setPreviewSrc(dataUrl);
-    setPhotoStep("preview");
-  }
-
-  // ── Enviar foto al backend Gemini ──
-  async function analyzePhoto() {
-    const b64 = capturedB64.current;
-    if (!b64) return;
-    setPhotoStep("processing");
-    setPhotoError(null);
-    try {
-      const res = await api.post("/scan-image", { image_base64: b64 });
-      capturedB64.current = null;
-      // *** NO llamamos onDetected directamente ***
-      // Mostramos el resultado para que el usuario lo confirme o edite
-      setDetectedCode(res.data.barcode || "");
-      setPhotoStep("result");
-    } catch (err) {
-      capturedB64.current = null;
-      const d = err.response?.data?.detail;
-      const msg = typeof d === "string" ? d : "No se detectó número en la imagen.";
-      // En caso de error, mostramos pantalla de resultado vacía para que el usuario escriba
-      setDetectedCode("");
-      setPhotoError(msg);
-      setPhotoStep("result");
-    }
-  }
-
-  // ── Confirmar y usar el código ──
-  function confirmCode() {
-    const code = detectedCode.trim();
-    if (!code) return;
-    setPreviewSrc(null);
-    setDetectedCode("");
-    onDetected(code);
-  }
-
-  // ══════════════════════════════════════════════════════
-  // RENDER
-  // ══════════════════════════════════════════════════════
-
-  // ── MENÚ ──
-  if (screen === "menu") {
-    const hasDetector = "BarcodeDetector" in window;
-    return (
-      <div className="space-y-3 py-1">
-        <p className="text-sm text-center text-muted-foreground">¿Cómo quieres capturar el código?</p>
-        <div className="space-y-2">
-          <button
-            onClick={() => setScreen("live")}
-            disabled={!hasDetector}
-            className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all
-              ${hasDetector ? "border-primary/30 hover:border-primary hover:bg-primary/5" : "border-muted/40 opacity-50 cursor-not-allowed"}`}
-          >
-            <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <Scan className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="font-semibold text-sm">Escaneo en vivo</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {hasDetector ? "Apunta la cámara — el código se detecta solo" : "No disponible en este navegador"}
-              </p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => { setPhotoStep("cam"); setPreviewSrc(null); setDetectedCode(""); setPhotoError(null); setScreen("photo"); }}
-            className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-blue-400/40 hover:border-blue-500 hover:bg-blue-50/50 text-left transition-all"
-          >
-            <div className="h-11 w-11 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
-              <Camera className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="font-semibold text-sm">Tomar foto de etiqueta</p>
-              <p className="text-xs text-muted-foreground mt-0.5">La IA lee el número. Funciona en todos los dispositivos.</p>
-            </div>
-          </button>
-        </div>
-        <Button variant="outline" size="sm" className="w-full" onClick={onClose}>
-          <X className="h-4 w-4 mr-1" /> Cancelar
-        </Button>
-      </div>
-    );
-  }
-
-  // ── PANTALLA LIVE ──
-  if (screen === "live") {
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between mb-1">
-          <button onClick={_goMenu} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground">
-            <ArrowLeft className="h-3.5 w-3.5" /> Menú
-          </button>
-          <span className="text-xs font-semibold">Escaneo en vivo</span>
-        </div>
-
-        <div className="relative rounded-xl overflow-hidden bg-black border border-primary/40" style={{ minHeight: 230 }}>
-          {/* video SIEMPRE en el DOM — useEffect lo conecta al stream */}
-          <video ref={liveVideoRef} className="w-full block" style={{ maxHeight: 280 }} playsInline muted autoPlay />
-
-          {!liveReady && !liveError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-              <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full" />
-            </div>
-          )}
-          {liveReady && (
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute inset-0 bg-black/40" />
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-                style={{ width:"78%", height:"28%", boxShadow:"0 0 0 9999px rgba(0,0,0,0.45)",
-                  border:"2px solid rgba(99,102,241,0.9)", borderRadius:6 }}>
-                <div className="absolute left-2 right-2 h-px bg-primary/80 animate-bounce" style={{ top:"50%" }} />
-              </div>
-              <p className="absolute bottom-2 left-0 right-0 text-center text-xs text-white/90">
-                Centra el código de barras en el recuadro
-              </p>
-            </div>
-          )}
-          {liveError && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/85 p-4">
-              <CameraOff className="h-8 w-8 text-red-400" />
-              <p className="text-xs text-red-300 text-center">{liveError}</p>
-              <Button size="sm" variant="outline" className="gap-2 bg-white/10 text-white border-white/20"
-                onClick={() => { _stopLive(); setPhotoStep("cam"); setPreviewSrc(null); setDetectedCode(""); setPhotoError(null); setScreen("photo"); }}>
-                <Camera className="h-4 w-4" /> Usar modo Foto
-              </Button>
-            </div>
-          )}
-        </div>
-        <Button variant="outline" size="sm" className="w-full" onClick={() => { _stopLive(); onClose(); }}>
-          <X className="h-4 w-4 mr-1" /> Cancelar
-        </Button>
-      </div>
-    );
-  }
-
-  // ── PANTALLA FOTO ──
-  if (screen === "photo") {
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between mb-1">
-          <button onClick={_goMenu} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground">
-            <ArrowLeft className="h-3.5 w-3.5" /> Menú
-          </button>
-          <span className="text-xs font-semibold">
-            {photoStep === "cam"        && "Encuadra la etiqueta"}
-            {photoStep === "preview"    && "Confirmar foto"}
-            {photoStep === "processing" && "Analizando..."}
-            {photoStep === "result"     && "Número detectado"}
-          </span>
-        </div>
-
-        {/* ── PASO 1: cámara ── */}
-        {photoStep === "cam" && (
-          <div className="space-y-2">
-            {photoError && (
-              <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-start gap-1">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />{photoError}
-              </div>
-            )}
-            <div className="relative rounded-xl overflow-hidden bg-black border" style={{ minHeight: 230 }}>
-              {/* video SIEMPRE en el DOM — useEffect lo conecta */}
-              <video ref={photoVideoRef} className="w-full block" style={{ maxHeight: 300 }} playsInline muted autoPlay />
-              {!photoReady && !photoError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-                  <div className="animate-spin h-10 w-10 border-4 border-yellow-400 border-t-transparent rounded-full" />
-                </div>
-              )}
-              {photoReady && (
-                <div className="absolute inset-0 pointer-events-none">
-                  <div className="absolute inset-0 bg-black/30" />
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-                    style={{ width:"84%", height:"42%", boxShadow:"0 0 0 9999px rgba(0,0,0,0.35)",
-                      border:"2px solid rgba(234,179,8,0.9)", borderRadius:6 }} />
-                  <p className="absolute bottom-2 left-0 right-0 text-center text-xs text-white/90">
-                    Centra la etiqueta en el recuadro y toca Capturar
-                  </p>
-                </div>
-              )}
-            </div>
-            <Button className="w-full h-11 gap-2" disabled={!photoReady} onClick={capturePhoto}>
-              <Camera className="h-5 w-5" />
-              {photoReady ? "Capturar foto" : "Iniciando cámara..."}
-            </Button>
-          </div>
-        )}
-
-        {/* ── PASO 2: preview ── */}
-        {photoStep === "preview" && (
-          <div className="space-y-3">
-            {previewSrc && <img src={previewSrc} alt="Etiqueta" className="w-full rounded-xl border object-contain max-h-52" />}
-            <p className="text-xs text-muted-foreground text-center">¿La etiqueta se ve clara y completa?</p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" className="gap-1" onClick={() => { setPreviewSrc(null); capturedB64.current = null; setPhotoStep("cam"); }}>
-                <Camera className="h-4 w-4" /> Repetir foto
-              </Button>
-              <Button className="gap-1" onClick={analyzePhoto}>
-                <Scan className="h-4 w-4" /> Analizar
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── PASO 3: procesando ── */}
-        {photoStep === "processing" && (
-          <div className="flex flex-col items-center justify-center py-10 gap-4">
-            <div className="relative">
-              <div className="animate-spin h-14 w-14 border-4 border-primary border-t-transparent rounded-full" />
-              <Scan className="absolute inset-0 m-auto h-6 w-6 text-primary" />
-            </div>
-            <div className="text-center">
-              <p className="font-semibold text-sm">Analizando etiqueta...</p>
-              <p className="text-xs text-muted-foreground mt-1">La IA está leyendo el número</p>
-            </div>
-          </div>
-        )}
-
-        {/* ── PASO 4: resultado — editable antes de confirmar ── */}
-        {photoStep === "result" && (
-          <div className="space-y-3">
-            {previewSrc && <img src={previewSrc} alt="Etiqueta" className="w-full rounded-xl border object-contain max-h-36" />}
-
-            {photoError ? (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-700">{photoError}</p>
-              </div>
-            ) : (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-green-700">Número detectado. Verifica que sea correcto o edítalo.</p>
-              </div>
-            )}
-
-            {/* Campo editable — usuario puede corregir si la IA se equivocó */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Código / Número de activo</label>
-              <input
-                type="text"
-                value={detectedCode}
-                onChange={e => setDetectedCode(e.target.value)}
-                placeholder="Escribe o edita el número..."
-                className="w-full border rounded-lg px-3 py-2.5 font-mono text-lg text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-primary"
-                autoFocus
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" className="gap-1" onClick={() => { setPreviewSrc(null); capturedB64.current = null; setDetectedCode(""); setPhotoError(null); setPhotoStep("cam"); }}>
-                <Camera className="h-4 w-4" /> Nueva foto
-              </Button>
-              <Button className="gap-1" disabled={!detectedCode.trim()} onClick={confirmCode}>
-                <CheckCircle className="h-4 w-4" /> Usar este código
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {photoStep !== "processing" && (
-          <Button variant="outline" size="sm" className="w-full" onClick={() => { _stopPhoto(); onClose(); }}>
-            <X className="h-4 w-4 mr-1" /> Cancelar
-          </Button>
-        )}
-      </div>
-    );
-  }
-
-  return null;
 }
 
 // ── Photo capture component — camera only, no gallery ──
@@ -570,8 +157,6 @@ export default function AuditPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
 
-  // Camera barcode scanner
-  const [cameraActive, setCameraActive] = useState(false);
 
   // Unknown surplus
   const [unknownSurplusDialog, setUnknownSurplusDialog] = useState(null);
@@ -612,7 +197,7 @@ export default function AuditPage() {
 
   useEffect(() => { Promise.all([fetchAudit(), fetchScans()]).finally(() => setLoading(false)); }, [fetchAudit, fetchScans]);
   useEffect(() => { if (audit?.cr_tienda) fetchStoreEquipment(); }, [audit?.cr_tienda, fetchStoreEquipment]);
-  useEffect(() => { if (audit?.status === "in_progress" && inputRef.current && !cameraActive) inputRef.current.focus(); }, [audit, cameraActive]);
+  useEffect(() => { if (audit?.status === "in_progress" && inputRef.current) inputRef.current.focus(); }, [audit]);
 
   useEffect(() => {
     if (isOnline && audit?.status === "in_progress" && offlineQueue.length > 0 && !syncing) {
@@ -660,18 +245,11 @@ export default function AuditPage() {
       } else { toast.error(err.response?.data?.detail || t("common.error")); }
     } finally {
       setScanning(false);
-      if (inputRef.current && !cameraActive) inputRef.current.focus();
+      if (inputRef.current) inputRef.current.focus();
     }
-  }, [scanning, api, auditId, t, addToQueue, cameraActive]);
+  }, [scanning, api, auditId, t, addToQueue]);
 
   const handleScan = async () => { const bc = barcode.trim(); if (!bc) return; await performScan(bc); setBarcode(""); };
-
-  const handleCameraDetected = useCallback(async (detectedBarcode) => {
-    setCameraActive(false);
-    setBarcode(detectedBarcode);
-    await performScan(detectedBarcode);
-    setBarcode("");
-  }, [performScan]);
 
   const handleDeleteScan = async (scanId) => {
     try {
@@ -850,21 +428,9 @@ export default function AuditPage() {
                   data-testid="barcode-input" autoComplete="off" />
               </div>
               <Button onClick={handleScan} disabled={scanning || !barcode.trim()} className="h-14 px-6"><Scan className="h-5 w-5" /></Button>
-              <Button
-                variant={cameraActive ? "destructive" : "outline"}
-                className="h-14 px-4"
-                onClick={() => setCameraActive(v => !v)}
-                title={cameraActive ? "Cerrar cámara" : "Escanear con cámara"}
-              >
-                {cameraActive ? <CameraOff className="h-5 w-5" /> : <Camera className="h-5 w-5" />}
-              </Button>
+
             </div>
-            {cameraActive && (
-              <BarcodeScanner
-                onDetected={handleCameraDetected}
-                onClose={() => setCameraActive(false)}
-              />
-            )}
+
           </CardContent>
         </Card>
       )}
@@ -993,17 +559,18 @@ export default function AuditPage() {
             </ScrollArea>
           </TabsContent>
           <TabsContent value="equipment">
-            <div className="rounded-md border overflow-x-auto">
-              <Table style={{ minWidth: 750 }}>
+            <div className="rounded-md border overflow-x-auto w-full">
+              <Table style={{ minWidth: 820 }}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="sticky left-0 bg-background z-10 whitespace-nowrap">Estado</TableHead>
+                    <TableHead className="sticky left-0 bg-background z-10 w-10">Estado</TableHead>
                     <TableHead className="whitespace-nowrap"><eqSort.SortHeader col="codigo_barras">{t("audit.barcode")}</eqSort.SortHeader></TableHead>
                     <TableHead className="whitespace-nowrap"><eqSort.SortHeader col="descripcion">{t("audit.description")}</eqSort.SortHeader></TableHead>
                     <TableHead className="whitespace-nowrap"><eqSort.SortHeader col="marca">{t("audit.brand")}</eqSort.SortHeader></TableHead>
                     <TableHead className="whitespace-nowrap"><eqSort.SortHeader col="modelo">{t("audit.model")}</eqSort.SortHeader></TableHead>
                     <TableHead className="whitespace-nowrap"><eqSort.SortHeader col="serie">Serie</eqSort.SortHeader></TableHead>
                     <TableHead className="text-right whitespace-nowrap"><eqSort.SortHeader col="valor_real">{t("audit.realValue")}</eqSort.SortHeader></TableHead>
+                    <TableHead className="whitespace-nowrap"><eqSort.SortHeader col="depreciado">{t("audit.deprecated")}</eqSort.SortHeader></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1013,11 +580,12 @@ export default function AuditPage() {
                       <TableRow key={eq.id} className={isScanned?"bg-emerald-500/5":""}>
                         <TableCell className="sticky left-0 bg-background z-10">{isScanned?<CheckCircle className="h-4 w-4 text-emerald-500"/>:<span className="text-muted-foreground text-xs">—</span>}</TableCell>
                         <TableCell className="font-mono text-xs whitespace-nowrap">{eq.codigo_barras}</TableCell>
-                        <TableCell className="text-sm whitespace-nowrap">{eq.descripcion}</TableCell>
+                        <TableCell className="text-sm whitespace-nowrap max-w-[160px] truncate">{eq.descripcion}</TableCell>
                         <TableCell className="text-sm whitespace-nowrap">{eq.marca}</TableCell>
                         <TableCell className="text-sm whitespace-nowrap">{eq.modelo}</TableCell>
-                        <TableCell className="text-sm font-mono text-xs whitespace-nowrap">{eq.serie}</TableCell>
+                        <TableCell className="text-xs font-mono whitespace-nowrap">{eq.serie}</TableCell>
                         <TableCell className="text-right font-mono text-sm whitespace-nowrap">{fmtMoney(eq.valor_real)}</TableCell>
+                        <TableCell><Badge variant={eq.depreciado?"destructive":"outline"} className="text-[10px]">{eq.depreciado?"Sí":"No"}</Badge></TableCell>
                       </TableRow>
                     );
                   })}

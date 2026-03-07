@@ -123,9 +123,7 @@ export default function LogsPage() {
   const doExport = async (exportType, extraParams = {}, filename) => {
     setExporting(true);
     try {
-      const params = { ...extraParams };
-      if (searchDebounced) params.search = searchDebounced;
-      const res = await api.get(`/export/${exportType}`, { params, responseType: "blob" });
+      const res = await api.get(`/export/${exportType}`, { params: extraParams, responseType: "blob" });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement("a");
       a.href = url;
@@ -140,20 +138,28 @@ export default function LogsPage() {
   const handleExportClassifications = () => {
     const params = {};
     if (classFilter !== "all") params.classification = classFilter;
+    if (searchDebounced) params.search = searchDebounced;
     doExport("classifications", params, `sigaf_clasificaciones_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
   const handleExportMovAB = () => {
-    doExport("movements-ab", {}, `SIGAF_AB_General_${new Date().toISOString().split("T")[0]}.xlsx`);
+    const params = {};
+    if (movFilter === "bajas") params.type = "bajas";
+    else if (movFilter === "altas") params.type = "altas";
+    if (searchDebounced) params.search = searchDebounced;
+    doExport("movements-ab", params, `SIGAF_AB_General_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
   const handleExportMovTransfer = () => {
-    doExport("movements-transferencias", {}, `SIGAF_TRANSFERENCIAS_General_${new Date().toISOString().split("T")[0]}.xlsx`);
+    const params = {};
+    if (searchDebounced) params.search = searchDebounced;
+    doExport("movements-transferencias", params, `SIGAF_TRANSFERENCIAS_General_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
   const handleExportAudits = () => {
     const params = {};
     if (auditFilter !== "all") params.status = auditFilter;
+    if (searchDebounced) params.search = searchDebounced;
     doExport("audits", params, `sigaf_auditorias_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
@@ -298,9 +304,9 @@ export default function LogsPage() {
               <SelectTrigger className="w-52" data-testid="mov-filter"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("logs.all")}</SelectItem>
-                <SelectItem value="altas">ALTAS</SelectItem>
-                <SelectItem value="bajas">BAJAS</SelectItem>
-                <SelectItem value="transferencias">TRANSFERENCIAS</SelectItem>
+                <SelectItem value="bajas">No Localizado (BAJA)</SelectItem>
+                <SelectItem value="altas">Sobrante (ALTA)</SelectItem>
+                <SelectItem value="transferencias">Transferencias</SelectItem>
               </SelectContent>
             </Select>
             <div className="flex gap-2 flex-wrap">
@@ -367,7 +373,6 @@ export default function LogsPage() {
                 <SelectItem value="all">{t("logs.all")}</SelectItem>
                 <SelectItem value="in_progress">{t("dashboard.inProgress")}</SelectItem>
                 <SelectItem value="completed">{t("logs.completed")}</SelectItem>
-                <SelectItem value="completed">Completada</SelectItem>
                 <SelectItem value="cancelada">Cancelada</SelectItem>
               </SelectContent>
             </Select>
@@ -403,11 +408,9 @@ export default function LogsPage() {
                         <TableCell>
                           <Badge variant="outline" className={`text-[10px] ${
                             item.status === "completed" ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" :
-                            item.status === "completed" ? "bg-amber-500/15 text-amber-600 border-amber-500/30" :
                             item.status === "cancelada" ? "bg-gray-500/10 text-gray-500 border-gray-400/30" :
                             "bg-blue-500/15 text-blue-600 border-blue-500/30"}`}>
                             {item.status === "completed" ? t("logs.completed") :
-                              item.status === "completed" ? "Completada" :
                               item.status === "cancelada" ? "Cancelada" : t("dashboard.inProgress")}
                           </Badge>
                         </TableCell>
@@ -446,10 +449,9 @@ export default function LogsPage() {
               <div className="flex items-center gap-3 flex-wrap">
                 <Badge variant="outline" className={`text-xs ${
                   selectedAudit.status === "completed" ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" :
-                  selectedAudit.status === "completed" ? "bg-amber-500/15 text-amber-600 border-amber-500/30" :
                   selectedAudit.status === "cancelada" ? "bg-gray-500/10 text-gray-500 border-gray-400/30" :
                   "bg-blue-500/15 text-blue-600 border-blue-500/30"}`}>
-                  {selectedAudit.status === "completed" ? t("logs.completed") : selectedAudit.status === "completed" ? "INCOMPLETO" : selectedAudit.status === "cancelada" ? "CANCELADA" : t("dashboard.inProgress")}
+                  {selectedAudit.status === "completed" ? t("logs.completed") : selectedAudit.status === "cancelada" ? "CANCELADA" : t("dashboard.inProgress")}
                 </Badge>
                 <span className="text-xs text-muted-foreground">Inicio: {fmtDate(selectedAudit.started_at)}</span>
                 {selectedAudit.finished_at && <span className="text-xs text-muted-foreground">Fin: {fmtDate(selectedAudit.finished_at)}</span>}
