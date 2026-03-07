@@ -674,7 +674,7 @@ async def get_movements(audit_id: Optional[str] = None, type: Optional[str] = No
 
 # ==================== LOGS ====================
 @api_router.get("/logs/classifications")
-async def get_classification_logs(audit_id: Optional[str] = None, classification: Optional[str] = None, search: Optional[str] = None, page: int = 1, limit: int = 100, user=Depends(get_current_user)):
+async def get_classification_logs(audit_id: Optional[str] = None, classification: Optional[str] = None, search: Optional[str] = None, page: int = 1, limit: int = 500, user=Depends(get_current_user)):
     query = {}
     if audit_id:
         query["audit_id"] = audit_id
@@ -1108,6 +1108,48 @@ async def export_to_excel(export_type: str, token: Optional[str] = None, authori
 
         for col, width in zip(range(1, 14), [18, 18, 28, 10, 14, 20, 12, 12, 12, 12, 14, 16, 28]):
             ws.column_dimensions[get_column_letter(col)].width = width
+
+        # ── Hoja de imágenes de formatos (solo auditorías completadas) ──
+        completed_with_photos = [
+            item for item in items
+            if item.get("status") == "completed" and (item.get("photo_ab") or item.get("photo_transf"))
+        ]
+        if completed_with_photos:
+            ws_photos = wb.create_sheet(title="Imágenes Formatos")
+            ws_photos.column_dimensions["A"].width = 20
+            ws_photos.column_dimensions["B"].width = 28
+            ws_photos.column_dimensions["C"].width = 18
+            ws_photos.column_dimensions["D"].width = 70
+            ws_photos.column_dimensions["E"].width = 70
+            style_title_row(ws_photos, 1, "SIGAF — Formatos de Movimiento de Auditorías", 5)
+            style_header_row(ws_photos, 2, ["CR Tienda", "Tienda", "Fecha", "Formato ALTAS/BAJAS", "Formato TRANSFERENCIAS"])
+            img_row = 3
+            for audit_doc in completed_with_photos:
+                ws_photos.cell(row=img_row, column=1, value=audit_doc.get("cr_tienda", ""))
+                ws_photos.cell(row=img_row, column=2, value=audit_doc.get("tienda", ""))
+                fecha = (audit_doc.get("finished_at") or "")[:10]
+                ws_photos.cell(row=img_row, column=3, value=fecha)
+                row_height = 20
+                for col_idx, field in [(4, "photo_ab"), (5, "photo_transf")]:
+                    photo_b64 = audit_doc.get(field)
+                    if photo_b64:
+                        try:
+                            import base64 as _b64i, io as _ioi
+                            from openpyxl.drawing.image import Image as XLImage
+                            img_bytes = _b64i.b64decode(photo_b64)
+                            xl_img = XLImage(_ioi.BytesIO(img_bytes))
+                            max_w, max_h = 380, 280
+                            if xl_img.width > max_w or xl_img.height > max_h:
+                                ratio = min(max_w / xl_img.width, max_h / xl_img.height)
+                                xl_img.width = int(xl_img.width * ratio)
+                                xl_img.height = int(xl_img.height * ratio)
+                            cell_ref = f"{get_column_letter(col_idx)}{img_row}"
+                            ws_photos.add_image(xl_img, cell_ref)
+                            row_height = max(row_height, int(xl_img.height * 0.75) + 10)
+                        except Exception:
+                            ws_photos.cell(row=img_row, column=col_idx, value="[Imagen no disponible]")
+                ws_photos.row_dimensions[img_row].height = row_height
+                img_row += 1
     else:
         raise HTTPException(400, "Invalid export type")
 
