@@ -232,14 +232,18 @@ export default function DashboardPage() {
                   <p className="text-xs text-muted-foreground mt-0.5">CR: {store.cr_tienda} &middot; {store.plaza}</p>
                 </div>
                 <Badge variant="outline"
-                  className={`shrink-0 text-[10px] ${store.audited
-                    ? false
-                      ? "bg-amber-500/15 text-amber-600 border-amber-500/30"
-                      : "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
-                    : ""}`}>
+                  className={`shrink-0 text-[10px] ${
+                    store.audited
+                      ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                      : store.audit_status === "in_progress"
+                        ? "bg-blue-500/15 text-blue-600 border-blue-500/30"
+                        : ""
+                  }`}>
                   {store.audited
-                    ? false ? "Incompleto" : t("dashboard.audited")
-                    : t("dashboard.notAudited")}
+                    ? t("dashboard.audited")
+                    : store.audit_status === "in_progress"
+                      ? "En Progreso"
+                      : t("dashboard.notAudited")}
                 </Badge>
               </div>
               <div className="flex items-center gap-3 mt-3">
