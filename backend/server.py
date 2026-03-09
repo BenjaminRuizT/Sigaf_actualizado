@@ -272,6 +272,8 @@ async def create_audit(input: AuditCreateInput, user=Depends(get_current_user)):
         "notes": ""
     }
     await db.audits.insert_one(audit)
+    # Mark store as audit in-progress
+    await db.stores.update_one({"cr_tienda": input.cr_tienda}, {"$set": {"audit_status": "in_progress", "last_audit_id": audit["id"]}})
     return {k: v for k, v in audit.items() if k != "_id"}
 
 @api_router.get("/audits/{audit_id}")
