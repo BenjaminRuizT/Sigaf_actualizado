@@ -331,7 +331,9 @@ export default function LogsPage() {
                     <TableHead><classSort.SortHeader col="classification">{t("audit.classification")}</classSort.SortHeader></TableHead>
                     <TableHead><classSort.SortHeader col="equipment_data.descripcion">{t("audit.description")}</classSort.SortHeader></TableHead>
                     <TableHead><classSort.SortHeader col="equipment_data.marca">{t("audit.brand")}</classSort.SortHeader></TableHead>
+                    <TableHead className="whitespace-nowrap">Serie</TableHead>
                     <TableHead className="text-right"><classSort.SortHeader col="equipment_data.valor_real">{t("audit.realValue")}</classSort.SortHeader></TableHead>
+                    <TableHead className="whitespace-nowrap">{t("audit.deprecated")}</TableHead>
                     <TableHead>{t("logs.store")}</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
@@ -344,12 +346,14 @@ export default function LogsPage() {
                           <TableCell><Badge className={`text-[10px] ${classColors[item.classification] || ""}`}>{classLabels[item.classification] || item.classification}</Badge></TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{eq.descripcion || "—"}</TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{eq.marca || "—"}</TableCell>
+                          <TableCell className="text-xs font-mono whitespace-nowrap">{eq.serie || "—"}</TableCell>
                           <TableCell className="text-right font-mono text-sm whitespace-nowrap">{fmtMoney(eq.valor_real)}</TableCell>
+                          <TableCell><Badge variant={eq.depreciado ? "destructive" : "outline"} className="text-[10px]">{eq.depreciado ? "Sí" : "No"}</Badge></TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{eq.tienda || "—"}</TableCell>
                         </TableRow>
                       );
                     })}
-                    {classData.items.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">{t("common.noResults")}</TableCell></TableRow>}
+                    {classData.items.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">{t("common.noResults")}</TableCell></TableRow>}
                   </TableBody>
                 </Table>
               </ScrollArea>
@@ -409,7 +413,9 @@ export default function LogsPage() {
                     <TableHead><movSort.SortHeader col="equipment_data.codigo_barras">{t("audit.barcode")}</movSort.SortHeader></TableHead>
                     <TableHead><movSort.SortHeader col="equipment_data.descripcion">{t("audit.description")}</movSort.SortHeader></TableHead>
                     <TableHead><movSort.SortHeader col="equipment_data.modelo">Modelo</movSort.SortHeader></TableHead>
+                    <TableHead className="whitespace-nowrap">Serie</TableHead>
                     <TableHead className="text-right"><movSort.SortHeader col="equipment_data.valor_real">{t("audit.realValue")}</movSort.SortHeader></TableHead>
+                    <TableHead className="whitespace-nowrap">{t("audit.deprecated")}</TableHead>
                     <TableHead>{t("logs.fromStore")}</TableHead>
                     <TableHead>{t("logs.toStore")}</TableHead>
                     <TableHead>{t("logs.createdBy")}</TableHead>
@@ -426,14 +432,16 @@ export default function LogsPage() {
                           <TableCell className="font-mono text-xs whitespace-nowrap">{eq.codigo_barras || "—"}</TableCell>
                           <TableCell className="text-sm whitespace-nowrap max-w-[180px] truncate">{eq.descripcion || "—"}</TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{eq.modelo || "—"}</TableCell>
+                          <TableCell className="text-xs font-mono whitespace-nowrap">{eq.serie || "—"}</TableCell>
                           <TableCell className="text-right font-mono text-sm whitespace-nowrap">{fmtMoney(eq.valor_real)}</TableCell>
+                          <TableCell><Badge variant={eq.depreciado ? "destructive" : "outline"} className="text-[10px]">{eq.depreciado ? "Sí" : "No"}</Badge></TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{item.from_tienda || "—"}</TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{item.to_tienda || "—"}</TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{item.created_by}</TableCell>
                         </TableRow>
                       );
                     })}
-                    {movData.items.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">{t("common.noResults")}</TableCell></TableRow>}
+                    {movData.items.length === 0 && <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">{t("common.noResults")}</TableCell></TableRow>}
                   </TableBody>
                 </Table>
               </ScrollArea>
@@ -516,7 +524,7 @@ export default function LogsPage() {
 
       {/* ── Audit Summary Dialog ── */}
       <Dialog open={!!selectedAudit} onOpenChange={(open) => { if (!open) { setSelectedAudit(null); setAuditSummary(null); } }}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" data-testid="audit-summary-dialog">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto" data-testid="audit-summary-dialog">
           <DialogHeader>
             <DialogTitle className="font-heading uppercase tracking-tight">{selectedAudit?.tienda}</DialogTitle>
             <DialogDescription>CR: {selectedAudit?.cr_tienda} &middot; {selectedAudit?.plaza} &middot; Auditor: {selectedAudit?.auditor_name}</DialogDescription>
@@ -590,7 +598,7 @@ export default function LogsPage() {
                         <p className="text-xs font-medium text-muted-foreground mb-2 uppercase">{label} ({items.length})</p>
                         {items.length > 0 ? (
                           <div className="overflow-x-auto rounded border">
-                            <ScrollArea className="h-[220px]">
+                            <ScrollArea className="h-[300px]">
                               <Table style={{ minWidth: 560 }}>
                                 <TableHeader><TableRow>
                                   <TableHead className="whitespace-nowrap">{t("audit.barcode")}</TableHead>
