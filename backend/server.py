@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-import os, logging, uuid, io, base64
+import os, logging, uuid, io, base64, asyncio
 from pathlib import Path
 from pydantic import BaseModel
 from typing import List, Optional
@@ -105,13 +105,33 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         raise HTTPException(401, "Invalid token")
 
 # ==================== AUTH ROUTES ====================
+from collections import defaultdict
+
+# Simple in-memory rate limiter for login (brute-force protection)
+_login_attempts: dict = defaultdict(list)
+_LOGIN_MAX_ATTEMPTS = 10
+_LOGIN_WINDOW_SECONDS = 300  # 5 minutes
+
+def _check_login_rate_limit(email: str):
+    now = datetime.now(timezone.utc).timestamp()
+    window_start = now - _LOGIN_WINDOW_SECONDS
+    attempts = [t for t in _login_attempts[email] if t > window_start]
+    _login_attempts[email] = attempts
+    if len(attempts) >= _LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(429, f"Demasiados intentos fallidos. Intente de nuevo en {_LOGIN_WINDOW_SECONDS // 60} minutos.")
+    _login_attempts[email].append(now)
+
 @api_router.post("/auth/login")
 async def login(input: LoginInput):
-    user = await db.users.find_one({"email": input.email.strip().lower()}, {"_id": 0})
+    email_key = input.email.strip().lower()
+    _check_login_rate_limit(email_key)
+    user = await db.users.find_one({"email": email_key}, {"_id": 0})
     if not user:
         user = await db.users.find_one({"email": input.email.strip()}, {"_id": 0})
     if not user or not verify_password(input.password, user["password_hash"]):
-        raise HTTPException(401, "Credenciales inválidas")
+        raise HTTPException(401, "Credenciales invalidas")
+    # Clear attempts on successful login
+    _login_attempts.pop(email_key, None)
     token = create_token(user["id"], user["email"], user["perfil"], user["nombre"])
     return {"token": token, "user": {k: v for k, v in user.items() if k != "password_hash"}}
 
@@ -172,31 +192,36 @@ async def get_reports_summary(user=Depends(get_current_user)):
 async def get_dashboard_stats(plaza: Optional[str] = None, user=Depends(get_current_user)):
     store_q = {}
     eq_q = {}
+    audit_q = {}
     if plaza and plaza != "all":
         store_q["plaza"] = plaza
         eq_q["plaza"] = plaza
-
-    total_stores = await db.stores.count_documents(store_q)
-    audited_stores = await db.stores.count_documents({**store_q, "audited": True})
-    total_equipment = await db.equipment.count_documents(eq_q)
-    deprecated_eq = await db.equipment.count_documents({**eq_q, "depreciado": True})
+        audit_q["plaza"] = plaza
 
     val_pipe = [{"$match": eq_q}, {"$group": {"_id": None, "total_cost": {"$sum": "$costo"}, "total_real": {"$sum": "$valor_real"}}}]
-    val = await db.equipment.aggregate(val_pipe).to_list(1)
+    plaza_pipe = [{"$group": {"_id": "$plaza", "count": {"$sum": 1}}}]
+
+    # Execute all independent queries in parallel for ~4x speed improvement
+    (
+        total_stores, audited_stores, total_equipment, deprecated_eq,
+        val, plaza_stats,
+        completed_audits, active_audits,
+        most_missing, least_missing
+    ) = await asyncio.gather(
+        db.stores.count_documents(store_q),
+        db.stores.count_documents({**store_q, "audited": True}),
+        db.equipment.count_documents(eq_q),
+        db.equipment.count_documents({**eq_q, "depreciado": True}),
+        db.equipment.aggregate(val_pipe).to_list(1),
+        db.equipment.aggregate(plaza_pipe).to_list(100),
+        db.audits.count_documents({**audit_q, "status": {"$in": ["completed"]}}),
+        db.audits.count_documents({**audit_q, "status": "in_progress"}),
+        db.audits.find({**audit_q, "status": {"$in": ["completed"]}}, {"_id": 0}).sort("not_found_count", -1).limit(5).to_list(5),
+        db.audits.find({**audit_q, "status": {"$in": ["completed"]}, "not_found_count": {"$gte": 0}}, {"_id": 0}).sort("not_found_count", 1).limit(5).to_list(5),
+    )
+
     total_cost = val[0]["total_cost"] if val else 0
     total_real = val[0]["total_real"] if val else 0
-
-    plaza_pipe = [{"$group": {"_id": "$plaza", "count": {"$sum": 1}}}]
-    plaza_stats = await db.equipment.aggregate(plaza_pipe).to_list(100)
-
-    audit_q = {}
-    if plaza and plaza != "all":
-        audit_q["plaza"] = plaza
-    completed_audits = await db.audits.count_documents({**audit_q, "status": {"$in": ["completed"]}})
-    active_audits = await db.audits.count_documents({**audit_q, "status": "in_progress"})
-
-    most_missing = await db.audits.find({**audit_q, "status": {"$in": ["completed"]}}, {"_id": 0}).sort("not_found_count", -1).limit(5).to_list(5)
-    least_missing = await db.audits.find({**audit_q, "status": {"$in": ["completed"]}, "not_found_count": {"$gte": 0}}, {"_id": 0}).sort("not_found_count", 1).limit(5).to_list(5)
 
     return {
         "total_stores": total_stores, "audited_stores": audited_stores,
@@ -365,27 +390,33 @@ async def finalize_audit(audit_id: str, input: Optional[FinalizeWithPhotosInput]
 
     not_found_items = []
     not_found_value = 0
+    scan_docs = []
+    movement_docs = []
+
     for eq in all_eq:
         if eq["id"] not in scanned_ids and eq["codigo_barras"] not in scanned_barcodes:
             not_found_items.append(eq)
             not_found_value += eq.get("valor_real", 0)
-            scan_rec = {
+            scan_docs.append({
                 "id": str(uuid.uuid4()), "audit_id": audit_id, "codigo_barras": eq["codigo_barras"],
                 "equipment_id": eq["id"], "classification": "no_localizado",
                 "equipment_data": eq, "origin_store": None,
                 "scanned_at": now_iso, "scanned_by": "system"
-            }
-            await db.audit_scans.insert_one(scan_rec)
-            # Auto-create BAJA movement for each not-found equipment
-            baja_movement = {
+            })
+            movement_docs.append({
                 "id": str(uuid.uuid4()), "audit_id": audit_id, "equipment_id": eq["id"],
                 "type": "baja", "from_cr_tienda": cr_tienda, "to_cr_tienda": None,
                 "status": "pending", "created_at": now_iso,
                 "created_by": user["nombre"], "created_by_id": user["sub"],
                 "equipment_data": eq, "from_tienda": audit["tienda"], "to_tienda": None,
                 "plaza": audit.get("plaza", ""), "auto_generated": True
-            }
-            await db.movements.insert_one(baja_movement)
+            })
+
+    # Bulk insert for performance — avoids N sequential round-trips to MongoDB
+    if scan_docs:
+        await db.audit_scans.insert_many(scan_docs)
+    if movement_docs:
+        await db.movements.insert_many(movement_docs)
 
     not_found_count = len(not_found_items)
     total_eq_count = len(all_eq)
@@ -1482,6 +1513,14 @@ async def import_data():
     await db.audits.create_index("cr_tienda")
     await db.audits.create_index("status")
     await db.users.create_index("email", unique=True)
+    # Compound indexes for high-frequency queries
+    await db.audit_scans.create_index([("audit_id", 1), ("codigo_barras", 1)])  # scan dedup check
+    await db.equipment.create_index([("cr_tienda", 1), ("codigo_barras", 1)])   # localizado lookup
+    await db.movements.create_index([("type", 1), ("created_at", -1)])           # movement logs
+    await db.movements.create_index("audit_id")                                  # movements by audit
+    await db.audit_scans.create_index([("audit_id", 1), ("classification", 1)]) # summary by class
+    await db.audits.create_index([("status", 1), ("started_at", -1)])           # audit logs
+    await db.audits.create_index([("plaza", 1), ("status", 1)])                 # dashboard plaza filter
 
     if users_path.exists():
         uwb = openpyxl.load_workbook(users_path, read_only=True)
