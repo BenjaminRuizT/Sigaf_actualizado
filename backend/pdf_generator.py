@@ -337,16 +337,28 @@ class SigafPDF(FPDF):
 #  MANUAL DE USUARIO
 # ═══════════════════════════════════════════════════════════════
 
-def generate_user_manual(stats, plazas_data):
-    pdf = SigafPDF("SIGAF - Manual de Usuario")
+def generate_user_manual(stats, plazas_data, user_perfil="Super Administrador"):
+    # Normalizar perfil
+    perfil = user_perfil or "Administrador"
+    is_super = perfil == "Super Administrador"
+    is_admin = perfil in ("Super Administrador", "Administrador")
+    is_socio = perfil == "Socio Tecnologico"
+
+    pdf = SigafPDF(f"SIGAF - Manual de Usuario ({perfil})")
     pdf.alias_nb_pages()
 
-    pdf.cover("Manual de Usuario", "Guia completa del sistema SIGAF", "v2.0 - Marzo 2026")
+    cover_subtitle = "Guia completa del sistema SIGAF"
+    if is_socio:
+        cover_subtitle = "Guia para Socio Tecnologico"
+    elif perfil == "Administrador":
+        cover_subtitle = "Guia para Administrador"
 
-    # Tabla de contenido
+    pdf.cover("Manual de Usuario", cover_subtitle, f"Perfil: {perfil}  |  v2.0 - Marzo 2026")
+
+    # Tabla de contenido adaptada al perfil
     pdf.add_page()
     pdf.section_title("Contenido")
-    toc = [
+    toc_all = [
         ("1","Introduccion al Sistema"),
         ("2","Acceso al Sistema"),
         ("3","Panel Principal (Dashboard)"),
@@ -359,12 +371,26 @@ def generate_user_manual(stats, plazas_data):
         ("5.5","  Transferencias entre Tiendas"),
         ("5.6","  Finalizar Auditoria y Foto de Formatos"),
         ("5.7","  Resumen de Auditoria Completada"),
-        ("6","Bitacoras y Exportacion"),
-        ("7","Panel de Administracion"),
-        ("8","Configuracion del Sistema"),
-        ("9","Preguntas Frecuentes"),
     ]
-    for num, item in toc:
+    if is_admin:
+        toc_all += [
+            ("6","Bitacoras y Exportacion"),
+            ("6.1","  Clasificaciones de Equipos"),
+            ("6.2","  Movimientos (ALTAS, BAJAS, TRANSFERENCIAS)"),
+            ("6.3","  Historial de Auditorias"),
+        ]
+    if is_super:
+        toc_all += [
+            ("7","Panel de Administracion"),
+            ("7.1","  Gestion de Usuarios"),
+            ("7.2","  Gestion de Equipos"),
+            ("7.3","  Reinicio de Datos"),
+        ]
+    toc_all += [
+        ("8" if is_super else ("7" if is_admin else "6"),"Configuracion del Sistema"),
+        ("9" if is_super else ("8" if is_admin else "7"),"Preguntas Frecuentes"),
+    ]
+    for num, item in toc_all:
         pdf.set_font("Helvetica","",10)
         pdf.set_text_color(*DARK)
         pdf.set_x(14)
@@ -375,39 +401,56 @@ def generate_user_manual(stats, plazas_data):
     pdf.add_page()
     pdf.section_title("Introduccion al Sistema","1")
     pdf.body("SIGAF (Sistema Integral de Gestion de Activo Fijo) es una plataforma web desarrollada para OXXO orientada a la realizacion de auditorias de inventario de equipo de computo en tiendas de conveniencia.")
-    pdf.body("Permite gestionar el inventario de equipos, realizar auditorias mediante escaneo de codigos de barras con dispositivos Zebra TC52, clasificar equipos automaticamente y generar documentos Excel y PDF de respaldo.")
-    pdf.note_box("PWA - Instalable en cualquier dispositivo","La aplicacion es una Progressive Web App. Se puede instalar en el Zebra TC52, tablets y PCs desde Chrome sin necesidad de descarga desde tienda de aplicaciones.", BLUE)
 
-    pdf.subsection("Perfiles de usuario")
+    if is_socio:
+        pdf.body("Como Socio Tecnologico, su rol principal es realizar auditorias de inventario en las tiendas asignadas usando el dispositivo Zebra TC52. Este manual cubre unicamente las funciones disponibles para su perfil.")
+        pdf.note_box("Funciones disponibles para Socio Tecnologico",
+            "Panel Principal (Dashboard), Gestion de Tiendas (consulta), Modulo de Auditoria completo, Configuracion del sistema.",
+            GREEN, (230, 255, 235))
+    elif perfil == "Administrador":
+        pdf.body("Como Administrador, tiene acceso al modulo de auditoria, bitacoras y exportacion de reportes Excel. Este manual cubre todas las funciones disponibles para su perfil.")
+        pdf.note_box("Funciones disponibles para Administrador",
+            "Panel Principal, Gestion de Tiendas, Modulo de Auditoria completo, Bitacoras (Clasificaciones, Movimientos, Historial de Auditorias), Exportacion Excel, Configuracion.",
+            BLUE, (230, 238, 255))
+    else:
+        pdf.body("Como Super Administrador, tiene acceso total al sistema incluyendo gestion de usuarios, equipos y reinicio de datos.")
+        pdf.note_box("Acceso total - Super Administrador",
+            "Todas las funciones del sistema: Panel, Auditoria, Bitacoras, Administracion de usuarios y equipos, Reinicio de datos, Configuracion.",
+            NAVY, (230, 235, 255))
+
+    pdf.subsection("Perfiles de usuario del sistema")
     pdf.table(
-        ["Perfil","Nivel de Acceso","Funciones principales"],
+        ["Perfil","Acceso a..."],
         [
-            ["Super Administrador","Total","Gestion de usuarios, equipos, reinicio de datos, todas las bitacoras y reportes"],
-            ["Administrador","Avanzado","Dashboard, auditorias, bitacoras con exportacion Excel, reportes PDF"],
-            ["Socio Tecnologico","Operativo","Dashboard y modulo de auditoria (inventario)"],
-        ],[45,28,117]
+            ["Super Administrador","Todo el sistema: Dashboard, Auditoria, Bitacoras, Administracion, Configuracion"],
+            ["Administrador","Dashboard, Auditoria, Bitacoras con exportacion Excel, Configuracion"],
+            ["Socio Tecnologico","Dashboard (consulta) y Modulo de Auditoria, Configuracion"],
+        ],[48,142]
     )
 
     pdf.subsection("Caracteristicas del sistema v2.0")
-    features = [
-        "Dashboard con 6 KPIs dinamicos filtrados por plaza en tiempo real",
-        "Tarjetas de tienda con estado: Pendiente / En Progreso / Auditada",
-        "Escaneo de codigos de barras con Zebra TC52 via DataWedge (teclado fisico)",
-        "Clasificacion automatica: Localizado, Sobrante, Sobrante Desconocido, No Localizado",
-        "Campo de Numero de Serie en registro de Sobrante Desconocido",
-        "Indicador visual de carga al procesar la finalizacion de auditoria",
-        "Foto obligatoria de formatos fisicos al finalizar (ALTA/BAJA y Transferencias)",
-        "Resumen interactivo: clic en tarjetas para filtrar detalle por grupo",
-        "Tabla de equipos con columnas Serie y Depreciado (con scroll horizontal en movil)",
-        "Exportacion Excel con hoja adicional de imagenes de formatos de movimiento",
-        "Bitacoras con columnas Serie y Depreciado",
-        "Descarga individual de fotos de formatos desde el historial de auditorias",
-        "Reporte PDF ejecutivo de una pagina por auditoria (con fotos incluidas)",
-        "Temas: Claro/Oscuro | Paletas: Profesional (azul) / Corporativo OXXO (rojo/amarillo)",
-        "Interfaz bilingue Espanol / Ingles",
+    features_all = [
+        ("all","Dashboard con 6 KPIs dinamicos filtrados por plaza en tiempo real"),
+        ("all","Tarjetas de tienda con estado: Pendiente / En Progreso / Auditada"),
+        ("all","Escaneo de codigos de barras con Zebra TC52 via DataWedge"),
+        ("all","Clasificacion automatica: Localizado, Sobrante, Sobrante Desconocido, No Localizado"),
+        ("all","Campo de Numero de Serie en registro de Sobrante Desconocido"),
+        ("all","Foto obligatoria de formatos fisicos al finalizar (ALTA/BAJA y Transferencias)"),
+        ("all","Resumen interactivo: clic en tarjetas para filtrar detalle por grupo"),
+        ("all","Tabla de equipos con columnas Serie y Depreciado"),
+        ("admin","Exportacion Excel con hoja adicional de imagenes de formatos"),
+        ("admin","Bitacoras con columnas Serie y Depreciado"),
+        ("admin","Descarga individual de fotos de formatos desde historial de auditorias"),
+        ("admin","Reporte PDF ejecutivo de una pagina por auditoria"),
+        ("super","Gestion de usuarios (crear, editar, eliminar)"),
+        ("super","Gestion y edicion de equipos"),
+        ("super","Reinicio de datos del sistema (carga de nuevos MAF)"),
+        ("all","Temas: Claro/Oscuro | Paletas: Profesional / Corporativo OXXO"),
+        ("all","Interfaz bilingue Espanol / Ingles"),
     ]
-    for f in features:
-        pdf.bullet(f)
+    for scope, f in features_all:
+        if scope == "all" or (scope == "admin" and is_admin) or (scope == "super" and is_super):
+            pdf.bullet(f)
 
     # ── 2. Acceso ──
     pdf.add_page()
@@ -473,8 +516,6 @@ def generate_user_manual(stats, plazas_data):
             ["Auditada","Verde","La auditoria fue completada exitosamente"],
         ],[38,30,122]
     )
-
-    pdf.subsection("Filtros disponibles")
     pdf.bullet("Plaza: filtra tarjetas de tiendas y todos los KPIs por plaza")
     pdf.bullet("Busqueda: filtra tiendas por CR o nombre en tiempo real")
 
@@ -482,7 +523,6 @@ def generate_user_manual(stats, plazas_data):
     pdf.add_page()
     pdf.section_title("Gestion de Tiendas","4")
     pdf.body("Al hacer clic en una tarjeta de tienda se abre un dialogo con informacion detallada:")
-
     pdf.screen_mock("Dialogo de Tienda - Equipos",[
         {"type":"text","text":"ABELARDO TIJ","size":9,"style":"B","color":NAVY,"dy":7},
         {"type":"text","text":"CR: 50SYP  |  Ensenada  |  35 equipos","size":7.5,"color":GRAY,"dy":7},
@@ -491,19 +531,17 @@ def generate_user_manual(stats, plazas_data):
         {"type":"text","text":"Cod.Barras  Descripcion      Marca   Modelo   Serie       Valor     Dep.","size":6.5,"color":GRAY,"dy":5},
         {"type":"text","text":"84847618    ACCESS POINT     CISCO   WAP361   SN-34F21   $4,200    No","size":6.5,"color":DARK,"dy":5},
         {"type":"text","text":"63745231    ESCANER-LECTOR   DATALO  DS9308   SN-X8812   $1,800    Si","size":6.5,"color":DARK,"dy":5},
-        {"type":"text","text":"84847784    HAND HELD        ZEBRA   TC52     SN-ZB001   $6,500    No","size":6.5,"color":DARK,"dy":6},
         {"type":"badge","text":" Iniciar Auditoria ","color":NAVY,"x":5,"w":65,"dy":5},
-    ], height=82)
-
-    pdf.note_box("Scroll horizontal","En dispositivos moviles la tabla de equipos incluye scroll horizontal para visualizar todas las columnas (Codigo, Descripcion, Marca, Modelo, Serie, Valor Real, Depreciado).",BLUE)
+    ], height=76)
+    pdf.note_box("Scroll horizontal","En moviles la tabla incluye scroll horizontal para ver todas las columnas: Codigo, Descripcion, Marca, Modelo, Serie, Valor Real, Depreciado.",BLUE)
 
     # ── 5. Módulo de Auditoría ──
     pdf.add_page()
     pdf.section_title("Modulo de Auditoria (Inventario)","5")
-    pdf.body("Nucleo del sistema. Permite realizar el inventario fisico completo de una tienda mediante escaneo de codigos de barras.")
+    pdf.body("Nucleo del sistema. Permite realizar el inventario fisico completo de una tienda.")
 
     pdf.subsection("5.1  Iniciar Auditoria")
-    pdf.body("En el dialogo de tienda presione 'Iniciar Auditoria'. El sistema abre el modulo de auditoria. La tarjeta de la tienda en el panel cambia inmediatamente a 'En Progreso' (azul).")
+    pdf.body("En el dialogo de tienda presione 'Iniciar Auditoria'. La tarjeta de la tienda cambia a 'En Progreso' (azul).")
     pdf.bullet("Si ya existe una auditoria en progreso para esa tienda, el sistema la retoma automaticamente")
     pdf.bullet("Solo puede haber una auditoria activa por tienda a la vez")
 
@@ -519,228 +557,211 @@ def generate_user_manual(stats, plazas_data):
         {"type":"text","text":"Progreso: 30 de 35 escaneados (86%)","size":7,"color":GRAY,"dy":6},
         {"type":"divider","dy":3},
         {"type":"text","text":"Ultimo: 84847784  HAND HELD ZEBRA TC52  -> LOCALIZADO","size":7,"color":GREEN,"dy":5},
-        {"type":"text","text":"Antes:  63738745  ESCANER (de otra tienda) -> SOBRANTE","size":7,"color":AMBER,"dy":5},
-    ], height=88)
+    ], height=82)
 
     pdf.subsection("5.2  Escaneo de Codigos de Barras con Zebra TC52")
-    pdf.body("El campo de escaneo es compatible con:")
     pdf.table(
         ["Metodo","Como usarlo","Velocidad"],
         [
-            ["Zebra TC52 (DataWedge)","Enfoque el campo y presione el gatillo del lector fisico. El codigo se procesa automaticamente.","< 0.5 seg"],
-            ["Entrada manual","Escriba el codigo en el campo y presione Enter o el boton 'Escanear'.","Manual"],
-        ],[55,95,40]
+            ["Zebra TC52 (DataWedge)","Enfoque el campo y presione el gatillo del lector fisico.","< 0.5 seg"],
+            ["Entrada manual","Escriba el codigo en el campo y presione Enter.","Manual"],
+        ],[52,98,40]
     )
-    pdf.note_box("Configuracion DataWedge","El Zebra TC52 viene preconfigurado con DataWedge para salida por teclado. No se requiere configuracion adicional en SIGAF. Asegurese de que el campo de escaneo tenga el foco antes de escanear.", NAVY)
+    pdf.note_box("DataWedge","El Zebra TC52 viene preconfigurado para salida por teclado. Solo asegurese de que el campo de escaneo tenga el foco antes de escanear.", NAVY)
 
     pdf.add_page()
     pdf.subsection("5.3  Clasificacion Automatica de Equipos")
-    pdf.body("Al escanear un codigo, el sistema lo clasifica automaticamente en menos de 0.5 segundos:")
     pdf.table(
-        ["Clasificacion","Condicion","Color","Accion del sistema"],
+        ["Clasificacion","Condicion","Color","Accion"],
         [
-            ["LOCALIZADO","El equipo pertenece a esta tienda","Verde","Se registra como encontrado. Avanza el contador."],
-            ["SOBRANTE","El equipo pertenece a otra tienda","Amarillo","Aparece dialogo de confirmacion de transferencia."],
-            ["SOBRANTE DESCONOCIDO","Codigo no existe en el MAF","Naranja","Se abre formulario para registrar como ALTA."],
-            ["NO LOCALIZADO","No escaneado al finalizar","Rojo","BAJA automatica aplicada al finalizar la auditoria."],
-        ],[40,50,25,75]
+            ["LOCALIZADO","El equipo pertenece a esta tienda","Verde","Se registra como encontrado"],
+            ["SOBRANTE","El equipo pertenece a otra tienda","Amarillo","Dialogo de confirmacion de transferencia"],
+            ["SOBRANTE DESCONOCIDO","Codigo no existe en el MAF","Naranja","Formulario de registro como ALTA"],
+            ["NO LOCALIZADO","No escaneado al finalizar","Rojo","BAJA automatica al finalizar"],
+        ],[40,52,25,73]
     )
 
     pdf.subsection("5.4  Registro de Sobrante Desconocido como ALTA")
-    pdf.body("Al detectar un equipo no registrado en el MAF, aparece el formulario de registro:")
-
     pdf.screen_mock("Sobrante Desconocido - Registrar ALTA",[
         {"type":"text","text":"Sobrante Desconocido - Registrar ALTA","size":8,"style":"B","color":ORANGE,"dy":7},
-        {"type":"text","text":"Codigo de barras detectado: NEW-00001-EQUIPO","size":7.5,"color":DARK,"dy":6},
-        {"type":"text","text":"Descripcion del equipo: [ ACCESS POINT          v ]","size":7.5,"color":DARK,"dy":6},
-        {"type":"text","text":"Marca:                  [ CISCO                 v ]","size":7.5,"color":DARK,"dy":6},
-        {"type":"text","text":"Modelo:                 [ WAP361                  ]","size":7.5,"color":DARK,"dy":6},
-        {"type":"text","text":"Numero de Serie:        [ SN-NEW001               ]  (opcional)","size":7.5,"color":DARK,"dy":7},
+        {"type":"text","text":"Codigo detectado: NEW-00001","size":7.5,"color":DARK,"dy":6},
+        {"type":"text","text":"Descripcion: [ ACCESS POINT          v ]   Marca: [ CISCO  v ]","size":7.5,"color":DARK,"dy":6},
+        {"type":"text","text":"Modelo:      [ WAP361                  ]   Serie: [ SN-001  ] (opcional)","size":7.5,"color":DARK,"dy":7},
         {"type":"badge","text":" Registrar como ALTA ","color":NAVY,"x":50,"w":90,"dy":6},
-    ], height=72)
-
-    pdf.bullet("Al confirmar: el equipo se agrega al MAF de la tienda y se genera movimiento de ALTA")
-    pdf.bullet("El numero de serie queda registrado para trazabilidad futura")
+    ], height=62)
+    pdf.bullet("Al confirmar: el equipo se agrega al MAF y se genera movimiento de ALTA")
+    pdf.bullet("El numero de serie queda registrado para trazabilidad")
 
     pdf.subsection("5.5  Transferencias entre Tiendas")
-    pdf.body("Al detectar un equipo SOBRANTE (perteneciente a otra tienda):")
-    pdf.bullet("Se muestra dialogo con: datos del equipo, tienda origen y tienda destino actual")
-    pdf.bullet("Al confirmar: se genera movimiento de TRANSFERENCIA y el equipo se reasigna")
-    pdf.bullet("Al rechazar: el equipo queda como SOBRANTE sin procesar")
+    pdf.body("Al detectar un equipo SOBRANTE (de otra tienda): se muestra dialogo con datos del equipo, tienda origen y tienda destino. Al confirmar se genera movimiento de TRANSFERENCIA.")
+
+    pdf.subsection("5.6  Finalizar Auditoria y Foto de Formatos")
+    pdf.body("Al presionar 'Finalizar Auditoria':")
+    pdf.bullet("Equipos no escaneados se clasifican como NO LOCALIZADO automaticamente")
+    pdf.bullet("Se aplica BAJA automatica a todos los no localizados")
+    pdf.bullet("Aparece pantalla de espera 'Procesando auditoria...' — NO cierre la ventana")
+    pdf.bullet("Si hay movimientos, se solicita foto del formato fisico firmado")
+    pdf.screen_mock("Foto de Formatos - Al Finalizar",[
+        {"type":"text","text":"Foto de Formato de Movimiento de Activo","size":8,"style":"B","color":NAVY,"dy":7},
+        {"type":"text","text":"[ Formato ALTAS / BAJAS ]   [ Abrir Camara ]  [ Capturado OK ]","size":7.5,"color":DARK,"dy":7},
+        {"type":"text","text":"[ Formato TRANSFERENCIAS ]  [ Abrir Camara ]  [ Sin captura ]","size":7.5,"color":DARK,"dy":7},
+        {"type":"badge","text":" Guardar Fotos y Finalizar ","color":NAVY,"x":30,"w":130,"dy":6},
+    ], height=54)
 
     pdf.add_page()
-    pdf.subsection("5.6  Finalizar Auditoria y Foto de Formatos")
-    pdf.body("Al presionar 'Finalizar Auditoria', el sistema muestra un resumen previo. Al confirmar:")
-    pdf.bullet("Todos los equipos no escaneados se clasifican automaticamente como NO LOCALIZADO")
-    pdf.bullet("Se aplica BAJA automatica a todos los no localizados")
-    pdf.bullet("Aparece pantalla de espera 'Procesando auditoria...' (puede tardar unos segundos)")
-    pdf.bullet("Si hay movimientos de ALTA/BAJA o TRANSFERENCIA, se solicita foto de formatos")
-
-    pdf.note_box("Indicador de proceso","Mientras el sistema procesa la finalizacion aparece una pantalla de espera con animacion giratoria. NO cierre la ventana. Espere hasta que se abra el dialogo de captura de fotos.", AMBER,(255,248,230))
-
-    pdf.screen_mock("Foto de Formatos - Obligatorio al Finalizar",[
-        {"type":"text","text":"Foto de Formato de Movimiento de Activo","size":8,"style":"B","color":NAVY,"dy":7},
-        {"type":"text","text":"Es obligatorio fotografiar el formato fisico firmado.","size":7.5,"color":GRAY,"dy":6},
-        {"type":"divider","dy":3},
-        {"type":"text","text":"[+] Formato ALTAS / BAJAS","size":8,"style":"B","color":DARK,"dy":5},
-        {"type":"badge","text":" Abrir Camara ","color":BLUE,"x":5,"w":55,"dy":7},
-        {"type":"text","text":"[+] Formato TRANSFERENCIAS","size":8,"style":"B","color":DARK,"dy":5},
-        {"type":"badge","text":" Abrir Camara ","color":BLUE,"x":5,"w":55,"dy":7},
-        {"type":"badge","text":" Guardar Fotos y Finalizar ","color":NAVY,"x":30,"w":130,"dy":6},
-    ], height=78)
-
     pdf.subsection("5.7  Resumen de Auditoria Completada")
-    pdf.body("Una vez finalizada, el sistema muestra el resumen con estadisticas e informacion detallada:")
-    pdf.bullet("4 tarjetas KPI: Total Equipos, Localizados, Sobrantes, No Localizados")
-    pdf.bullet("Haga clic en las tarjetas Localizado/Sobrante/No Localizado para ver el detalle de ese grupo")
-    pdf.bullet("Tabla de detalle con: Codigo, Descripcion, Marca, Modelo, Serie, Valor, Depreciado")
-    pdf.bullet("Fotos de formatos de movimiento (si se tomaron al finalizar)")
-
     pdf.screen_mock("Resumen Post-Auditoria",[
-        {"type":"text","text":"ABELARDO TIJ  |  Completada  |  07/03/26","size":8,"style":"B","color":NAVY,"dy":6},
+        {"type":"text","text":"ABELARDO TIJ  |  Completada  |  08/03/26","size":8,"style":"B","color":NAVY,"dy":6},
         {"type":"kpirow","values":[
             ("Equipos","35",NAVY),
             ("Localizado","30",GREEN),
             ("Sobrante","2",AMBER),
             ("No Local.","3",RED),
         ]},
-        {"type":"text","text":"<-- Haga clic en Localizado/Sobrante/No Localizado para ver el detalle -->","size":7,"color":GRAY,"dy":5},
+        {"type":"text","text":"<-- Haga clic en las tarjetas para filtrar el detalle -->","size":7,"color":GRAY,"dy":5},
         {"type":"divider","dy":3},
-        {"type":"text","text":"LOCALIZADO (30):","size":7.5,"style":"B","color":GREEN,"dy":5},
-        {"type":"text","text":"Cod.Barras  Descripcion   Marca  Modelo  Serie    Valor    Dep.","size":6.5,"color":GRAY,"dy":5},
+        {"type":"text","text":"NO LOCALIZADO (3):","size":7.5,"style":"B","color":RED,"dy":5},
+        {"type":"text","text":"Cod.Barras  Descripcion   Marca  Modelo  Serie    Valor    Dep.","size":6.5,"color":GRAY,"dy":4},
         {"type":"text","text":"84847618    ACCESS POINT  CISCO  WAP361  SN-F21  $4,200   No","size":6.5,"color":DARK,"dy":5},
-    ], height=88)
+    ], height=84)
+    pdf.bullet("Haga clic en Localizado/Sobrante/No Localizado para ver el detalle de cada grupo")
+    pdf.bullet("Tabla con: Codigo, Descripcion, Marca, Modelo, Serie, Valor, Depreciado")
 
-    # ── 6. Bitácoras ──
+    # ── 6. Bitácoras — solo admin/super ──
+    if is_admin:
+        pdf.add_page()
+        pdf.section_title("Bitacoras y Exportacion","6")
+        pdf.body("Acceso desde 'Bitacoras' en el menu lateral.")
+
+        pdf.subsection("6.1  Clasificaciones de Equipos")
+        pdf.body("Historial de todos los escaneos clasificados. Columnas:")
+        pdf.table(
+            ["Columna","Descripcion"],
+            [
+                ["Fecha","Fecha y hora del escaneo"],
+                ["Codigo Barras","Codigo del equipo"],
+                ["Clasificacion","LOCALIZADO / SOBRANTE / SOBRANTE DESCONOCIDO / NO LOCALIZADO"],
+                ["Descripcion","Tipo de equipo"],
+                ["Marca","Fabricante"],
+                ["Serie","Numero de serie del equipo"],
+                ["Valor Real","Valor calculado del activo"],
+                ["Depreciado","Si / No segun vida util"],
+                ["Tienda","Tienda donde se escaneo"],
+            ],[35,155]
+        )
+        pdf.bullet("Filtro por tipo de clasificacion")
+        pdf.bullet("Exportacion Excel incluye columnas Serie y Depreciado")
+
+        pdf.subsection("6.2  Movimientos (ALTAS, BAJAS, TRANSFERENCIAS)")
+        pdf.table(
+            ["Filtro","Que muestra"],
+            [
+                ["Todos","Todos los movimientos"],
+                ["No Localizado (BAJA)","Solo movimientos de baja"],
+                ["Sobrante (ALTA)","Solo registros de alta"],
+                ["Transferencias","Solo transferencias entre tiendas"],
+            ],[50,140]
+        )
+        pdf.body("Botones de exportacion:")
+        pdf.bullet("'Exportar ALTAS/BAJAS': SIGAF_AB_[FECHA].xlsx (incluye hoja con fotos de formatos)")
+        pdf.bullet("'Exportar Transferencias': SIGAF_TRANSFERENCIAS_[FECHA].xlsx (incluye fotos)")
+
+        pdf.subsection("6.3  Historial de Auditorias")
+        pdf.screen_mock("Resumen de Auditoria en Bitacoras",[
+            {"type":"text","text":"ARIAS TIJ  |  Completada  |  08/03/26","size":8,"style":"B","color":NAVY,"dy":6},
+            {"type":"kpirow","values":[
+                ("Localizado","1",GREEN),
+                ("Sobrante","2",AMBER),
+                ("No Local.","33",RED),
+            ]},
+            {"type":"text","text":"<-- Clic en tarjetas para filtrar equipos -->","size":7,"color":GRAY,"dy":5},
+            {"type":"divider","dy":3},
+            {"type":"text","text":"NO LOCALIZADO (33): MONITOR - VIEWSONIC  Serie: TEY152060895","size":7,"color":DARK,"dy":5},
+        ], height=66)
+        pdf.body("Botones en el pie del resumen:")
+        pdf.table(
+            ["Boton","Funcion"],
+            [
+                ["Descargar AB","Descarga la foto del formato ALTAS/BAJAS como JPG"],
+                ["Descargar Transf.","Descarga la foto del formato TRANSFERENCIAS como JPG"],
+                ["Reporte PDF","Genera reporte ejecutivo de una pagina listo para imprimir"],
+            ],[40,150] if not is_super else [40,148]
+        )
+        if is_super:
+            pdf.bullet("Eliminar Auditoria: solo disponible para Super Administrador")
+
+    # ── 7. Administración — solo super ──
+    if is_super:
+        pdf.add_page()
+        pdf.section_title("Panel de Administracion","7")
+        pdf.body("Disponible solo para Super Administrador. Se accede desde 'Administracion' en el menu lateral.")
+        pdf.subsection("7.1  Gestion de Usuarios")
+        pdf.bullet("Crear nuevos usuarios: nombre, email, contrasena y perfil")
+        pdf.bullet("Editar usuarios existentes")
+        pdf.bullet("Eliminar usuarios")
+        pdf.subsection("7.2  Gestion de Equipos")
+        pdf.bullet("Buscar equipos por codigo, descripcion o serie; filtrar por plaza")
+        pdf.bullet("Editar campos: descripcion, marca, modelo, serie, costo, depreciacion")
+        pdf.subsection("7.3  Reinicio de Datos")
+        for i,s in enumerate([
+            "Ir a Administracion > 'Reiniciar Datos'",
+            "Adjuntar MAF.xlsx con el inventario actualizado",
+            "Adjuntar USUARIOS.xlsx (opcional)",
+            "Confirmar la operacion",
+        ],1):
+            pdf.bullet(f"{i}. {s}")
+        pdf.note_box("ADVERTENCIA CRITICA","Esta accion elimina TODOS los datos: auditorias, movimientos, escaneos, equipos. NO SE PUEDE DESHACER.", RED,(255,235,235))
+
+    # ── Configuración ──
+    sec_num = "8" if is_super else ("7" if is_admin else "6")
     pdf.add_page()
-    pdf.section_title("Bitacoras y Exportacion","6")
-    pdf.body("Disponible para Administrador y Super Administrador. Acceso desde 'Bitacoras' en el menu lateral.")
-
-    pdf.subsection("6.1  Clasificaciones de Equipos")
-    pdf.body("Historial de todos los escaneos clasificados. Columnas disponibles:")
+    pdf.section_title("Configuracion del Sistema", sec_num)
     pdf.table(
-        ["Columna","Descripcion"],
+        ["Opcion","Valores","Descripcion"],
         [
-            ["Fecha","Fecha y hora del escaneo"],
-            ["Codigo Barras","Codigo del equipo"],
-            ["Clasificacion","LOCALIZADO / SOBRANTE / SOBRANTE DESCONOCIDO / NO LOCALIZADO"],
-            ["Descripcion","Tipo de equipo (ACCESS POINT, ESCANER-LECTOR, etc.)"],
-            ["Marca","Fabricante del equipo"],
-            ["Modelo","Modelo especifico"],
-            ["Serie","Numero de serie (si fue registrado)"],
-            ["Depreciado","Si / No segun vida util calculada"],
-            ["Tienda","Tienda donde se realizo el escaneo"],
-        ],[35,155]
-    )
-    pdf.bullet("Filtro por clasificacion: Todos / Localizado / Sobrante / Sobrante Desconocido / No Localizado")
-    pdf.bullet("Exportacion Excel incluye columnas Serie y Depreciado")
-
-    pdf.subsection("6.2  Movimientos (ALTAS, BAJAS, TRANSFERENCIAS)")
-    pdf.body("Historial de todos los movimientos generados por las auditorias.")
-    pdf.table(
-        ["Filtro","Que muestra"],
-        [
-            ["Todos","Todos los movimientos sin distincion"],
-            ["No Localizado (BAJA)","Solo movimientos de baja por no localizacion"],
-            ["Sobrante (ALTA)","Solo registros de nuevos equipos como alta"],
-            ["Transferencias","Solo transferencias entre tiendas"],
-        ],[50,140]
-    )
-    pdf.body("Botones de exportacion separados por tipo:")
-    pdf.bullet("'Exportar ALTAS/BAJAS': genera SIGAF_AB_[FECHA].xlsx (incluye hoja 'Imagenes Formatos' con fotos)")
-    pdf.bullet("'Exportar Transferencias': genera SIGAF_TRANSFERENCIAS_[FECHA].xlsx (incluye fotos)")
-
-    pdf.subsection("6.3  Historial de Auditorias")
-    pdf.body("Lista de todas las auditorias con filtros por estado. Al hacer clic en una auditoria:")
-
-    pdf.screen_mock("Resumen de Auditoria en Bitacoras",[
-        {"type":"text","text":"ACANTILADOS TIJ  |  CR:50SYP  |  Completada  |  07/03/26","size":7.5,"style":"B","color":NAVY,"dy":6},
-        {"type":"kpirow","values":[
-            ("Localizado","1",GREEN),
-            ("Sobrante","2",AMBER),
-            ("No Local.","21",RED),
-        ]},
-        {"type":"text","text":"<-- Haga clic en las tarjetas para filtrar el detalle de equipos -->","size":7,"color":GRAY,"dy":5},
-        {"type":"divider","dy":3},
-        {"type":"text","text":"NO LOCALIZADO (21):","size":7.5,"style":"B","color":RED,"dy":5},
-        {"type":"text","text":"Cod.Barras  Descripcion  Marca  Modelo  Serie  Valor   Dep.","size":6.5,"color":GRAY,"dy":5},
-        {"type":"text","text":"84847618    ACCESS POINT CISCO  WAP361  ----   $4,200  No","size":6.5,"color":DARK,"dy":5},
-    ], height=78)
-
-    pdf.body("Botones en el pie del resumen (solo auditorias completadas):")
-    pdf.table(
-        ["Boton","Funcion"],
-        [
-            ["Descargar AB","Descarga la foto del formato ALTAS/BAJAS como archivo JPG"],
-            ["Descargar Transf.","Descarga la foto del formato TRANSFERENCIAS como archivo JPG"],
-            ["Reporte PDF","Genera e imprime un reporte ejecutivo de una pagina con todos los datos"],
-            ["Eliminar Auditoria","Solo Super Administrador: elimina la auditoria y sus datos asociados"],
-        ],[40,150]
-    )
-
-    # ── 7. Administración ──
-    pdf.add_page()
-    pdf.section_title("Panel de Administracion","7")
-    pdf.body("Disponible solo para Super Administrador. Se accede desde 'Administracion' en el menu lateral.")
-
-    pdf.subsection("Gestion de Usuarios")
-    pdf.bullet("Crear nuevos usuarios: nombre, email, contrasena y perfil (Super Admin / Admin / Socio Tec.)")
-    pdf.bullet("Editar usuarios existentes: modificar cualquier campo")
-    pdf.bullet("Eliminar usuarios (excepto el usuario administrador de respaldo)")
-
-    pdf.subsection("Gestion de Equipos")
-    pdf.bullet("Buscar equipos por codigo de barras, numero de activo, descripcion o serie")
-    pdf.bullet("Filtrar por plaza")
-    pdf.bullet("Editar campos: descripcion, marca, modelo, serie, costo, depreciacion")
-
-    pdf.subsection("Reinicio de Datos")
-    pdf.body("Permite actualizar el inventario cargando nuevos archivos Excel:")
-    for i,s in enumerate([
-        "Ir a Administracion > boton 'Reiniciar Datos'",
-        "Adjuntar MAF.xlsx con el inventario actualizado de equipos",
-        "Adjuntar USUARIOS.xlsx con los usuarios (opcional)",
-        "Presionar 'Reiniciar Datos' para confirmar la operacion",
-    ],1):
-        pdf.bullet(f"{i}. {s}")
-    pdf.note_box("ADVERTENCIA CRITICA","Esta accion elimina TODOS los datos del sistema: auditorias, movimientos, clasificaciones, escaneos y equipos. Esta accion NO SE PUEDE DESHACER. Asegurese de tener un respaldo antes de proceder.", RED,(255,235,235))
-
-    # ── 8. Configuración ──
-    pdf.section_title("Configuracion del Sistema","8")
-    pdf.table(
-        ["Opcion","Valores disponibles","Descripcion"],
-        [
-            ["Tema","Claro / Oscuro","Cambia el esquema de colores de toda la interfaz"],
-            ["Idioma","Espanol / Ingles","Traduce todos los textos del sistema instantaneamente"],
-            ["Paleta de colores","Profesional / OXXO","Azul marino (Profesional) o Rojo/Amarillo corporativo OXXO"],
+            ["Tema","Claro / Oscuro","Cambia el esquema de colores"],
+            ["Idioma","Espanol / Ingles","Traduce todos los textos del sistema"],
+            ["Paleta","Profesional / OXXO","Azul marino (Profesional) o Rojo/Amarillo corporativo"],
         ],[28,40,122]
     )
 
-    # ── 9. FAQ ──
+    # ── FAQ adaptado al perfil ──
+    faq_num = "9" if is_super else ("8" if is_admin else "7")
     pdf.add_page()
-    pdf.section_title("Preguntas Frecuentes","9")
-    faq = [
+    pdf.section_title("Preguntas Frecuentes", faq_num)
+
+    faq_common = [
         ("La tienda no muestra el estado 'En Progreso'",
-         "Recargue la pagina (F5 o jalar hacia abajo en movil). El estado se asigna al crear la auditoria. Si persiste, cierre sesion y vuelva a ingresar."),
+         "Recargue la pagina. Si persiste, cierre sesion y vuelva a ingresar."),
         ("Escanee un codigo incorrecto, como lo elimino?",
-         "En el historial de escaneos (lista debajo del campo de entrada), presione el icono X junto al registro incorrecto para eliminarlo del conteo."),
+         "En el historial de escaneos, presione el icono X junto al registro incorrecto."),
         ("Puedo cancelar una auditoria en curso?",
-         "Si. Presione el boton CANCELAR (rojo) en la parte superior del modulo. Es obligatorio escribir el motivo de cancelacion. La tienda queda disponible para nueva auditoria."),
-        ("El dispositivo Zebra no escanea en SIGAF",
-         "Verifique que DataWedge este activo y configurado como salida de teclado. Asegurese de tocar primero el campo de escaneo para que tenga el foco (borde destacado). Si persiste, reinicie la aplicacion DataWedge en el Zebra."),
+         "Si. Presione CANCELAR (rojo) en el modulo. Debe escribir el motivo. La tienda queda disponible para nueva auditoria."),
+        ("El Zebra no escanea en SIGAF",
+         "Verifique que DataWedge este activo. Toque primero el campo de escaneo para darle el foco. Si persiste, reinicie DataWedge."),
         ("Que pasa con un equipo Sobrante Desconocido?",
-         "Se abre el formulario para registrarlo manualmente con Descripcion, Marca, Modelo y Serie (opcional). Al confirmar queda registrado en el MAF de la tienda como ALTA."),
-        ("Que significa estado INCOMPLETO en una auditoria?",
-         "Que mas del 20% de los equipos de la tienda no fueron localizados durante la auditoria. El sistema lo marca automaticamente."),
-        ("Donde estan las fotos de los formatos de movimiento?",
-         "En Bitacoras > Historial de Auditorias. Abra el resumen de la auditoria y baje hasta el final. Use los botones 'Descargar AB' o 'Descargar Transf.' para guardar las fotos."),
-        ("Como imprimo el reporte de una auditoria?",
-         "En Bitacoras > Historial de Auditorias, abra el resumen y presione 'Reporte PDF'. Se abre una ventana con el reporte ejecutivo. Use Ctrl+P (o Cmd+P en Mac) para imprimir."),
-        ("La exportacion Excel no incluye lo que espero",
-         "Verifique el filtro activo en la tabla antes de exportar. La exportacion respeta exactamente el filtro seleccionado (tipo de movimiento y busqueda de texto)."),
-        ("Puedo auditar una tienda mas de una vez en el mismo ciclo?",
-         "Si. Al iniciar auditoria en una tienda ya auditada, se crea una nueva auditoria independiente. El historial de la anterior queda disponible en Bitacoras."),
+         "Se abre el formulario para registrarlo: Descripcion, Marca, Modelo y Serie (opcional). Al confirmar queda registrado como ALTA."),
+        ("Que significa estado INCOMPLETO?",
+         "Mas del 20% de los equipos no fueron localizados. El sistema lo marca automaticamente."),
+        ("Como fotografio los formatos al finalizar?",
+         "Al finalizar si hay movimientos, aparece el dialogo de fotos. Use el boton 'Abrir Camara' para cada formato. Puede omitirlas si no aplica."),
     ]
-    for q, a in faq:
+    faq_admin = [
+        ("Donde estan las fotos de los formatos de movimiento?",
+         "En Bitacoras > Historial de Auditorias. Abra el resumen y use los botones 'Descargar AB' o 'Descargar Transf.'"),
+        ("Como imprimo el reporte de una auditoria?",
+         "En el resumen de auditoria presione 'Reporte PDF'. Use Ctrl+P para imprimir."),
+        ("La exportacion Excel no incluye lo que espero",
+         "Verifique el filtro activo antes de exportar. La exportacion respeta el filtro seleccionado."),
+    ]
+    faq_super = [
+        ("Como reinicio los datos del sistema?",
+         "Administracion > 'Reiniciar Datos'. Adjunte MAF.xlsx y USUARIOS.xlsx. ADVERTENCIA: esta accion es irreversible."),
+        ("Como creo un nuevo usuario?",
+         "Administracion > Usuarios > 'Nuevo Usuario'. Complete nombre, email, contrasena y seleccione el perfil."),
+    ]
+    faq_list = faq_common + (faq_admin if is_admin else []) + (faq_super if is_super else [])
+    for q, a in faq_list:
         pdf.subsection(q)
         pdf.body(a)
 
@@ -748,7 +769,6 @@ def generate_user_manual(stats, plazas_data):
     pdf.output(out)
     out.seek(0)
     return out
-
 
 # ═══════════════════════════════════════════════════════════════
 #  PRESENTACION DEL PROYECTO
