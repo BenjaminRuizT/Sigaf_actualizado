@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSortable } from "@/hooks/useSortable";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,27 +18,6 @@ import {
   AlertTriangle, XCircle, TrendingUp, TrendingDown, RefreshCw, Printer, ImageDown
 } from "lucide-react";
 
-function useSortable(defaultKey, defaultDir = "desc") {
-  const [sortKey, setSortKey] = useState(defaultKey);
-  const [sortDir, setSortDir] = useState(defaultDir);
-  const toggle = (key) => { if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortKey(key); setSortDir("asc"); } };
-  const sorted = (items) => {
-    if (!sortKey) return items;
-    return [...items].sort((a, b) => {
-      let av = a[sortKey], bv = b[sortKey];
-      if (sortKey.includes(".")) { const [p, c] = sortKey.split("."); av = (a[p] || {})[c]; bv = (b[p] || {})[c]; }
-      av = av ?? ""; bv = bv ?? "";
-      if (typeof av === "number" && typeof bv === "number") return sortDir === "asc" ? av - bv : bv - av;
-      return sortDir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
-    });
-  };
-  const SortHeader = ({ col, children, className }) => (
-    <button onClick={() => toggle(col)} className={`flex items-center gap-1 hover:text-foreground transition-colors whitespace-nowrap ${className || ""}`}>
-      {children} <ArrowUpDown className={`h-3 w-3 ${sortKey === col ? "opacity-80" : "opacity-30"}`} />
-    </button>
-  );
-  return { sorted, SortHeader };
-}
 
 const movTypeLabel = (type) => {
   const labels = { alta: "ALTA", baja: "BAJA", disposal: "BAJA", transfer: "TRANSFERENCIA" };
@@ -392,13 +372,13 @@ export default function LogsPage() {
               </SelectContent>
             </Select>
             <div className="flex gap-2 flex-wrap">
-              <Button variant="outline" size="sm" onClick={handleExportMovAB} disabled={exporting} data-testid="export-movements-ab" className="gap-2">
+              <Button variant="outline" size="sm" onClick={handleExportMovAB} disabled={exporting} data-testid="export-movements-ab" className="gap-2" title="Exportar ALTAS / BAJAS a Excel">
                 {exporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Exportar ALTAS / BAJAS
+                <span className="hidden sm:inline">Exportar </span>ALTAS / BAJAS
               </Button>
-              <Button variant="outline" size="sm" onClick={handleExportMovTransfer} disabled={exporting} data-testid="export-movements-transfer" className="gap-2">
+              <Button variant="outline" size="sm" onClick={handleExportMovTransfer} disabled={exporting} data-testid="export-movements-transfer" className="gap-2" title="Exportar Transferencias a Excel">
                 {exporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Exportar Transferencias
+                <span className="hidden sm:inline">Exportar </span>Transferencias
               </Button>
             </div>
           </div>
@@ -573,7 +553,12 @@ export default function LogsPage() {
                 <Card><CardContent className="p-4 space-y-2">
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">{t("audit.notFoundValue")}</span><span className="font-mono font-bold text-red-500">{fmtMoney(auditSummary?.stats?.not_found_value ?? selectedAudit.not_found_value)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">{t("audit.movementsPending")}</span><span className="font-mono font-bold">{auditSummary?.stats?.movements_count ?? 0}</span></div>
-                  {selectedAudit.status === "completed" && <div className="mt-2 p-2 bg-amber-500/10 rounded text-sm text-amber-600 font-medium">Estado: INCOMPLETO (&gt;20% equipos no localizados)</div>}
+                  {selectedAudit.status === "completed" && selectedAudit.total_equipment > 0 &&
+                    ((auditSummary?.stats?.not_found_count ?? selectedAudit.not_found_count ?? 0) / selectedAudit.total_equipment) > 0.20 &&
+                    <div className="mt-2 p-2 bg-amber-500/10 rounded text-sm text-amber-600 font-medium">
+                      Estado: INCOMPLETO (&gt;20% equipos no localizados)
+                    </div>
+                  }
                 </CardContent></Card>
               )}
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useSortable } from "@/hooks/useSortable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,28 +16,6 @@ import { toast } from "sonner";
 import { Store, Monitor, CheckCircle, AlertTriangle, Search, Play, Eye, ChevronLeft, ChevronRight, TrendingDown, DollarSign, BarChart3, Activity, ArrowUpDown, FileText } from "lucide-react";
 import { PlazaBarChart, DepreciationPieChart, AuditStatusChart } from "@/components/DashboardCharts";
 
-function useSortable(defaultKey, defaultDir = "asc") {
-  const [sortKey, setSortKey] = useState(defaultKey);
-  const [sortDir, setSortDir] = useState(defaultDir);
-  const toggle = (key) => {
-    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortKey(key); setSortDir("asc"); }
-  };
-  const sorted = (items, key = sortKey, dir = sortDir) => {
-    if (!key) return items;
-    return [...items].sort((a, b) => {
-      const av = a[key] ?? "", bv = b[key] ?? "";
-      if (typeof av === "number") return dir === "asc" ? av - bv : bv - av;
-      return dir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
-    });
-  };
-  const SortHeader = ({ col, children }) => (
-    <button onClick={() => toggle(col)} className="flex items-center gap-1 hover:text-foreground transition-colors">
-      {children} <ArrowUpDown className="h-3 w-3 opacity-40" />
-    </button>
-  );
-  return { sortKey, sortDir, toggle, sorted, SortHeader };
-}
 
 export default function DashboardPage() {
   const { api, user } = useAuth();
@@ -211,7 +190,12 @@ export default function DashboardPage() {
         </Select>
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder={t("dashboard.searchStore")} value={search} onChange={e => setSearch(e.target.value)} className="pl-10" data-testid="store-search-input" />
+          <Input placeholder={t("dashboard.searchStore")} value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-9" data-testid="store-search-input" />
+          {search && (
+            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" aria-label="Limpiar búsqueda">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          )}
         </div>
       </div>
 

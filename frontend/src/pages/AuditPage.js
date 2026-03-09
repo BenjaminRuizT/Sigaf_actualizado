@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useSortable } from "@/hooks/useSortable";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
@@ -29,25 +30,6 @@ const classColors = {
 };
 const classIcons = { localizado: CheckCircle, sobrante: AlertTriangle, sobrante_desconocido: HelpCircle, no_localizado: XCircle };
 
-function useSortable(defaultKey, defaultDir = "asc") {
-  const [sortKey, setSortKey] = useState(defaultKey);
-  const [sortDir, setSortDir] = useState(defaultDir);
-  const toggle = (key) => { if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortKey(key); setSortDir("asc"); } };
-  const sorted = (items) => {
-    if (!sortKey) return items;
-    return [...items].sort((a, b) => {
-      const av = a[sortKey] ?? "", bv = b[sortKey] ?? "";
-      if (typeof av === "number") return sortDir === "asc" ? av - bv : bv - av;
-      return sortDir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
-    });
-  };
-  const SortHeader = ({ col, children }) => (
-    <button onClick={() => toggle(col)} className="flex items-center gap-1 hover:text-foreground transition-colors whitespace-nowrap">
-      {children} <ArrowUpDown className="h-3 w-3 opacity-40" />
-    </button>
-  );
-  return { sorted, SortHeader };
-}
 
 // ── Photo capture component — camera only, no gallery ──
 function PhotoCapture({ label, icon, onCapture, captured, testId }) {
@@ -481,6 +463,26 @@ export default function AuditPage() {
         <Card><CardContent className="p-3 text-center"><AlertTriangle className="h-5 w-5 text-amber-500 mx-auto mb-1" /><p className="font-mono text-2xl font-bold">{audit?.surplus_count || 0}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">{t("audit.surplus")}</p></CardContent></Card>
         <Card><CardContent className="p-3 text-center"><XCircle className="h-5 w-5 text-red-500 mx-auto mb-1" /><p className="font-mono text-2xl font-bold">{isActive ? realTimeNotFound : (audit?.not_found_count || 0)}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">{t("audit.notFound")}</p></CardContent></Card>
       </div>
+
+      {/* Progress bar — only during active audit */}
+      {isActive && totalEq > 0 && (() => {
+        const scannedCount = userScans.length + offlineQueue.length;
+        const pct = Math.min(100, Math.round((scannedCount / totalEq) * 100));
+        const color = pct >= 90 ? "bg-emerald-500" : pct >= 60 ? "bg-blue-500" : "bg-amber-500";
+        return (
+          <Card>
+            <CardContent className="p-3 space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Progreso de escaneo</span>
+                <span className="font-mono font-semibold text-foreground">{scannedCount} / {totalEq} ({pct}%)</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Unknown surplus pending alert */}
       {isActive && unknownPendingScans.length > 0 && (
