@@ -261,6 +261,8 @@ async def create_audit(input: AuditCreateInput, user=Depends(get_current_user)):
         raise HTTPException(404, "Store not found")
     active = await db.audits.find_one({"cr_tienda": input.cr_tienda, "status": "in_progress"}, {"_id": 0})
     if active:
+        # Ensure store is marked in_progress (may not be set if audit pre-dates this fix)
+        await db.stores.update_one({"cr_tienda": input.cr_tienda}, {"$set": {"audit_status": "in_progress", "last_audit_id": active["id"]}})
         return active
     audit = {
         "id": str(uuid.uuid4()), "cr_tienda": input.cr_tienda, "tienda": store["tienda"],
