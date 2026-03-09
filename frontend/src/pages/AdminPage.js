@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSortable } from "@/hooks/useSortable";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,25 +15,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Users, Monitor, Search, ChevronLeft, ChevronRight, ArrowUpDown, RotateCcw, AlertTriangle, Eye, EyeOff, Download, Upload, FileSpreadsheet } from "lucide-react";
 
-function useSortable(defaultKey, defaultDir = "asc") {
-  const [sortKey, setSortKey] = useState(defaultKey);
-  const [sortDir, setSortDir] = useState(defaultDir);
-  const toggle = (key) => { if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortKey(key); setSortDir("asc"); } };
-  const sorted = (items) => {
-    if (!sortKey) return items;
-    return [...items].sort((a, b) => {
-      const av = a[sortKey] ?? "", bv = b[sortKey] ?? "";
-      if (typeof av === "number") return sortDir === "asc" ? av - bv : bv - av;
-      return sortDir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
-    });
-  };
-  const SortHeader = ({ col, children }) => (
-    <button onClick={() => toggle(col)} className="flex items-center gap-1 hover:text-foreground transition-colors">
-      {children} <ArrowUpDown className={`h-3 w-3 ${sortKey === col ? "opacity-80" : "opacity-30"}`} />
-    </button>
-  );
-  return { sorted, SortHeader };
-}
 
 export default function AdminPage() {
   const { api, user: currentUser } = useAuth();
@@ -46,6 +28,7 @@ export default function AdminPage() {
   const [eqSearch, setEqSearch] = useState("");
   const [eqPlaza, setEqPlaza] = useState("all");
   const [eqPage, setEqPage] = useState(1);
+  const [plazas, setPlazas] = useState([]);
   const [editEq, setEditEq] = useState(null);
   const [eqForm, setEqForm] = useState({});
   const [resetDialog, setResetDialog] = useState(false);
@@ -58,6 +41,7 @@ export default function AdminPage() {
   const eqSort = useSortable("descripcion");
 
   const fetchUsers = useCallback(async () => { try { const res = await api.get("/admin/users"); setUsers(res.data); } catch {} }, [api]);
+  const fetchPlazas = useCallback(async () => { try { const res = await api.get("/stores/plazas"); setPlazas(res.data); } catch {} }, [api]);
   const fetchEquipment = useCallback(async () => {
     try {
       const params = { page: eqPage, limit: 30 };
@@ -70,6 +54,7 @@ export default function AdminPage() {
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => { fetchEquipment(); }, [fetchEquipment]);
+  useEffect(() => { fetchPlazas(); }, [fetchPlazas]);
 
   const handleSaveUser = async () => {
     try {
@@ -170,7 +155,7 @@ export default function AdminPage() {
 
         <TabsContent value="equipment" className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3">
-            <Select value={eqPlaza} onValueChange={v => { setEqPlaza(v); setEqPage(1); }}><SelectTrigger className="w-48" data-testid="eq-plaza-filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{t("dashboard.allPlazas")}</SelectItem><SelectItem value="Este">Este</SelectItem><SelectItem value="Centro">Centro</SelectItem><SelectItem value="Playas">Playas</SelectItem><SelectItem value="Ensenada">Ensenada</SelectItem><SelectItem value="Oficinas Region">Oficinas Region</SelectItem></SelectContent></Select>
+            <Select value={eqPlaza} onValueChange={v => { setEqPlaza(v); setEqPage(1); }}><SelectTrigger className="w-48" data-testid="eq-plaza-filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{t("dashboard.allPlazas")}</SelectItem>{plazas.map(p => <SelectItem key={p.cr_plaza || p.plaza} value={p.plaza}>{p.plaza}</SelectItem>)}</SelectContent></Select>
             <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder={t("admin.searchEquipment")} value={eqSearch} onChange={e => { setEqSearch(e.target.value); setEqPage(1); }} className="pl-10" data-testid="eq-search-input" /></div>
           </div>
           <Card><div className="overflow-x-auto"><ScrollArea className="h-[500px]"><Table style={{minWidth:600}}>
