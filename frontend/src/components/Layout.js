@@ -4,8 +4,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { LayoutDashboard, ClipboardList, Shield, Settings, LogOut, Menu, Sun, Moon, Globe, Rocket, PieChart, ShieldAlert } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { LayoutDashboard, ClipboardList, Shield, Settings, LogOut, Menu, Sun, Moon, Globe, Rocket, PieChart } from "lucide-react";
+import { useState } from "react";
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
@@ -14,31 +14,15 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
-  const [pendingUnlocks, setPendingUnlocks] = useState(0);
 
   const isAdmin = ["Administrador", "Super Administrador"].includes(user?.perfil);
   const isSuperAdmin = user?.perfil === "Super Administrador";
-
-  // Poll for pending unlock requests every 60s (Super Admin only)
-  const fetchPendingUnlocks = useCallback(async () => {
-    if (!isSuperAdmin) return;
-    try {
-      const res = await api.get("/admin/unlock-requests");
-      setPendingUnlocks((res.data || []).filter(u => u.unlock_requested).length);
-    } catch {}
-  }, [api, isSuperAdmin]);
-
-  useEffect(() => {
-    fetchPendingUnlocks();
-    const interval = setInterval(fetchPendingUnlocks, 60000);
-    return () => clearInterval(interval);
-  }, [fetchPendingUnlocks]);
 
   const navItems = [
     { path: "/", icon: LayoutDashboard, label: t("nav.dashboard"), show: true },
     { path: "/reports", icon: PieChart, label: "Reportes", show: isAdmin },
     { path: "/logs", icon: ClipboardList, label: t("nav.logs"), show: isAdmin },
-    { path: "/admin", icon: Shield, label: t("nav.admin"), show: isSuperAdmin, badge: pendingUnlocks > 0 ? pendingUnlocks : null },
+    { path: "/admin", icon: Shield, label: t("nav.admin"), show: isSuperAdmin },
     { path: "/settings", icon: Settings, label: t("nav.settings"), show: true },
     { path: "/deploy", icon: Rocket, label: "Despliegue", show: isSuperAdmin },
   ];
@@ -58,12 +42,7 @@ export default function Layout({ children }) {
           <button key={item.path} onClick={() => handleNav(item.path)} data-testid={`sidebar-nav-${item.path.replace("/","") || "dashboard"}`}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${isActive(item.path) ? "bg-primary text-primary-foreground" : "hover:bg-muted text-foreground"}`}>
             <item.icon className="h-4 w-4" />
-            <span className="flex-1 text-left">{item.label}</span>
-            {item.badge && (
-              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold">
-                {item.badge}
-              </span>
-            )}
+            {item.label}
           </button>
         ))}
       </nav>
@@ -142,13 +121,8 @@ export default function Layout({ children }) {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-card border-t border-border z-40 flex justify-around items-center px-2">
         {navItems.filter(i => i.show).map(item => (
           <button key={item.path} onClick={() => handleNav(item.path)} data-testid={`bottom-nav-${item.path.replace("/","") || "dashboard"}`}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors min-w-[56px] relative ${isActive(item.path) ? "text-primary" : "text-muted-foreground"}`}>
+            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors min-w-[56px] ${isActive(item.path) ? "text-primary" : "text-muted-foreground"}`}>
             <item.icon className="h-5 w-5" />
-            {item.badge && (
-              <span className="absolute top-0.5 right-1 inline-flex items-center justify-center min-w-[14px] h-[14px] px-0.5 rounded-full bg-amber-500 text-white text-[9px] font-bold">
-                {item.badge}
-              </span>
-            )}
             <span className="text-[10px] font-medium">{item.label}</span>
           </button>
         ))}
