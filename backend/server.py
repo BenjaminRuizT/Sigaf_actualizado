@@ -767,9 +767,14 @@ async def download_manual(user=Depends(get_current_user)):
         }
     except Exception as e:
         logger.error(f"Error getting stats for manual: {e}")
-    output = generate_user_manual(stats, [])
+    output = generate_user_manual(stats, [], user_perfil=user.get("perfil", "Administrador"))
+    filename = "SIGAF_Manual_de_Usuario.pdf"
+    if user.get("perfil") == "Socio Tecnologico":
+        filename = "SIGAF_Manual_Socio_Tecnologico.pdf"
+    elif user.get("perfil") == "Administrador":
+        filename = "SIGAF_Manual_Administrador.pdf"
     return StreamingResponse(output, media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=SIGAF_Manual_de_Usuario.pdf"})
+        headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 @api_router.get("/download/presentation")
 async def download_presentation(user=Depends(get_current_user)):
