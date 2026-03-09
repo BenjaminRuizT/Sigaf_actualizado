@@ -105,166 +105,35 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         raise HTTPException(401, "Invalid token")
 
 # ==================== AUTH ROUTES ====================
+from collections import defaultdict
 
-# Persistent DB-backed account lockout system
-_LOGIN_MAX_ATTEMPTS = 5          # lock after 5 consecutive failures
-_LOGIN_LOCK_SECONDS  = 1800      # auto-unlock after 30 minutes
+# Simple in-memory rate limiter for login (brute-force protection)
+_login_attempts: dict = defaultdict(list)
+_LOGIN_MAX_ATTEMPTS = 10
+_LOGIN_WINDOW_SECONDS = 300  # 5 minutes
 
-class UnlockRequestInput(BaseModel):
-    email: str
-    reason: Optional[str] = None
-
-class UserUnlockInput(BaseModel):
-    user_id: str
-
-async def _record_failed_login(email: str) -> dict:
-    """Increment failed attempts counter and lock account when threshold is reached."""
-    now_iso = datetime.now(timezone.utc).isoformat()
-    user_doc = await db.users.find_one(
-        {"email": {"$in": [email, email.lower()]}}, {"_id": 0}
-    )
-    if not user_doc:
-        return {}   # don't reveal whether email exists
-
-    new_attempts = (user_doc.get("failed_login_attempts") or 0) + 1
-    update = {"failed_login_attempts": new_attempts, "last_failed_at": now_iso}
-
-    if new_attempts >= _LOGIN_MAX_ATTEMPTS:
-        update["locked_at"] = now_iso
-        update["locked"] = True
-        update["unlock_requested"] = False
-        update["unlock_request_reason"] = None
-        update["unlock_request_at"] = None
-
-    await db.users.update_one({"id": user_doc["id"]}, {"$set": update})
-    return {**user_doc, **update}
-
-async def _check_and_auto_unlock(user_doc: dict) -> dict:
-    """Auto-unlock if lock window has expired. Returns updated user_doc."""
-    if not user_doc.get("locked"):
-        return user_doc
-    locked_at_str = user_doc.get("locked_at")
-    if locked_at_str:
-        locked_at = datetime.fromisoformat(locked_at_str)
-        elapsed = (datetime.now(timezone.utc) - locked_at.replace(tzinfo=timezone.utc)
-                   if locked_at.tzinfo is None
-                   else datetime.now(timezone.utc) - locked_at)
-        if elapsed.total_seconds() >= _LOGIN_LOCK_SECONDS:
-            await db.users.update_one(
-                {"id": user_doc["id"]},
-                {"$set": {"locked": False, "failed_login_attempts": 0,
-                           "unlock_requested": False, "locked_at": None}}
-            )
-            return {**user_doc, "locked": False}
-    return user_doc
+def _check_login_rate_limit(email: str):
+    now = datetime.now(timezone.utc).timestamp()
+    window_start = now - _LOGIN_WINDOW_SECONDS
+    attempts = [t for t in _login_attempts[email] if t > window_start]
+    _login_attempts[email] = attempts
+    if len(attempts) >= _LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(429, f"Demasiados intentos fallidos. Intente de nuevo en {_LOGIN_WINDOW_SECONDS // 60} minutos.")
+    _login_attempts[email].append(now)
 
 @api_router.post("/auth/login")
 async def login(input: LoginInput):
     email_key = input.email.strip().lower()
-    user = await db.users.find_one(
-        {"email": {"$in": [email_key, input.email.strip()]}}, {"_id": 0}
-    )
+    _check_login_rate_limit(email_key)
+    user = await db.users.find_one({"email": email_key}, {"_id": 0})
     if not user:
-        # Fake delay to prevent user enumeration
+        user = await db.users.find_one({"email": input.email.strip()}, {"_id": 0})
+    if not user or not verify_password(input.password, user["password_hash"]):
         raise HTTPException(401, "Credenciales invalidas")
-
-    # Auto-unlock if time window expired
-    user = await _check_and_auto_unlock(user)
-
-    if user.get("locked"):
-        remaining_min = max(1, round(
-            (_LOGIN_LOCK_SECONDS - (
-                datetime.now(timezone.utc) -
-                datetime.fromisoformat(user["locked_at"]).replace(tzinfo=timezone.utc)
-            ).total_seconds()) / 60
-        ))
-        raise HTTPException(423, {
-            "code": "ACCOUNT_LOCKED",
-            "message": f"Cuenta bloqueada por {_LOGIN_MAX_ATTEMPTS} intentos fallidos.",
-            "remaining_minutes": remaining_min,
-            "unlock_requested": user.get("unlock_requested", False),
-            "user_id": user["id"],
-            "email": user["email"]
-        })
-
-    if not verify_password(input.password, user["password_hash"]):
-        updated = await _record_failed_login(email_key)
-        attempts_left = max(0, _LOGIN_MAX_ATTEMPTS - (updated.get("failed_login_attempts") or 0))
-        if updated.get("locked"):
-            raise HTTPException(423, {
-                "code": "ACCOUNT_LOCKED",
-                "message": f"Cuenta bloqueada por demasiados intentos fallidos.",
-                "remaining_minutes": _LOGIN_LOCK_SECONDS // 60,
-                "unlock_requested": False,
-                "user_id": user["id"],
-                "email": user["email"]
-            })
-        detail = "Credenciales invalidas"
-        if attempts_left <= 2:
-            detail = f"Credenciales invalidas. {attempts_left} intento{'s' if attempts_left != 1 else ''} restante{'s' if attempts_left != 1 else ''} antes del bloqueo."
-        raise HTTPException(401, detail)
-
-    # Successful login — reset counters
-    await db.users.update_one(
-        {"id": user["id"]},
-        {"$set": {"failed_login_attempts": 0, "locked": False, "locked_at": None,
-                   "unlock_requested": False, "last_login": datetime.now(timezone.utc).isoformat()}}
-    )
+    # Clear attempts on successful login
+    _login_attempts.pop(email_key, None)
     token = create_token(user["id"], user["email"], user["perfil"], user["nombre"])
-    return {"token": token, "user": {k: v for k, v in user.items() if k not in ("password_hash", "_id")}}
-
-@api_router.post("/auth/request-unlock")
-async def request_unlock(input: UnlockRequestInput):
-    """User requests manual unlock by super admin. No auth required (user is locked out)."""
-    email_key = input.email.strip().lower()
-    user = await db.users.find_one(
-        {"email": {"$in": [email_key, input.email.strip()]}}, {"_id": 0}
-    )
-    if not user or not user.get("locked"):
-        # Silent success to prevent user enumeration
-        return {"message": "Si la cuenta existe y esta bloqueada, la solicitud fue enviada."}
-
-    await db.users.update_one(
-        {"id": user["id"]},
-        {"$set": {
-            "unlock_requested": True,
-            "unlock_request_at": datetime.now(timezone.utc).isoformat(),
-            "unlock_request_reason": (input.reason or "").strip()[:500]
-        }}
-    )
-    return {"message": "Solicitud de desbloqueo enviada. Un administrador la revisara pronto."}
-
-@api_router.get("/admin/unlock-requests")
-async def get_unlock_requests(user=Depends(get_current_user)):
-    """Super admin: get all pending unlock requests."""
-    if user["perfil"] != "Super Administrador":
-        raise HTTPException(403, "Solo Super Administrador puede ver solicitudes de desbloqueo")
-    locked_users = await db.users.find(
-        {"locked": True},
-        {"_id": 0, "password_hash": 0}
-    ).to_list(200)
-    return locked_users
-
-@api_router.post("/admin/unlock/{user_id}")
-async def unlock_user(user_id: str, admin=Depends(get_current_user)):
-    """Super admin: manually unlock a user account."""
-    if admin["perfil"] != "Super Administrador":
-        raise HTTPException(403, "Solo Super Administrador puede desbloquear cuentas")
-    target = await db.users.find_one({"id": user_id}, {"_id": 0})
-    if not target:
-        raise HTTPException(404, "Usuario no encontrado")
-    await db.users.update_one(
-        {"id": user_id},
-        {"$set": {
-            "locked": False, "failed_login_attempts": 0,
-            "locked_at": None, "unlock_requested": False,
-            "unlock_request_reason": None, "unlock_request_at": None,
-            "unlocked_by": admin["nombre"],
-            "unlocked_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-    return {"message": f"Usuario {target['email']} desbloqueado correctamente"}
-
+    return {"token": token, "user": {k: v for k, v in user.items() if k != "password_hash"}}
 
 @api_router.get("/auth/me")
 async def get_me(user=Depends(get_current_user)):
@@ -460,82 +329,34 @@ async def scan_barcode(audit_id: str, input: ScanInput, user=Depends(get_current
     cr_tienda = audit["cr_tienda"]
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    # Check if this equipment had a pending BAJA from a previous audit
-    # This is critical: if equipment was marked as "no_localizado" (BAJA) before but
-    # it now physically appears, we must cancel that BAJA and restore its active status.
-    async def _cancel_pending_baja(equipment_id: str, equipment_barcode: str) -> Optional[dict]:
-        """Cancel any pending BAJA movement for this equipment. Returns the cancelled movement or None."""
-        pending_baja = await db.movements.find_one(
-            {"equipment_id": equipment_id, "type": "baja", "status": "pending"},
-            {"_id": 0}
-        )
-        if pending_baja:
-            await db.movements.update_one(
-                {"id": pending_baja["id"]},
-                {"$set": {
-                    "status": "cancelled",
-                    "cancelled_at": now_iso,
-                    "cancelled_by": user["nombre"],
-                    "cancel_reason": f"Equipo localizado fisicamente en auditoria {audit_id} - BAJA revertida automaticamente"
-                }}
-            )
-            return pending_baja
-        return None
-
     # Check in current store
     equipment = await db.equipment.find_one({"cr_tienda": cr_tienda, "codigo_barras": barcode}, {"_id": 0})
     if equipment:
-        # Check and cancel any pending BAJA for this equipment
-        cancelled_baja = await _cancel_pending_baja(equipment["id"], barcode)
-
         scan_rec = {
             "id": str(uuid.uuid4()), "audit_id": audit_id, "codigo_barras": barcode,
             "equipment_id": equipment["id"], "classification": "localizado",
             "equipment_data": equipment, "origin_store": None,
-            "scanned_at": now_iso, "scanned_by": user["nombre"],
-            "baja_revertida": cancelled_baja is not None,  # flag for frontend notification
+            "scanned_at": now_iso, "scanned_by": user["nombre"]
         }
         await db.audit_scans.insert_one(scan_rec)
         await db.audits.update_one({"id": audit_id}, {"$inc": {"located_count": 1}})
-        result = {k: v for k, v in scan_rec.items() if k != "_id"}
-        return {
-            "status": "localizado",
-            "scan": result,
-            "baja_revertida": cancelled_baja is not None,
-            "baja_info": {
-                "audit_id": cancelled_baja.get("audit_id"),
-                "created_at": cancelled_baja.get("created_at"),
-            } if cancelled_baja else None
-        }
+        return {"status": "localizado", "scan": {k: v for k, v in scan_rec.items() if k != "_id"}}
 
-    # Check in other stores (equipment assigned to a different store)
+    # Check in other stores
     other = await db.equipment.find_one({"codigo_barras": barcode, "cr_tienda": {"$ne": cr_tienda}}, {"_id": 0})
     if other:
-        # Also cancel pending BAJA if this equipment appears in another store
-        cancelled_baja = await _cancel_pending_baja(other["id"], barcode)
-
         scan_rec = {
             "id": str(uuid.uuid4()), "audit_id": audit_id, "codigo_barras": barcode,
             "equipment_id": other["id"], "classification": "sobrante",
             "equipment_data": other,
             "origin_store": {"cr_tienda": other["cr_tienda"], "tienda": other["tienda"], "plaza": other["plaza"]},
-            "scanned_at": now_iso, "scanned_by": user["nombre"],
-            "baja_revertida": cancelled_baja is not None,
+            "scanned_at": now_iso, "scanned_by": user["nombre"]
         }
         await db.audit_scans.insert_one(scan_rec)
         await db.audits.update_one({"id": audit_id}, {"$inc": {"surplus_count": 1}})
-        result = {k: v for k, v in scan_rec.items() if k != "_id"}
-        return {
-            "status": "sobrante",
-            "scan": result,
-            "baja_revertida": cancelled_baja is not None,
-            "baja_info": {
-                "audit_id": cancelled_baja.get("audit_id"),
-                "from_tienda": cancelled_baja.get("from_tienda"),
-            } if cancelled_baja else None
-        }
+        return {"status": "sobrante", "scan": {k: v for k, v in scan_rec.items() if k != "_id"}}
 
-    # Not found anywhere in equipment DB
+    # Not found anywhere
     scan_rec = {
         "id": str(uuid.uuid4()), "audit_id": audit_id, "codigo_barras": barcode,
         "equipment_id": None, "classification": "sobrante_desconocido",
@@ -1692,8 +1513,6 @@ async def import_data():
     await db.audits.create_index("cr_tienda")
     await db.audits.create_index("status")
     await db.users.create_index("email", unique=True)
-    await db.users.create_index("locked")                                         # blocked user queries
-    await db.movements.create_index([("equipment_id", 1), ("type", 1), ("status", 1)])  # pending BAJA lookup per equipment
     # Compound indexes for high-frequency queries
     await db.audit_scans.create_index([("audit_id", 1), ("codigo_barras", 1)])  # scan dedup check
     await db.equipment.create_index([("cr_tienda", 1), ("codigo_barras", 1)])   # localizado lookup
