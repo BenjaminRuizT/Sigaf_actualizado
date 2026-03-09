@@ -206,30 +206,13 @@ export default function AuditPage() {
     }
     try {
       const res = await api.post(`/audits/${auditId}/scan`, { barcode: bc });
-      const { status, scan, baja_revertida, baja_info } = res.data;
+      const { status, scan } = res.data;
       if (status !== "already_scanned") setScans(prev => [scan, ...prev]);
       if (status === "localizado") {
-        setFlashClass("flash-success");
-        if (baja_revertida) {
-          // Special notification: this equipment had a pending BAJA that is now cancelled
-          toast.success(
-            `✓ LOCALIZADO: ${bc} — ⚠ BAJA REVERTIDA: el equipo tenía una baja pendiente de auditoría anterior que ha sido cancelada automáticamente.`,
-            { duration: 6000 }
-          );
-        } else {
-          toast.success(`${t("audit.located")}: ${bc}`);
-        }
+        setFlashClass("flash-success"); toast.success(`${t("audit.located")}: ${bc}`);
         setAudit(p => p ? { ...p, located_count: (p.located_count || 0) + 1 } : p);
       } else if (status === "sobrante") {
-        setFlashClass("flash-warning");
-        if (baja_revertida) {
-          toast.warning(
-            `SOBRANTE: ${bc} — BAJA REVERTIDA: equipo encontrado en otra tienda, baja pendiente cancelada.`,
-            { duration: 6000 }
-          );
-        } else {
-          toast.warning(`${t("audit.surplus")}: ${bc}`);
-        }
+        setFlashClass("flash-warning"); toast.warning(`${t("audit.surplus")}: ${bc}`);
         setTransferDialog(scan); setAudit(p => p ? { ...p, surplus_count: (p.surplus_count || 0) + 1 } : p);
       } else if (status === "sobrante_desconocido") {
         setFlashClass("flash-error"); toast.warning(`${t("audit.surplusUnknown")}: ${bc}`);
@@ -481,52 +464,21 @@ export default function AuditPage() {
         <Card><CardContent className="p-3 text-center"><XCircle className="h-5 w-5 text-red-500 mx-auto mb-1" /><p className="font-mono text-2xl font-bold">{isActive ? realTimeNotFound : (audit?.not_found_count || 0)}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">{t("audit.notFound")}</p></CardContent></Card>
       </div>
 
-      {/* Progress bar — based on located count vs total inventory (not raw scans) */}
+      {/* Progress bar — only during active audit */}
       {isActive && totalEq > 0 && (() => {
-        // CORRECT metric: how many inventory items have been physically confirmed present
-        // Sobrantes (surplus) are NOT inventory items of this store — excluded from progress
-        // Offline queue items are "pending confirmation" — shown separately
-        const confirmedFound = locatedCount;
-        const pendingOffline = offlineQueue.length;
-        const pct = Math.min(100, Math.round((confirmedFound / totalEq) * 100));
-        // Color logic: green only when all own-store equipment is found
-        const barColor = pct >= 100 ? "bg-emerald-500" : pct >= 70 ? "bg-blue-500" : pct >= 40 ? "bg-amber-500" : "bg-red-400";
-        const surplusCount = audit?.surplus_count || 0;
+        const scannedCount = userScans.length + offlineQueue.length;
+        const pct = Math.min(100, Math.round((scannedCount / totalEq) * 100));
+        const color = pct >= 90 ? "bg-emerald-500" : pct >= 60 ? "bg-blue-500" : "bg-amber-500";
         return (
           <Card>
-            <CardContent className="p-3 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground font-medium">Progreso de cobertura del inventario</span>
-                <span className={`font-mono font-bold ${pct >= 100 ? "text-emerald-600" : "text-foreground"}`}>
-                  {confirmedFound} / {totalEq} ({pct}%)
-                </span>
+            <CardContent className="p-3 space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Progreso de escaneo</span>
+                <span className="font-mono font-semibold text-foreground">{scannedCount} / {totalEq} ({pct}%)</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
-                <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
+                <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
               </div>
-              {/* Contextual legend — only shown when there's something to clarify */}
-              {(surplusCount > 0 || pendingOffline > 0 || realTimeNotFound > 0) && (
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground pt-0.5">
-                  {surplusCount > 0 && (
-                    <span className="flex items-center gap-1">
-                      <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
-                      {surplusCount} sobrante{surplusCount > 1 ? "s" : ""} (no son de esta tienda)
-                    </span>
-                  )}
-                  {pendingOffline > 0 && (
-                    <span className="flex items-center gap-1">
-                      <span className="inline-block w-2 h-2 rounded-full bg-slate-400" />
-                      {pendingOffline} escaneo{pendingOffline > 1 ? "s" : ""} offline sin confirmar
-                    </span>
-                  )}
-                  {realTimeNotFound > 0 && (
-                    <span className="flex items-center gap-1">
-                      <span className="inline-block w-2 h-2 rounded-full bg-red-400" />
-                      {realTimeNotFound} equipo{realTimeNotFound > 1 ? "s" : ""} aún sin localizar
-                    </span>
-                  )}
-                </div>
-              )}
             </CardContent>
           </Card>
         );
