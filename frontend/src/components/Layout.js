@@ -49,7 +49,12 @@ export default function Layout({ children }) {
       <div className="p-3 border-t border-border space-y-2">
         <div className="px-3 py-2">
           <p className="text-sm font-medium truncate">{user?.nombre}</p>
-          <p className="text-xs text-muted-foreground truncate">{user?.perfil}</p>
+          <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+          <span className={`inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full font-medium ${
+            user?.perfil === "Super Administrador" ? "bg-violet-500/15 text-violet-600" :
+            user?.perfil === "Administrador" ? "bg-blue-500/15 text-blue-600" :
+            "bg-amber-500/15 text-amber-600"
+          }`}>{user?.perfil}</span>
         </div>
         <button onClick={handleLogout} data-testid="nav-logout"
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
