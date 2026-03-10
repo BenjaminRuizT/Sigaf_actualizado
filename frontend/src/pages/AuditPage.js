@@ -163,6 +163,13 @@ export default function AuditPage() {
       if (res.data.status !== "in_progress") {
         const sumRes = await api.get(`/audits/${auditId}/summary`);
         setSummary(sumRes.data);
+        // Auto-verificar firma en auditorías completadas
+        if (res.data.status === "completed" && res.data.signature) {
+          try {
+            const sigRes = await api.get(`/audits/${auditId}/verify-signature`);
+            setSigVerify({ valid: sigRes.data.valid, signature: sigRes.data.signature, checked_at: new Date().toLocaleTimeString("es-MX") });
+          } catch { /* silencioso — no bloquear carga */ }
+        }
       }
     } catch { toast.error(t("common.error")); }
   }, [api, auditId, t]);
@@ -326,10 +333,16 @@ export default function AuditPage() {
         api.get(`/audits/${auditId}`), api.get(`/audits/${auditId}/summary`), api.get(`/audits/${auditId}/scans`),
       ]);
       setAudit(auditRes.data); setSummary(sumRes.data); setScans(scansRes.data);
+      // Auto-verificar firma al completar
+      try {
+        const sigRes = await api.get(`/audits/${auditId}/verify-signature`);
+        setSigVerify({ valid: sigRes.data.valid, signature: sigRes.data.signature, checked_at: new Date().toLocaleTimeString("es-MX") });
+      } catch { /* silencioso */ }
       const movements = sumRes.data?.movements || [];
       const hasAB = movements.some(m => ["alta","baja","disposal"].includes(m.type));
       const hasTransf = movements.some(m => m.type === "transfer");
       if (hasAB || hasTransf) {
+        // Solo pedir foto si hay movimientos que documentar
         setPendingFinalize({ hasAB, hasTransf });
         setPhotoABCapture(null);
         setPhotoTransfCapture(null);
@@ -683,33 +696,40 @@ export default function AuditPage() {
             </CardContent></Card>
             <div className="mt-4 flex flex-wrap gap-2 items-center">
               <Button onClick={() => navigate("/")}><ArrowLeft className="h-4 w-4 mr-2" />{t("audit.backToDashboard")}</Button>
-              {/* Signature verification — visible to admins on completed audits */}
-              {["Administrador", "Super Administrador"].includes(user?.perfil) && audit?.status === "completed" && (
-                <Button variant="outline" className="gap-2" onClick={async () => {
-                  try {
-                    const res = await api.get(`/audits/${audit.id}/verify-signature`);
-                    setSigVerify({ valid: res.data.valid, signature: res.data.signature, checked_at: new Date().toLocaleTimeString("es-MX") });
-                  } catch { toast.error("No se pudo verificar la firma"); }
-                }}>
-                  <ShieldCheck className="h-4 w-4" /> Verificar integridad
-                </Button>
-              )}
             </div>
-            {sigVerify && (
-              <div className={`mt-3 rounded-lg border p-3 flex items-start gap-3 ${sigVerify.valid ? "bg-emerald-500/10 border-emerald-500/30" : "bg-red-500/10 border-red-500/30"}`}>
-                {sigVerify.valid
-                  ? <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
-                  : <ShieldX className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />}
-                <div className="space-y-1">
-                  <p className={`text-sm font-semibold ${sigVerify.valid ? "text-emerald-700" : "text-red-700"}`}>
-                    {sigVerify.valid ? "Auditoría íntegra — firma válida" : "⚠ FIRMA INVÁLIDA — posible manipulación de datos"}
+            {/* Indicador de integridad — siempre visible en auditorías completadas, verificación automática */}
+            {audit?.status === "completed" && (
+              <div className={`mt-3 rounded-lg border p-3 flex items-start gap-3 ${
+                sigVerify === null
+                  ? "bg-muted/40 border-muted-foreground/20"
+                  : sigVerify.valid
+                    ? "bg-emerald-500/10 border-emerald-500/30"
+                    : "bg-red-500/10 border-red-500/30"
+              }`}>
+                {sigVerify === null
+                  ? <ShieldCheck className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5 animate-pulse" />
+                  : sigVerify.valid
+                    ? <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                    : <ShieldX className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />}
+                <div className="space-y-1 min-w-0">
+                  <p className={`text-sm font-semibold ${
+                    sigVerify === null ? "text-muted-foreground"
+                    : sigVerify.valid ? "text-emerald-700" : "text-red-700"
+                  }`}>
+                    {sigVerify === null
+                      ? "Verificando integridad…"
+                      : sigVerify.valid
+                        ? "Auditoría íntegra — firma digital válida"
+                        : "⚠ FIRMA INVÁLIDA — posible manipulación de datos"}
                   </p>
-                  {sigVerify.signature && (
+                  {sigVerify?.signature && (
                     <p className="text-[11px] font-mono text-muted-foreground break-all">
                       HMAC-SHA256: {sigVerify.signature.hash}
                     </p>
                   )}
-                  <p className="text-xs text-muted-foreground">Verificado a las {sigVerify.checked_at}</p>
+                  {sigVerify && (
+                    <p className="text-xs text-muted-foreground">Verificado automáticamente a las {sigVerify.checked_at}</p>
+                  )}
                 </div>
               </div>
             )}

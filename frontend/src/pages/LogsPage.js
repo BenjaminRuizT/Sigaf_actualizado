@@ -16,7 +16,7 @@ import {
   Download, ChevronLeft, ChevronRight, ClipboardList, ArrowRightLeft, History,
   DollarSign, ArrowUpDown, Search, Eye, Trash2, StickyNote, CheckCircle,
   AlertTriangle, XCircle, TrendingUp, TrendingDown, RefreshCw, Printer, ImageDown,
-  ShieldCheck, ShieldAlert
+  ShieldCheck, ShieldAlert, X, ZoomIn
 } from "lucide-react";
 
 
@@ -57,6 +57,7 @@ export default function LogsPage() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryFilter, setSummaryFilter] = useState("not_found"); // "located" | "surplus" | "not_found"
   const [deleteDialog, setDeleteDialog] = useState(null);
+  const [lightbox, setLightbox] = useState(null); // { src, title, filename }
 
   const classSort = useSortable("scanned_at");
   const movSort = useSortable("created_at");
@@ -769,13 +770,23 @@ ${(a.photo_ab || a.photo_transf) ? `
                     {selectedAudit?.photo_ab && (
                       <div className="space-y-1.5">
                         <p className="text-xs font-medium text-muted-foreground">Formato ALTAS / BAJAS</p>
-                        <img src={`data:image/jpeg;base64,${selectedAudit.photo_ab}`} alt="Formato AB" className="w-full rounded border object-contain max-h-48"/>
+                        <button className="relative w-full group" onClick={() => setLightbox({ src: `data:image/jpeg;base64,${selectedAudit.photo_ab}`, title: "Formato ALTAS / BAJAS", filename: `formato_AB_${selectedAudit.cr_tienda}.jpg` })}>
+                          <img src={`data:image/jpeg;base64,${selectedAudit.photo_ab}`} alt="Formato AB" className="w-full rounded border object-contain max-h-48 transition group-hover:brightness-75"/>
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                            <ZoomIn className="h-8 w-8 text-white drop-shadow-lg"/>
+                          </div>
+                        </button>
                       </div>
                     )}
                     {selectedAudit?.photo_transf && (
                       <div className="space-y-1.5">
                         <p className="text-xs font-medium text-muted-foreground">Formato TRANSFERENCIAS</p>
-                        <img src={`data:image/jpeg;base64,${selectedAudit.photo_transf}`} alt="Formato Transferencias" className="w-full rounded border object-contain max-h-48"/>
+                        <button className="relative w-full group" onClick={() => setLightbox({ src: `data:image/jpeg;base64,${selectedAudit.photo_transf}`, title: "Formato TRANSFERENCIAS", filename: `formato_TRANSF_${selectedAudit.cr_tienda}.jpg` })}>
+                          <img src={`data:image/jpeg;base64,${selectedAudit.photo_transf}`} alt="Formato Transferencias" className="w-full rounded border object-contain max-h-48 transition group-hover:brightness-75"/>
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                            <ZoomIn className="h-8 w-8 text-white drop-shadow-lg"/>
+                          </div>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -834,6 +845,30 @@ ${(a.photo_ab || a.photo_transf) ? `
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Lightbox de fotos */}
+      {lightbox && (
+        <div className="fixed inset-0 z-50 bg-black/85 flex flex-col items-center justify-center p-4"
+          onClick={() => setLightbox(null)}>
+          <div className="w-full max-w-4xl flex flex-col gap-3" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="text-white font-semibold text-sm tracking-wide uppercase">{lightbox.title}</p>
+              <div className="flex gap-2">
+                <button className="flex items-center gap-1.5 text-xs bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 rounded-md transition"
+                  onClick={() => { const a = document.createElement("a"); a.href = lightbox.src; a.download = lightbox.filename; a.click(); }}>
+                  <ImageDown className="h-4 w-4" /> Descargar
+                </button>
+                <button className="flex items-center gap-1.5 text-xs bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 rounded-md transition"
+                  onClick={() => setLightbox(null)}>
+                  <X className="h-4 w-4" /> Cerrar
+                </button>
+              </div>
+            </div>
+            <img src={lightbox.src} alt={lightbox.title}
+              className="w-full max-h-[80vh] object-contain rounded-lg border border-white/20 shadow-2xl"/>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
