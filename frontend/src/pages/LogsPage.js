@@ -15,7 +15,8 @@ import { toast } from "sonner";
 import {
   Download, ChevronLeft, ChevronRight, ClipboardList, ArrowRightLeft, History,
   DollarSign, ArrowUpDown, Search, Eye, Trash2, StickyNote, CheckCircle,
-  AlertTriangle, XCircle, TrendingUp, TrendingDown, RefreshCw, Printer, ImageDown
+  AlertTriangle, XCircle, TrendingUp, TrendingDown, RefreshCw, Printer, ImageDown,
+  ShieldCheck, ShieldAlert
 } from "lucide-react";
 
 
@@ -184,7 +185,7 @@ export default function LogsPage() {
     document.body.appendChild(a); a.click(); a.remove();
   };
 
-  // Generar PDF ejecutivo de auditoría (una página, usa ventana de impresión)
+  // Generar PDF completo de auditoría — incluye TODOS los equipos por categoría
   const handlePrintReport = () => {
     if (!selectedAudit) return;
     const a = selectedAudit;
@@ -192,55 +193,192 @@ export default function LogsPage() {
     const fmtD = (d) => d ? new Date(d).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }) : "—";
     const fmtM = (n) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
 
-    const photoAB = a.photo_ab ? `<div style="margin-top:12px"><p style="font-size:10px;font-weight:600;color:#555;margin-bottom:4px">FORMATO ALTAS / BAJAS</p><img src="data:image/jpeg;base64,${a.photo_ab}" style="max-width:100%;max-height:200px;border:1px solid #ddd;border-radius:4px"/></div>` : "";
-    const photoT = a.photo_transf ? `<div style="margin-top:12px"><p style="font-size:10px;font-weight:600;color:#555;margin-bottom:4px">FORMATO TRANSFERENCIAS</p><img src="data:image/jpeg;base64,${a.photo_transf}" style="max-width:100%;max-height:200px;border:1px solid #ddd;border-radius:4px"/></div>` : "";
-    const notFound = (auditSummary?.not_found || []).slice(0, 20).map(sc => {
+    const COLS = `<colgroup>
+      <col style="width:12%"><col style="width:28%"><col style="width:12%">
+      <col style="width:14%"><col style="width:14%"><col style="width:12%"><col style="width:8%">
+    </colgroup>`;
+    const TH = `<thead><tr>
+      <th>Cód. Barras</th><th>Descripción</th><th>Marca</th>
+      <th>Modelo</th><th>Serie</th><th style="text-align:right">Valor Real</th><th style="text-align:center">Depr.</th>
+    </tr></thead>`;
+
+    const makeRows = (items, rowClass) => items.map(sc => {
       const eq = sc.equipment_data || {};
-      return `<tr><td style="border:1px solid #ddd;padding:3px 6px;font-size:9px;font-family:monospace">${sc.codigo_barras}</td><td style="border:1px solid #ddd;padding:3px 6px;font-size:9px">${eq.descripcion||"—"}</td><td style="border:1px solid #ddd;padding:3px 6px;font-size:9px">${eq.marca||"—"} ${eq.modelo||""}</td><td style="border:1px solid #ddd;padding:3px 6px;font-size:9px;text-align:right">${fmtM(eq.valor_real)}</td><td style="border:1px solid #ddd;padding:3px 6px;font-size:9px;text-align:center">${eq.depreciado?"Sí":"No"}</td></tr>`;
+      const dep = eq.depreciado;
+      return `<tr class="${rowClass}">
+        <td style="font-family:monospace">${sc.codigo_barras || "—"}</td>
+        <td>${eq.descripcion || "—"}</td>
+        <td>${eq.marca || "—"}</td>
+        <td>${eq.modelo || "—"}</td>
+        <td style="font-family:monospace">${eq.serie || "—"}</td>
+        <td style="text-align:right;font-family:monospace">${fmtM(eq.valor_real)}</td>
+        <td style="text-align:center"><span class="${dep ? "badge-dep" : "badge-act"}">${dep ? "Sí" : "No"}</span></td>
+      </tr>`;
     }).join("");
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Reporte Auditoría — ${a.tienda}</title>
-    <style>
-      body{font-family:Calibri,Arial,sans-serif;margin:0;padding:16px;color:#222;font-size:11px}
-      h1{font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:0 0 2px}
-      .header{background:#1E3C78;color:#fff;padding:12px 16px;border-radius:6px;margin-bottom:12px}
-      .header p{margin:2px 0;font-size:11px;opacity:.9}
-      .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600}
-      .grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px}
-      .stat{border:1px solid #ddd;border-radius:6px;padding:8px;text-align:center}
-      .stat .num{font-size:20px;font-weight:700;font-family:monospace}
-      .stat .lbl{font-size:9px;color:#666;text-transform:uppercase;margin-top:2px}
-      .stat.green .num{color:#16a34a} .stat.amber .num{color:#d97706} .stat.red .num{color:#dc2626}
-      .row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0}
-      .photos{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
-      table{width:100%;border-collapse:collapse;margin-top:6px}
-      th{background:#1E3C78;color:#fff;padding:4px 6px;font-size:9px;text-align:left;border:1px solid #1E3C78}
-      @media print{body{padding:8px}@page{size:A4;margin:10mm}}
-    </style></head><body>
-    <div class="header">
-      <h1>${a.tienda}</h1>
-      <p>CR: ${a.cr_tienda} · Plaza: ${a.plaza} · Auditor: ${a.auditor_name}</p>
-      <p>Inicio: ${fmtD(a.started_at)}${a.finished_at ? "  ·  Fin: " + fmtD(a.finished_at) : ""}</p>
-    </div>
-    <div class="grid">
-      <div class="stat"><div class="num">${a.total_equipment||0}</div><div class="lbl">Total Equipos</div></div>
-      <div class="stat green"><div class="num">${s.located_count||0}</div><div class="lbl">Localizados</div></div>
-      <div class="stat amber"><div class="num">${s.surplus_count||0}</div><div class="lbl">Sobrantes</div></div>
-      <div class="stat red"><div class="num">${s.not_found_count||0}</div><div class="lbl">No Localizados</div></div>
-    </div>
-    <div style="border:1px solid #eee;border-radius:6px;padding:10px;margin-bottom:12px">
-      <div class="row"><span style="color:#555">Valor Equipos No Localizados</span><span style="font-weight:700;color:#dc2626;font-family:monospace">${fmtM(s.not_found_value)}</span></div>
-      <div class="row"><span style="color:#555">Movimientos Generados</span><span style="font-weight:700;font-family:monospace">${s.movements_count||0}</span></div>
-      ${a.notes ? `<div style="margin-top:6px;padding:6px;background:#f9f9f9;border-radius:4px;font-size:10px;color:#555"><strong>Notas:</strong> ${a.notes}</div>` : ""}
-    </div>
-    ${(auditSummary?.not_found||[]).length > 0 ? `
-    <p style="font-weight:700;font-size:11px;margin:0 0 4px;text-transform:uppercase">Equipos No Localizados (${Math.min(20,(auditSummary?.not_found||[]).length)}${(auditSummary?.not_found||[]).length>20?" de "+(auditSummary?.not_found||[]).length:""})</p>
-    <table><thead><tr><th>Código Barras</th><th>Descripción</th><th>Marca / Modelo</th><th style="text-align:right">Valor</th><th style="text-align:center">Depr.</th></tr></thead><tbody>${notFound}</tbody></table>` : ""}
-    ${(a.photo_ab || a.photo_transf) ? `<div style="margin-top:14px"><p style="font-weight:700;font-size:11px;text-transform:uppercase;margin-bottom:6px">Formatos de Movimiento</p><div class="photos">${photoAB}${photoT}</div></div>` : ""}
-    <p style="margin-top:16px;font-size:8px;color:#999;text-align:right">Generado por SIGAF · ${new Date().toLocaleString("es-MX")}</p>
-    <script>window.onload=()=>{window.print();}</script></body></html>`;
+    const located   = auditSummary?.located   || [];
+    const surplus   = auditSummary?.surplus   || [];
+    const notFound  = auditSummary?.not_found || [];
 
-    const w = window.open("", "_blank", "width=800,height=900");
+    // Value totals
+    const locatedVal  = located.reduce((acc, sc) => acc + ((sc.equipment_data || {}).valor_real || 0), 0);
+    const surplusVal  = surplus.reduce((acc, sc) => acc + ((sc.equipment_data || {}).valor_real || 0), 0);
+    const nfVal       = notFound.reduce((acc, sc) => acc + ((sc.equipment_data || {}).valor_real || 0), 0);
+    const totalVal    = locatedVal + surplusVal;
+
+    // Coverage %
+    const total = a.total_equipment || 1;
+    const coveragePct = Math.round((located.length / total) * 100);
+
+    const photoAB = a.photo_ab
+      ? `<div class="page-break-avoid"><p class="section-title" style="color:#1e40af">📄 Formato ALTAS / BAJAS</p><img src="data:image/jpeg;base64,${a.photo_ab}" class="fmt-photo"/></div>`
+      : "";
+    const photoT = a.photo_transf
+      ? `<div class="page-break-avoid"><p class="section-title" style="color:#1e40af">📄 Formato TRANSFERENCIAS</p><img src="data:image/jpeg;base64,${a.photo_transf}" class="fmt-photo"/></div>`
+      : "";
+
+    const locatedTable  = located.length  > 0 ? `<table>${COLS}${TH}<tbody>${makeRows(located,  "row-loc")}</tbody></table>` : `<p class="empty-note">Sin equipos localizados</p>`;
+    const surplusTable  = surplus.length  > 0 ? `<table>${COLS}${TH}<tbody>${makeRows(surplus,  "row-sur")}</tbody></table>` : `<p class="empty-note">Sin sobrantes</p>`;
+    const nfTable       = notFound.length > 0 ? `<table>${COLS}${TH}<tbody>${makeRows(notFound, "row-nf")}</tbody></table>`  : `<p class="empty-note">Sin equipos no localizados ✓</p>`;
+
+    const sigBlock = a.signature
+      ? `<div style="margin-top:4px;padding:6px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px">
+           <span style="font-size:9px;color:#15803d;font-weight:600">✓ Firma digital HMAC-SHA256 verificable</span>
+           <span style="font-size:8px;font-family:monospace;color:#166534;margin-left:8px">${(a.signature.hash||"").slice(0,32)}…</span>
+         </div>`
+      : "";
+
+    const html = `<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<title>Reporte Auditoría — ${a.tienda}</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:Calibri,Arial,sans-serif;margin:0;padding:14px;color:#1a1a1a;font-size:10.5px;line-height:1.4}
+  /* ─── Header ─── */
+  .header{background:linear-gradient(135deg,#1e3c78 0%,#2a5298 100%);color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:14px}
+  .header h1{font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin:0 0 3px}
+  .header p{margin:2px 0;font-size:10.5px;opacity:.88}
+  .status-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:10px;font-weight:700;margin-left:8px}
+  .st-completed{background:#d1fae5;color:#065f46}
+  .st-incompleto{background:#fef3c7;color:#92400e}
+  /* ─── KPI grid ─── */
+  .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
+  .kpi{border:1px solid #e5e7eb;border-radius:7px;padding:8px 6px;text-align:center}
+  .kpi .num{font-size:22px;font-weight:800;font-family:'Courier New',monospace;line-height:1}
+  .kpi .lbl{font-size:8.5px;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;margin-top:3px}
+  .kpi.tot{border-color:#93c5fd;background:#eff6ff} .kpi.tot .num{color:#1d4ed8}
+  .kpi.loc{border-color:#6ee7b7;background:#f0fdf4} .kpi.loc .num{color:#065f46}
+  .kpi.sur{border-color:#fde68a;background:#fffbeb} .kpi.sur .num{color:#92400e}
+  .kpi.nf {border-color:#fca5a5;background:#fff1f2} .kpi.nf  .num{color:#b91c1c}
+  .kpi.cov{border-color:#c4b5fd;background:#faf5ff} .kpi.cov .num{color:#6d28d9}
+  /* ─── Value summary ─── */
+  .val-box{border:1px solid #e5e7eb;border-radius:7px;padding:10px 14px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+  .val-row{padding:4px 0}
+  .val-row .lbl{font-size:9.5px;color:#6b7280}
+  .val-row .amt{font-weight:700;font-family:'Courier New',monospace;font-size:11px}
+  .amt-red{color:#b91c1c} .amt-green{color:#065f46} .amt-blue{color:#1d4ed8}
+  /* ─── Section titles ─── */
+  .section-title{font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.6px;
+    margin:16px 0 5px;padding:5px 10px;border-radius:5px;display:flex;align-items:center;gap:6px}
+  .st-loc{background:#d1fae5;color:#065f46;border-left:4px solid #10b981}
+  .st-sur{background:#fef3c7;color:#92400e;border-left:4px solid #f59e0b}
+  .st-nf {background:#fee2e2;color:#b91c1c;border-left:4px solid #ef4444}
+  .st-fmt{background:#dbeafe;color:#1e40af;border-left:4px solid #3b82f6}
+  /* ─── Tables ─── */
+  table{width:100%;border-collapse:collapse;margin-bottom:4px;font-size:9px}
+  th{padding:4px 6px;font-size:8.5px;text-align:left;font-weight:700;letter-spacing:.3px}
+  td{padding:3px 6px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+  .row-loc td{background:#fff} .row-loc:nth-child(even) td{background:#f9fffe}
+  .row-sur td{background:#fff} .row-sur:nth-child(even) td{background:#fffdf4}
+  .row-nf  td{background:#fff} .row-nf:nth-child(even)  td{background:#fff5f5}
+  thead tr{background:#374151} thead th{color:#fff}
+  .row-nf thead tr{background:#7f1d1d}
+  /* ─── Badges ─── */
+  .badge-dep{background:#fee2e2;color:#b91c1c;padding:1px 5px;border-radius:4px;font-size:8px;font-weight:700}
+  .badge-act{background:#d1fae5;color:#065f46;padding:1px 5px;border-radius:4px;font-size:8px;font-weight:700}
+  .empty-note{color:#6b7280;font-style:italic;font-size:10px;padding:8px 10px;background:#f9fafb;border-radius:5px}
+  /* ─── Photos ─── */
+  .fmt-photo{max-width:100%;max-height:220px;border:1px solid #ddd;border-radius:5px;display:block;margin-top:6px}
+  .photos-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  /* ─── Footer ─── */
+  .footer{margin-top:20px;padding-top:8px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center}
+  .footer span{font-size:8px;color:#9ca3af}
+  /* ─── Print ─── */
+  .page-break-avoid{page-break-inside:avoid}
+  @media print{
+    body{padding:6px}
+    @page{size:A4;margin:10mm 8mm}
+    .kpi-grid{grid-template-columns:repeat(5,1fr) !important}
+  }
+</style>
+</head><body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>${a.tienda}
+    <span class="status-badge ${a.status === "completed" ? "st-completed" : "st-incompleto"}">
+      ${a.status === "completed" ? "COMPLETADA" : "INCOMPLETA"}
+    </span>
+  </h1>
+  <p>CR: <strong>${a.cr_tienda}</strong> &nbsp;·&nbsp; Plaza: <strong>${a.plaza}</strong> &nbsp;·&nbsp; Auditor: <strong>${a.auditor_name}</strong></p>
+  <p>Inicio: ${fmtD(a.started_at)} &nbsp;·&nbsp; Fin: ${fmtD(a.finished_at)}</p>
+  ${a.notes ? `<p style="margin-top:5px;font-size:10px;background:rgba(255,255,255,.15);padding:4px 8px;border-radius:4px">📝 ${a.notes}</p>` : ""}
+</div>
+${sigBlock}
+
+<!-- KPIs -->
+<div class="kpi-grid">
+  <div class="kpi tot"><div class="num">${a.total_equipment || 0}</div><div class="lbl">Total Equipos</div></div>
+  <div class="kpi loc"><div class="num">${located.length}</div><div class="lbl">Localizados</div></div>
+  <div class="kpi sur"><div class="num">${surplus.length}</div><div class="lbl">Sobrantes</div></div>
+  <div class="kpi nf" ><div class="num">${notFound.length}</div><div class="lbl">No Localizados</div></div>
+  <div class="kpi cov"><div class="num">${coveragePct}%</div><div class="lbl">Cobertura</div></div>
+</div>
+
+<!-- VALUE SUMMARY -->
+<div class="val-box">
+  <div class="val-row"><div class="lbl">Valor inventario localizado</div><div class="amt amt-green">${fmtM(locatedVal)}</div></div>
+  <div class="val-row"><div class="lbl">Valor sobrantes</div><div class="amt amt-blue">${fmtM(surplusVal)}</div></div>
+  <div class="val-row"><div class="lbl">Valor no localizado</div><div class="amt amt-red">${fmtM(nfVal)}</div></div>
+  <div class="val-row"><div class="lbl">Movimientos pendientes</div><div class="amt">${s.movements_count || 0}</div></div>
+  <div class="val-row"><div class="lbl">No localizados depreciados</div><div class="amt">${s.not_found_deprecated || 0}</div></div>
+  <div class="val-row"><div class="lbl">Valor total en tienda</div><div class="amt amt-blue">${fmtM(totalVal)}</div></div>
+</div>
+
+<!-- LOCALIZADOS -->
+<div class="page-break-avoid">
+  <p class="section-title st-loc">✔ Equipos Localizados (${located.length})</p>
+  ${locatedTable}
+</div>
+
+<!-- SOBRANTES -->
+<div class="page-break-avoid">
+  <p class="section-title st-sur">⚠ Sobrantes (${surplus.length})</p>
+  ${surplusTable}
+</div>
+
+<!-- NO LOCALIZADOS -->
+<div class="page-break-avoid">
+  <p class="section-title st-nf">✖ No Localizados (${notFound.length})</p>
+  ${nfTable}
+</div>
+
+<!-- FORMATOS -->
+${(a.photo_ab || a.photo_transf) ? `
+<p class="section-title st-fmt" style="margin-top:20px">📄 Formatos de Movimiento</p>
+<div class="photos-grid">${photoAB}${photoT}</div>` : ""}
+
+<!-- FOOTER -->
+<div class="footer">
+  <span>SIGAF — Sistema Integral de Gestión de Activo Fijo</span>
+  <span>Generado: ${new Date().toLocaleString("es-MX")}</span>
+</div>
+
+<script>window.onload = () => { window.print(); }</script>
+</body></html>`;
+
+    const w = window.open("", "_blank", "width=900,height=1000");
     if (w) { w.document.write(html); w.document.close(); }
   };
 
@@ -460,6 +598,7 @@ export default function LogsPage() {
                     <TableHead>{t("audit.status")}</TableHead>
                     <TableHead className="text-right">{t("logs.locatedCount")}</TableHead>
                     <TableHead className="text-right">{t("logs.notFoundCount")}</TableHead>
+                    <TableHead className="text-center">Firma</TableHead>
                     <TableHead className="text-center">{t("common.actions")}</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
