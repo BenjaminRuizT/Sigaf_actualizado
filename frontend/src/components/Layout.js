@@ -4,7 +4,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { LayoutDashboard, ClipboardList, Shield, Settings, LogOut, Menu, Sun, Moon, Globe, Rocket, PieChart, ShieldAlert, Activity, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Shield, Settings, LogOut, Menu, Sun, Moon, Globe, Rocket, PieChart, ShieldAlert, Activity, ShieldCheck, Package, History } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 export default function Layout({ children }) {
@@ -49,6 +49,8 @@ export default function Layout({ children }) {
     { path: "/deploy", icon: Rocket, label: "Despliegue", show: isSuperAdmin },
     { path: "/app-logs", icon: Activity, label: "Logs del Sistema", show: isSuperAdmin },
     { path: "/security-logs", icon: ShieldCheck, label: "Auditoría de Seguridad", show: isSuperAdmin },
+    { path: "/equipment-search", icon: Package, label: "Consultar Equipo", show: true },
+    { path: "/admin-history", icon: History, label: "Historial de Cambios", show: isSuperAdmin },
   ];
 
   const handleNav = (path) => { navigate(path); setOpen(false); };
