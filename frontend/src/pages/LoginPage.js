@@ -68,8 +68,11 @@ export default function LoginPage() {
         email: lockedState.email,
         reason: unlockReason.trim() || undefined,
       });
-      setUnlockSent(true);
       toast.success("Solicitud enviada. Un administrador la revisará pronto.");
+      setLockedState(null);
+      setUnlockView(false);
+      setUnlockSent(false);
+      setUnlockReason("");
     } catch {
       toast.error("No se pudo enviar la solicitud. Intenta de nuevo.");
     } finally {
