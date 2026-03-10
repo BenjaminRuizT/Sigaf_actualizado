@@ -63,7 +63,7 @@ export default function Layout({ children }) {
         <h1 className="font-heading text-2xl font-bold uppercase tracking-tight" data-testid="sidebar-title">SIGAF</h1>
         <p className="text-xs text-muted-foreground mt-1 uppercase tracking-widest">{t("app.fullName")}</p>
       </div>
-      <nav className="flex-1 p-3 space-y-1">
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto min-h-0">
         {navItems.filter(i => i.show).map(item => (
           <button key={item.path} onClick={() => handleNav(item.path)} data-testid={`sidebar-nav-${item.path.replace("/","") || "dashboard"}`}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${isActive(item.path) ? "bg-primary text-primary-foreground" : "hover:bg-muted text-foreground"}`}>
