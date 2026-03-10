@@ -10,18 +10,29 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Sun, Moon, Globe, Palette, User, Eye, EyeOff, Save, Info, CheckCircle, Camera, QrCode, Download, BarChart3, Shield, CloudOff, BookOpen } from "lucide-react";
+import { Sun, Moon, Globe, Palette, User, Eye, EyeOff, Save, Info, CheckCircle, Camera, QrCode, Download, BarChart3, Shield, CloudOff, BookOpen, Server, Database, Rocket, Lock, RefreshCw, Wrench } from "lucide-react";
 
-const APP_VERSION = "2.5.0";
-const APP_BUILD_DATE = "Marzo 2025";
+const APP_VERSION = "3.0.0";
+const APP_BUILD_DATE = "Marzo 2026";
 
 const FEATURES = [
-  { icon: QrCode, label: "Escaneo de código de barras con cámara", desc: "Escaneo en tiempo real sin necesidad de foto" },
-  { icon: CloudOff, label: "Modo Offline", desc: "Escaneos se guardan localmente y sincronizan al reconectarse" },
+  { icon: QrCode, label: "Escaneo de código de barras con cámara", desc: "Escaneo en tiempo real con detección automática, soporte Zebra TC52/DataWedge" },
+  { icon: CloudOff, label: "Modo Offline", desc: "Escaneos guardados localmente y sincronizados automáticamente al reconectarse" },
   { icon: Camera, label: "Captura fotográfica de movimientos", desc: "Registro fotográfico de formatos ALTA/BAJA y Transferencias" },
-  { icon: BarChart3, label: "Reportes y exportación Excel", desc: "Documentos SIGAF_AB y SIGAF_TRANSFERENCIAS con formato profesional" },
-  { icon: Shield, label: "Roles de acceso", desc: "Super Administrador, Administrador, Socio Tecnológico" },
-  { icon: BookOpen, label: "Bitácoras completas", desc: "Historial de clasificaciones, movimientos y auditorías" },
+  { icon: BarChart3, label: "Reportes y exportación Excel / PDF", desc: "SIGAF_AB, SIGAF_TRANSFERENCIAS, Manual de Usuario y Presentación Ejecutiva" },
+  { icon: Shield, label: "Roles de acceso y bloqueo de sesión", desc: "Super Administrador, Administrador, Socio Tecnológico — bloqueo por intentos fallidos con flujo de desbloqueo" },
+  { icon: BookOpen, label: "Bitácoras completas", desc: "Historial de clasificaciones, movimientos, auditorías y logs de sistema" },
+  { icon: RefreshCw, label: "Reversión automática de BAJA", desc: "Si un equipo con BAJA pendiente se vuelve a localizar, la baja se cancela automáticamente con trazabilidad" },
+  { icon: Wrench, label: "Logs de sistema", desc: "Registro de actividad por usuario, errores y eventos críticos — solo Super Administrador" },
+];
+
+const DEPLOY_INFO = [
+  { label: "Frontend", value: "insightful-caring-production-2702.up.railway.app", type: "url" },
+  { label: "Backend API", value: "sigafactualizado-production.up.railway.app/api", type: "url" },
+  { label: "Base de datos", value: "MongoDB Atlas — cluster0.sn33tur.mongodb.net/sigaf", type: "info" },
+  { label: "Plataforma", value: "Railway (Frontend + Backend)", type: "info" },
+  { label: "Stack", value: "FastAPI + React 19 + MongoDB", type: "info" },
+  { label: "Scanner soportado", value: "Zebra TC52 (TC520K) — Android 11 — DataWedge keystroke", type: "info" },
 ];
 
 export default function SettingsPage() {
@@ -33,6 +44,7 @@ export default function SettingsPage() {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showDeploy, setShowDeploy] = useState(false);
 
   const handleSaveProfile = async () => {
     if (!nombre.trim() && !password.trim()) return;
@@ -125,6 +137,7 @@ export default function SettingsPage() {
             <SelectContent>
               <SelectItem value="es">{t("settings.spanish")}</SelectItem>
               <SelectItem value="en">{t("settings.english")}</SelectItem>
+              <SelectItem value="pt">{t("settings.portuguese")}</SelectItem>
             </SelectContent>
           </Select>
         </CardContent>
@@ -183,6 +196,7 @@ export default function SettingsPage() {
             <div className="flex gap-2 flex-wrap">
               <Badge variant="outline" className="text-xs">v{APP_VERSION}</Badge>
               <Badge variant="outline" className="text-xs">{APP_BUILD_DATE}</Badge>
+              <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 text-xs">Producción</Badge>
             </div>
           </div>
 
@@ -213,7 +227,7 @@ export default function SettingsPage() {
           <div className="border-t pt-3 space-y-1.5">
             <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Perfiles de usuario</p>
             <div className="space-y-1.5 text-xs text-muted-foreground">
-              <p><strong className="text-foreground">Super Administrador:</strong> Acceso total — importar datos, administrar usuarios, eliminar auditorías, exportar reportes</p>
+              <p><strong className="text-foreground">Super Administrador:</strong> Acceso total — importar datos, administrar usuarios, logs de sistema, desbloqueo de cuentas, eliminar auditorías</p>
               <p><strong className="text-foreground">Administrador:</strong> Gestión de auditorías, visualización de reportes y bitácoras, exportación de datos</p>
               <p><strong className="text-foreground">Socio Tecnológico:</strong> Realizar auditorías, escanear equipos, registrar movimientos</p>
             </div>
@@ -230,10 +244,74 @@ export default function SettingsPage() {
                 <Download className="h-3.5 w-3.5 text-primary" />
                 <span><strong className="text-foreground">SIGAF_TRANSFERENCIAS_[PLAZA]_[FECHA].xlsx</strong> — Movimientos de Transferencias</span>
               </div>
+              <div className="flex items-center gap-2">
+                <Download className="h-3.5 w-3.5 text-primary" />
+                <span><strong className="text-foreground">Manual_Usuario_SIGAF.pdf</strong> — Manual según perfil (ST/Admin/SuperAdmin)</span>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Deployment Info — Super Admin only */}
+      {user?.perfil === "Super Administrador" && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Server className="h-5 w-5" />
+                <div>
+                  <CardTitle className="text-base">Configuración y Despliegue</CardTitle>
+                  <CardDescription className="text-sm">Información técnica del entorno de producción</CardDescription>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowDeploy(!showDeploy)} className="text-xs">
+                {showDeploy ? "Ocultar" : "Mostrar"}
+              </Button>
+            </div>
+          </CardHeader>
+          {showDeploy && (
+            <CardContent className="space-y-3">
+              {DEPLOY_INFO.map(({ label, value, type }) => (
+                <div key={label} className="flex flex-col gap-0.5">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
+                  <p className={`text-sm font-mono break-all ${type === "url" ? "text-blue-600 dark:text-blue-400" : "text-foreground"}`}>{value}</p>
+                </div>
+              ))}
+              <div className="border-t pt-3 space-y-2">
+                <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Orden de despliegue</p>
+                <div className="space-y-1 text-xs text-muted-foreground font-mono">
+                  <p className="flex gap-2"><span className="text-primary font-bold">1.</span> backend/server.py → Railway backend</p>
+                  <p className="flex gap-2"><span className="text-primary font-bold">2.</span> frontend/src/pages/*.js → Railway frontend (build)</p>
+                  <p className="flex gap-2"><span className="text-primary font-bold">3.</span> frontend/src/components/Layout.js → incluir en build</p>
+                  <p className="flex gap-2"><span className="text-primary font-bold">4.</span> frontend/src/lib/translations.js → incluir en build</p>
+                  <p className="flex gap-2"><span className="text-primary font-bold">5.</span> frontend/src/hooks/useSortable.js → nuevo archivo (fix10+)</p>
+                </div>
+              </div>
+              <div className="border-t pt-3 space-y-1">
+                <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Variables de entorno requeridas</p>
+                <div className="space-y-1 text-xs font-mono text-muted-foreground bg-muted/50 rounded p-2">
+                  <p>REACT_APP_BACKEND_URL=https://sigafactualizado-production.up.railway.app</p>
+                  <p>MONGODB_URL=mongodb+srv://sigaf_user:Diciembre*2025@cluster0...</p>
+                  <p>SECRET_KEY=[jwt-secret]</p>
+                </div>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
     </div>
   );
 }
+
+const APP_VERSION = "3.0.0";
+const APP_BUILD_DATE = "Marzo 2026";
+
+const FEATURES = [
+  { icon: QrCode, label: "Escaneo de código de barras con cámara", desc: "Escaneo en tiempo real con DataWedge (Zebra TC52) o cámara del dispositivo" },
+  { icon: CloudOff, label: "Modo Offline", desc: "Escaneos se guardan localmente y sincronizan automáticamente al reconectarse" },
+  { icon: Camera, label: "Captura fotográfica de movimientos", desc: "Registro fotográfico de formatos ALTA/BAJA y Transferencias" },
+  { icon: BarChart3, label: "Reportes y exportación Excel", desc: "Documentos SIGAF_AB y SIGAF_TRANSFERENCIAS con formato profesional" },
+  { icon: Shield, label: "Bloqueo de cuentas y solicitud de desbloqueo", desc: "5 intentos fallidos bloquean la cuenta — el usuario puede solicitar desbloqueo al Super Admin" },
+  { icon: BookOpen, label: "Bitácoras y logs del sistema", desc: "Historial de auditorías, movimientos y logs de actividad del servidor en tiempo real" },
+];

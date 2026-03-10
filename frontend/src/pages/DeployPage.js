@@ -8,14 +8,49 @@ export default function DeployPage() {
 
   const sections = [
     {
+      icon: Server,
+      title: "0. URLs de la aplicación en producción (Railway)",
+      content: [
+        { type: "text", value: "La aplicación está desplegada en Railway.app con los siguientes servicios activos:" },
+        { type: "subtitle", value: "Servicios activos" },
+        { type: "code", value: `Frontend (React PWA):
+  https://insightful-caring-production-2702.up.railway.app
+
+Backend (FastAPI):
+  https://sigafactualizado-production.up.railway.app/api
+
+Base de datos (MongoDB Atlas):
+  Cluster: cluster0.sn33tur.mongodb.net
+  Base de datos: sigaf
+  Usuario: sigaf_user` },
+        { type: "subtitle", value: "Variables de entorno requeridas (Railway)" },
+        { type: "code", value: `# Backend (sigafactualizado)
+MONGO_URL=mongodb+srv://sigaf_user:Diciembre*2025@cluster0.sn33tur.mongodb.net/sigaf
+DB_NAME=sigaf
+JWT_SECRET=<clave-secreta-32-chars>
+CORS_ORIGINS=https://insightful-caring-production-2702.up.railway.app
+
+# Frontend (insightful-caring-production-2702)
+REACT_APP_BACKEND_URL=https://sigafactualizado-production.up.railway.app` },
+        { type: "subtitle", value: "Despliegue de nuevos archivos en Railway" },
+        { type: "list", items: [
+          "1. En Railway, ir al servicio backend → pestaña Deploy → Source → conectado a GitHub o subir archivos",
+          "2. Para actualizar server.py: subir el archivo al repositorio o usar Railway CLI: railway up",
+          "3. Para el frontend: reconstruir con yarn build y subir la carpeta build/",
+          "4. Railway redespliega automáticamente al detectar cambios en el repositorio conectado",
+          "5. Ver logs en tiempo real: Railway dashboard → servicio → Logs"
+        ]},
+      ]
+    },
+    {
       icon: Code,
       title: "1. Requisitos del entorno de desarrollo",
       content: [
         { type: "text", value: "Para trabajar con el código fuente del proyecto en un IDE, necesita:" },
         { type: "list", items: [
           "Node.js v18+ y Yarn (gestor de paquetes frontend)",
-          "Python 3.10+ con pip",
-          "MongoDB 6.0+ (local o servicio cloud como MongoDB Atlas)",
+          "Python 3.11+ con pip",
+          "MongoDB 7.0+ (Atlas recomendado, o local)",
           "IDE recomendado: VS Code con extensiones de Python y React"
         ]},
       ]
@@ -56,7 +91,7 @@ export default function DeployPage() {
         { type: "text", value: "Configure las variables de entorno del backend editando el archivo /app/backend/.env:" },
         { type: "code", value: `# /app/backend/.env
 MONGO_URL="mongodb://localhost:27017"  # URL de MongoDB
-DB_NAME="sigaf_database"               # Nombre de la base de datos
+DB_NAME="sigaf"               # Nombre de la base de datos
 CORS_ORIGINS="*"                       # Orígenes permitidos (en producción usar URL del frontend)
 JWT_SECRET="su-clave-secreta-jwt"      # Clave secreta para tokens JWT` },
         { type: "text", value: "Instale las dependencias e inicie el servidor:" },
@@ -191,7 +226,7 @@ yarn build
 
 # Para forzar actualización del caché:
 # 1. Abrir DevTools > Application > Cache Storage
-# 2. Eliminar "sigaf-cache-v2"
+# 2. Eliminar "sigaf-cache-v3"
 # 3. Recargar la página
 
 # Para verificar escaneos pendientes:
@@ -306,7 +341,7 @@ services:
       dockerfile: Dockerfile.backend
     environment:
       - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=sigaf_database
+      - DB_NAME=sigaf
       - JWT_SECRET=su-clave-secreta-segura-32-chars
       - CORS_ORIGINS=https://su-dominio.com
     depends_on:

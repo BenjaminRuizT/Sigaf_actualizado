@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Users, Monitor, Search, ChevronLeft, ChevronRight, ArrowUpDown, RotateCcw, AlertTriangle, Eye, EyeOff, Download, Upload, FileSpreadsheet } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Monitor, Search, ChevronLeft, ChevronRight, ArrowUpDown, RotateCcw, AlertTriangle, Eye, EyeOff, Download, Upload, FileSpreadsheet, ShieldAlert } from "lucide-react";
 
 
 export default function AdminPage() {
@@ -37,6 +37,10 @@ export default function AdminPage() {
   const [mafFile, setMafFile] = useState(null);
   const [usersFile, setUsersFile] = useState(null);
 
+  // Unlock requests (Super Admin only)
+  const [unlockRequests, setUnlockRequests] = useState([]);
+  const [unlockLoading, setUnlockLoading] = useState(null); // user_id being unlocked
+
   const userSort = useSortable("nombre");
   const eqSort = useSortable("descripcion");
 
@@ -52,9 +56,26 @@ export default function AdminPage() {
     } catch {}
   }, [api, eqPage, eqSearch, eqPlaza]);
 
+  const fetchUnlockRequests = useCallback(async () => {
+    if (currentUser?.perfil !== "Super Administrador") return;
+    try { const res = await api.get("/admin/unlock-requests"); setUnlockRequests(res.data); } catch {}
+  }, [api, currentUser?.perfil]);
+
+  const handleUnlockUser = async (userId, userEmail) => {
+    setUnlockLoading(userId);
+    try {
+      await api.post(`/admin/unlock/${userId}`);
+      toast.success(`Usuario ${userEmail} desbloqueado`);
+      fetchUnlockRequests();
+      fetchUsers();
+    } catch (err) { toast.error(err.response?.data?.detail || t("common.error")); }
+    finally { setUnlockLoading(null); }
+  };
+
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => { fetchEquipment(); }, [fetchEquipment]);
   useEffect(() => { fetchPlazas(); }, [fetchPlazas]);
+  useEffect(() => { fetchUnlockRequests(); }, [fetchUnlockRequests]);
 
   const handleSaveUser = async () => {
     try {
@@ -121,6 +142,54 @@ export default function AdminPage() {
           <RotateCcw className="h-4 w-4" /> Reiniciar Datos
         </Button>
       </div>
+
+      {/* Unlock Requests Panel — Super Admin only */}
+      {currentUser?.perfil === "Super Administrador" && unlockRequests.length > 0 && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/8 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0" />
+            <p className="text-sm font-semibold text-amber-700">
+              {unlockRequests.filter(u => u.unlock_requested).length > 0
+                ? `${unlockRequests.filter(u => u.unlock_requested).length} solicitud(es) de desbloqueo pendiente(s)`
+                : `${unlockRequests.length} cuenta(s) bloqueada(s)`
+              }
+            </p>
+          </div>
+          <div className="space-y-2">
+            {unlockRequests.map(u => (
+              <div key={u.id} className="flex items-center justify-between bg-background/80 rounded-md px-3 py-2 gap-3 flex-wrap">
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium">{u.nombre}</span>
+                    <span className="text-xs font-mono text-muted-foreground">{u.email}</span>
+                    {u.unlock_requested && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-700 font-medium">
+                        Solicitud enviada
+                      </span>
+                    )}
+                  </div>
+                  {u.unlock_request_reason && (
+                    <p className="text-xs text-muted-foreground italic">"{u.unlock_request_reason}"</p>
+                  )}
+                  {u.locked_at && (
+                    <p className="text-[10px] text-muted-foreground">
+                      Bloqueado: {new Date(u.locked_at).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}
+                    </p>
+                  )}
+                </div>
+                <Button size="sm" variant="outline" className="gap-1.5 border-amber-400 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950 shrink-0"
+                  onClick={() => handleUnlockUser(u.id, u.email)} disabled={unlockLoading === u.id}>
+                  {unlockLoading === u.id
+                    ? <div className="animate-spin h-3 w-3 border-2 border-amber-600 border-t-transparent rounded-full" />
+                    : <ShieldAlert className="h-3.5 w-3.5" />
+                  }
+                  Desbloquear
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="grid w-full grid-cols-2" data-testid="admin-tabs">
