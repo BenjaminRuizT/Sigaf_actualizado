@@ -54,8 +54,9 @@ export default function LogsPage() {
 
   const [selectedAudit, setSelectedAudit] = useState(null);
   const [auditSummary, setAuditSummary] = useState(null);
+  const [auditSigVerify, setAuditSigVerify] = useState(null); // null=verificando | {valid, signature}
   const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryFilter, setSummaryFilter] = useState("not_found"); // "located" | "surplus" | "not_found"
+  const [summaryFilter, setSummaryFilter] = useState("not_found");
   const [deleteDialog, setDeleteDialog] = useState(null);
   const [lightbox, setLightbox] = useState(null); // { src, title, filename }
 
@@ -149,6 +150,7 @@ export default function LogsPage() {
   const handleViewAudit = async (audit) => {
     setSelectedAudit(audit);
     setSummaryFilter("not_found");
+    setAuditSigVerify(null); // resetear firma al abrir
     if (audit.status !== "in_progress") {
       setSummaryLoading(true);
       try {
@@ -157,8 +159,14 @@ export default function LogsPage() {
           api.get(`/audits/${audit.id}`)
         ]);
         setAuditSummary(sumRes.data);
-        // Actualizar selectedAudit con datos completos (incluyendo fotos)
         setSelectedAudit(auditRes.data);
+        // Auto-verificar firma en auditorías completadas
+        if (audit.status === "completed") {
+          try {
+            const sigRes = await api.get(`/audits/${audit.id}/verify-signature`);
+            setAuditSigVerify({ valid: sigRes.data.valid, signature: sigRes.data.signature });
+          } catch { setAuditSigVerify({ valid: false, signature: null }); }
+        }
       }
       catch { toast.error(t("common.error")); }
       finally { setSummaryLoading(false); }
@@ -643,7 +651,7 @@ ${(a.photo_ab || a.photo_transf) ? `
       </Tabs>
 
       {/* ── Audit Summary Dialog ── */}
-      <Dialog open={!!selectedAudit} onOpenChange={(open) => { if (!open) { setSelectedAudit(null); setAuditSummary(null); } }}>
+      <Dialog open={!!selectedAudit} onOpenChange={(open) => { if (!open) { setSelectedAudit(null); setAuditSummary(null); setAuditSigVerify(null); } }}>
         <DialogContent className="max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto" data-testid="audit-summary-dialog">
           <DialogHeader>
             <DialogTitle className="font-heading uppercase tracking-tight">{selectedAudit?.tienda}</DialogTitle>
@@ -762,6 +770,39 @@ ${(a.photo_ab || a.photo_transf) ? `
                 </CardContent></Card>
               )}
 
+              {/* Indicador de integridad — auditorías completadas */}
+              {selectedAudit?.status === "completed" && (
+                <div className={`rounded-lg border p-3 flex items-start gap-3 ${
+                  auditSigVerify === null
+                    ? "bg-muted/40 border-muted-foreground/20"
+                    : auditSigVerify.valid
+                      ? "bg-emerald-500/10 border-emerald-500/30"
+                      : "bg-red-500/10 border-red-500/30"
+                }`}>
+                  <ShieldCheck className={`h-4 w-4 shrink-0 mt-0.5 ${
+                    auditSigVerify === null ? "text-muted-foreground animate-pulse"
+                    : auditSigVerify.valid ? "text-emerald-600" : "text-red-600"
+                  }`} />
+                  <div className="space-y-0.5 min-w-0">
+                    <p className={`text-sm font-semibold ${
+                      auditSigVerify === null ? "text-muted-foreground"
+                      : auditSigVerify.valid ? "text-emerald-700" : "text-red-700"
+                    }`}>
+                      {auditSigVerify === null
+                        ? "Verificando integridad…"
+                        : auditSigVerify.valid
+                          ? "Auditoría íntegra — firma digital válida"
+                          : "⚠ FIRMA INVÁLIDA — posible manipulación de datos"}
+                    </p>
+                    {auditSigVerify?.signature?.hash && (
+                      <p className="text-[10px] font-mono text-muted-foreground break-all">
+                        HMAC-SHA256: {auditSigVerify.signature.hash}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Fotos de formatos (solo auditorías completadas) */}
               {selectedAudit?.status === "completed" && (selectedAudit?.photo_ab || selectedAudit?.photo_transf) && (
                 <Card><CardContent className="p-4 space-y-3">
@@ -848,7 +889,7 @@ ${(a.photo_ab || a.photo_transf) ? `
 
       {/* Lightbox de fotos */}
       {lightbox && (
-        <div className="fixed inset-0 z-50 bg-black/85 flex flex-col items-center justify-center p-4"
+        <div className="fixed inset-0 z-[200] bg-black/90 flex flex-col items-center justify-center p-4"
           onClick={() => setLightbox(null)}>
           <div className="w-full max-w-4xl flex flex-col gap-3" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
