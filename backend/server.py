@@ -127,6 +127,53 @@ api_router = APIRouter(prefix="/api")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# ==================== ADMIN HISTORY (SNAPSHOTS + ROLLBACK) ====================
+# Every destructive or mutating Super Admin action saves a snapshot to db.admin_history.
+# Snapshots store the BEFORE state so the action can be undone.
+
+class HistAction:
+    DELETE_AUDIT     = "DELETE_AUDIT"
+    DELETE_USER      = "DELETE_USER"
+    UPDATE_USER      = "UPDATE_USER"
+    CREATE_USER      = "CREATE_USER"
+    UPDATE_EQUIPMENT = "UPDATE_EQUIPMENT"
+    DATA_RESET       = "DATA_RESET"
+
+_ROLLBACK_SUPPORTED = {HistAction.DELETE_AUDIT, HistAction.DELETE_USER,
+                       HistAction.UPDATE_USER, HistAction.UPDATE_EQUIPMENT}
+
+async def save_history(
+    action: str,
+    actor_email: str,
+    actor_id: str,
+    target_id: Optional[str],
+    target_label: Optional[str],
+    before: Optional[dict],
+    extra: Optional[dict] = None,
+) -> str:
+    """Persist a history snapshot; returns the generated snapshot_id."""
+    snapshot_id = str(uuid.uuid4())
+    try:
+        doc = {
+            "id": snapshot_id,
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "action": action,
+            "actor_email": actor_email,
+            "actor_id": actor_id,
+            "target_id": target_id,
+            "target_label": target_label,
+            "before": before,
+            "extra": extra or {},
+            "rolled_back": False,
+            "rolled_back_at": None,
+            "rolled_back_by": None,
+            "can_rollback": action in _ROLLBACK_SUPPORTED,
+        }
+        await db.admin_history.insert_one(doc)
+    except Exception:
+        pass  # history must never crash business logic
+    return snapshot_id
+
 # ==================== SECURITY AUDIT LOGS ====================
 # A structured event log for security-relevant actions, distinct from
 # the HTTP request log (app_logs).  Never raises — logging must never
@@ -558,6 +605,96 @@ async def clear_security_logs(current_user=Depends(get_current_user)):
     cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
     result = await db.security_logs.delete_many({"ts": {"$lt": cutoff}})
     return {"deleted": result.deleted_count, "cutoff": cutoff}
+
+
+# ==================== ADMIN HISTORY ENDPOINTS ====================
+
+@api_router.get("/admin/history")
+async def get_admin_history(
+    action: Optional[str] = None,
+    limit: int = 200,
+    current_user=Depends(get_current_user)
+):
+    """Super Admin: list recent admin actions with snapshot data."""
+    if current_user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Acceso denegado")
+    query = {}
+    if action:
+        query["action"] = action
+    items = await db.admin_history.find(query, {"_id": 0}).sort("ts", -1).limit(min(limit, 1000)).to_list(1000)
+    return items
+
+@api_router.post("/admin/history/{snapshot_id}/rollback")
+async def rollback_action(snapshot_id: str, current_user=Depends(get_current_user)):
+    """Super Admin: restore the before-state of a destructive action."""
+    if current_user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Acceso denegado")
+    snap = await db.admin_history.find_one({"id": snapshot_id}, {"_id": 0})
+    if not snap:
+        raise HTTPException(404, "Snapshot no encontrado")
+    if snap.get("rolled_back"):
+        raise HTTPException(400, "Esta acción ya fue revertida")
+    if not snap.get("can_rollback"):
+        raise HTTPException(400, "Esta acción no soporta rollback")
+
+    action = snap["action"]
+    before = snap.get("before")
+    now_iso = datetime.now(timezone.utc).isoformat()
+    result_msg = ""
+
+    if action == HistAction.UPDATE_USER and before:
+        uid = snap["target_id"]
+        safe = {k: v for k, v in before.items() if k not in ("_id",)}
+        await db.users.update_one({"id": uid}, {"$set": safe})
+        result_msg = f"Usuario {snap['target_label']} restaurado al estado anterior"
+
+    elif action == HistAction.DELETE_USER and before:
+        existing = await db.users.find_one({"id": before["id"]})
+        if existing:
+            raise HTTPException(409, "El usuario ya existe — no se puede restaurar")
+        safe = {k: v for k, v in before.items() if k not in ("_id",)}
+        await db.users.insert_one(safe)
+        result_msg = f"Usuario {snap['target_label']} restaurado"
+
+    elif action == HistAction.DELETE_AUDIT and before:
+        existing = await db.audits.find_one({"id": before["id"]})
+        if existing:
+            raise HTTPException(409, "La auditoría ya existe — no se puede restaurar")
+        audit_doc = {k: v for k, v in before.items() if k not in ("_id",)}
+        await db.audits.insert_one(audit_doc)
+        # Restore scans and movements from extra
+        scans = snap.get("extra", {}).get("scans", [])
+        movements = snap.get("extra", {}).get("movements", [])
+        if scans:
+            await db.audit_scans.insert_many([{k: v for k, v in s.items() if k != "_id"} for s in scans])
+        if movements:
+            await db.movements.insert_many([{k: v for k, v in m.items() if k != "_id"} for m in movements])
+        # Restore store status
+        cr = before.get("cr_tienda")
+        if cr:
+            await db.stores.update_one({"cr_tienda": cr}, {"$set": {
+                "audited": before.get("status") == "completed",
+                "last_audit_date": before.get("finished_at"),
+                "last_audit_id": before.get("id"),
+                "audit_status": before.get("status")
+            }})
+        result_msg = f"Auditoría {snap['target_label']} restaurada con {len(scans)} escaneos y {len(movements)} movimientos"
+
+    elif action == HistAction.UPDATE_EQUIPMENT and before:
+        eid = snap["target_id"]
+        safe = {k: v for k, v in before.items() if k not in ("_id",)}
+        await db.equipment.update_one({"id": eid}, {"$set": safe})
+        result_msg = f"Equipo {snap['target_label']} restaurado al estado anterior"
+
+    else:
+        raise HTTPException(400, "Rollback no implementado para esta acción")
+
+    await db.admin_history.update_one({"id": snapshot_id}, {"$set": {
+        "rolled_back": True,
+        "rolled_back_at": now_iso,
+        "rolled_back_by": current_user["email"]
+    }})
+    return {"message": result_msg, "snapshot_id": snapshot_id}
 
 
 @api_router.get("/auth/me")
@@ -1095,6 +1232,12 @@ async def delete_audit(audit_id: str, user=Depends(get_current_user)):
     audit = await db.audits.find_one({"id": audit_id}, {"_id": 0})
     if not audit:
         raise HTTPException(404, "Audit not found")
+    # Snapshot BEFORE delete for rollback
+    scans_snap = await db.audit_scans.find({"audit_id": audit_id}, {"_id": 0}).to_list(10000)
+    movements_snap = await db.movements.find({"audit_id": audit_id}, {"_id": 0}).to_list(1000)
+    await save_history(HistAction.DELETE_AUDIT, user["email"], user["sub"],
+                       audit_id, f"{audit.get('tienda')} ({audit.get('cr_tienda')})",
+                       dict(audit), {"scans": scans_snap, "movements": movements_snap})
     # Delete associated scans and movements
     await db.audit_scans.delete_many({"audit_id": audit_id})
     await db.movements.delete_many({"audit_id": audit_id})
@@ -1722,6 +1865,8 @@ async def create_user(input: UserCreateInput, user=Depends(get_current_user)):
                 "password_hash": hash_password(input.password), "perfil": input.perfil,
                 "created_at": datetime.now(timezone.utc).isoformat()}
     await db.users.insert_one(new_user)
+    await save_history(HistAction.CREATE_USER, user["email"], user["sub"],
+                       new_user["id"], input.email, None, {"perfil": input.perfil})
     await sec_log(SecEvent.USER_CREATED, actor_email=user["email"], actor_id=user["sub"],
                   target=input.email, detail={"perfil": input.perfil})
     return {k: v for k, v in new_user.items() if k not in ("_id", "password_hash")}
@@ -1745,6 +1890,10 @@ async def update_user(user_id: str, input: UserUpdateInput, user=Depends(get_cur
     result = await db.users.update_one({"id": user_id}, {"$set": update})
     if result.matched_count == 0:
         raise HTTPException(404, "User not found")
+    await save_history(HistAction.UPDATE_USER, user["email"], user["sub"],
+                       user_id, (target_before or {}).get("email"),
+                       {k: v for k, v in (target_before or {}).items() if k != "password_hash"},
+                       {"fields": list(update.keys())})
     # Log role change as a CRITICAL event
     if input.perfil and target_before and input.perfil != target_before.get("perfil"):
         await sec_log(SecEvent.ROLE_CHANGED, actor_email=user["email"], actor_id=user["sub"],
@@ -1772,10 +1921,33 @@ async def delete_user(user_id: str, user=Depends(get_current_user)):
     result = await db.users.delete_one({"id": user_id})
     if result.deleted_count == 0:
         raise HTTPException(404, "User not found")
+    await save_history(HistAction.DELETE_USER, user["email"], user["sub"],
+                       user_id, (target or {}).get("email"),
+                       {k: v for k, v in (target or {}).items()})
     await sec_log(SecEvent.USER_DELETED, actor_email=user["email"], actor_id=user["sub"],
                   target=(target or {}).get("email"),
                   detail={"perfil": (target or {}).get("perfil")})
     return {"message": "User deleted"}
+
+@api_router.get("/equipment/search")
+async def search_equipment_public(
+    q: str,
+    user=Depends(get_current_user)
+):
+    """All profiles: search equipment by barcode, no_activo, serie, descripcion or tienda."""
+    q = q.strip()
+    if not q or len(q) < 2:
+        raise HTTPException(400, "La búsqueda requiere al menos 2 caracteres")
+    query = {"$or": [
+        {"codigo_barras": {"$regex": q, "$options": "i"}},
+        {"no_activo":     {"$regex": q, "$options": "i"}},
+        {"serie":         {"$regex": q, "$options": "i"}},
+        {"descripcion":   {"$regex": q, "$options": "i"}},
+        {"tienda":        {"$regex": q, "$options": "i"}},
+        {"marca":         {"$regex": q, "$options": "i"}},
+    ]}
+    items = await db.equipment.find(query, {"_id": 0}).limit(50).to_list(50)
+    return {"results": [decrypt_equipment(i) for i in items], "total": len(items)}
 
 @api_router.get("/admin/equipment")
 async def admin_get_equipment(search: Optional[str] = None, plaza: Optional[str] = None, page: int = 1, limit: int = 50, user=Depends(get_current_user)):
@@ -1801,6 +1973,8 @@ async def admin_update_equipment(equip_id: str, input: EquipmentUpdateInput, use
     update = {k: v for k, v in input.model_dump().items() if v is not None}
     if not update:
         raise HTTPException(400, "No fields to update")
+    # Capture before-state for history
+    eq_before = await db.equipment.find_one({"id": equip_id}, {"_id": 0})
     if "costo" in update or "depreciacion" in update:
         current = await db.equipment.find_one({"id": equip_id}, {"_id": 0})
         if current:
@@ -1812,6 +1986,10 @@ async def admin_update_equipment(equip_id: str, input: EquipmentUpdateInput, use
     result = await db.equipment.update_one({"id": equip_id}, {"$set": update})
     if result.matched_count == 0:
         raise HTTPException(404, "Equipment not found")
+    await save_history(HistAction.UPDATE_EQUIPMENT, user["email"], user["sub"],
+                       equip_id, (eq_before or {}).get("codigo_barras", equip_id),
+                       decrypt_equipment(eq_before) if eq_before else None,
+                       {"fields": list(update.keys())})
     await sec_log(SecEvent.EQUIPMENT_EDITED, actor_email=user["email"], actor_id=user["sub"],
                   target=equip_id, detail={"fields": list(update.keys())})
     updated = await db.equipment.find_one({"id": equip_id}, {"_id": 0})
@@ -1924,6 +2102,9 @@ async def reset_data(maf_file: UploadFile = File(...), users_file: UploadFile = 
     count_eq = await db.equipment.count_documents({})
     count_stores = await db.stores.count_documents({})
     count_users = await db.users.count_documents({"is_backup": {"$ne": True}})
+    await save_history(HistAction.DATA_RESET, user["email"], user["sub"],
+                       None, "RESET COMPLETO", None,
+                       {"equipment": count_eq, "stores": count_stores, "users": count_users})
     await sec_log(SecEvent.DATA_RESET, actor_email=user["email"], actor_id=user["sub"],
                   detail={"equipment": count_eq, "stores": count_stores, "users": count_users})
     return {"message": "Data reset complete", "equipment": count_eq, "stores": count_stores, "users": count_users}
@@ -2050,6 +2231,9 @@ async def import_data():
     await db.security_logs.create_index([("ts", -1)])                           # security log queries
     await db.security_logs.create_index([("level", 1), ("ts", -1)])             # filter by severity
     await db.security_logs.create_index([("actor_email", 1), ("ts", -1)])       # filter by user
+    await db.admin_history.create_index([("ts", -1)])                           # history queries
+    await db.admin_history.create_index([("action", 1), ("ts", -1)])            # filter by action type
+    await db.admin_history.create_index([("rolled_back", 1)])                   # pending rollbacks
     await db.app_logs.create_index([("ts", -1)])                                # app log time queries
     await db.app_logs.create_index([("is_error", 1), ("ts", -1)])               # error filter
 
