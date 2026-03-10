@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Package, X, Barcode, Hash, Tag, MapPin, DollarSign, Calendar, Wrench } from "lucide-react";
+import { Search, Package, Barcode, Hash, Tag, MapPin, DollarSign, Calendar, Wrench } from "lucide-react";
 import { toast } from "sonner";
 
 const fmtM = (n) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
@@ -16,6 +16,7 @@ export default function EquipmentSearchPage() {
   const [results, setResults] = useState(null); // null = no buscado aún
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [history, setHistory] = useState([]); // [{ q, found, ts }]
   const inputRef = useRef(null);
 
   const handleSearch = async (q = query) => {
@@ -25,11 +26,17 @@ export default function EquipmentSearchPage() {
     setSelected(null);
     try {
       const res = await api.get("/equipment/search", { params: { q: trimmed } });
+      const found = (res.data.results || []).length > 0;
       setResults(res.data.results || []);
+      // Agregar al historial de búsquedas
+      setHistory(prev => [{ q: trimmed, found, count: res.data.results?.length || 0, ts: new Date() }, ...prev.slice(0, 19)]);
     } catch (err) {
       toast.error("Error al buscar equipo");
     } finally {
       setLoading(false);
+      // Limpiar input y devolver focus para siguiente escaneo
+      setQuery("");
+      setTimeout(() => inputRef.current?.focus(), 50);
     }
   };
 
@@ -56,7 +63,7 @@ export default function EquipmentSearchPage() {
 
       {/* Barra de búsqueda */}
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-3">
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -69,12 +76,6 @@ export default function EquipmentSearchPage() {
                 className="pl-9 h-11 text-base font-mono"
                 autoFocus
               />
-              {query && (
-                <button className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  onClick={() => { setQuery(""); setResults(null); setSelected(null); inputRef.current?.focus(); }}>
-                  <X className="h-4 w-4" />
-                </button>
-              )}
             </div>
             <Button onClick={() => handleSearch()} disabled={loading} className="h-11 px-6 gap-2">
               {loading
@@ -83,6 +84,25 @@ export default function EquipmentSearchPage() {
               Buscar
             </Button>
           </div>
+
+          {/* Historial de búsquedas */}
+          {history.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Últimas consultas</p>
+              <div className="flex flex-wrap gap-1.5">
+                {history.map((h, i) => (
+                  <div key={i} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono border ${
+                    h.found
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700"
+                      : "bg-red-500/10 border-red-500/30 text-red-600"
+                  }`}>
+                    <span>{h.q}</span>
+                    <span className="opacity-70">{h.found ? `✓ ${h.count}` : "✗ No encontrado"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
