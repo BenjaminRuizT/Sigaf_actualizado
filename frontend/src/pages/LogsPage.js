@@ -460,7 +460,7 @@ ${(a.photo_ab || a.photo_transf) ? `
                       return (
                         <TableRow key={item.id}>
                           <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{fmtDate(item.scanned_at)}</TableCell>
-                          <TableCell className="font-mono text-xs whitespace-nowrap">{item.codigo_barras}</TableCell>
+                          <TableCell className="font-mono text-xs max-w-[160px]"><span className="block truncate" title={item.codigo_barras}>{item.codigo_barras}</span></TableCell>
                           <TableCell><Badge className={`text-[10px] ${classColors[item.classification] || ""}`}>{classLabels[item.classification] || item.classification}</Badge></TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{eq.descripcion || "—"}</TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{eq.marca || "—"}</TableCell>
@@ -547,7 +547,7 @@ ${(a.photo_ab || a.photo_transf) ? `
                           <TableCell>
                             <Badge variant="outline" className={`text-[10px] ${movTypeBadge(item.type)}`}>{movTypeLabel(item.type)}</Badge>
                           </TableCell>
-                          <TableCell className="font-mono text-xs whitespace-nowrap">{eq.codigo_barras || "—"}</TableCell>
+                          <TableCell className="font-mono text-xs max-w-[160px]"><span className="block truncate" title={eq.codigo_barras || "—"}>{eq.codigo_barras || "—"}</span></TableCell>
                           <TableCell className="text-sm whitespace-nowrap max-w-[180px] truncate">{eq.descripcion || "—"}</TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{eq.modelo || "—"}</TableCell>
                           <TableCell className="text-xs font-mono whitespace-nowrap">{eq.serie || "—"}</TableCell>
@@ -738,7 +738,7 @@ ${(a.photo_ab || a.photo_transf) ? `
                                     const eq = scan.equipment_data || {};
                                     return (
                                       <TableRow key={scan.id}>
-                                        <TableCell className="font-mono text-xs whitespace-nowrap">{scan.codigo_barras}</TableCell>
+                                        <TableCell className="font-mono text-xs max-w-[160px]"><span className="block truncate" title={scan.codigo_barras}>{scan.codigo_barras}</span></TableCell>
                                         <TableCell className="text-sm whitespace-nowrap max-w-[140px] truncate">{eq.descripcion || "—"}</TableCell>
                                         <TableCell className="text-sm whitespace-nowrap">{eq.marca || "—"}</TableCell>
                                         <TableCell className="text-sm whitespace-nowrap">{eq.modelo || "—"}</TableCell>
