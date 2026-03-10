@@ -303,15 +303,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-const APP_VERSION = "3.0.0";
-const APP_BUILD_DATE = "Marzo 2026";
-
-const FEATURES = [
-  { icon: QrCode, label: "Escaneo de código de barras con cámara", desc: "Escaneo en tiempo real con DataWedge (Zebra TC52) o cámara del dispositivo" },
-  { icon: CloudOff, label: "Modo Offline", desc: "Escaneos se guardan localmente y sincronizan automáticamente al reconectarse" },
-  { icon: Camera, label: "Captura fotográfica de movimientos", desc: "Registro fotográfico de formatos ALTA/BAJA y Transferencias" },
-  { icon: BarChart3, label: "Reportes y exportación Excel", desc: "Documentos SIGAF_AB y SIGAF_TRANSFERENCIAS con formato profesional" },
-  { icon: Shield, label: "Bloqueo de cuentas y solicitud de desbloqueo", desc: "5 intentos fallidos bloquean la cuenta — el usuario puede solicitar desbloqueo al Super Admin" },
-  { icon: BookOpen, label: "Bitácoras y logs del sistema", desc: "Historial de auditorías, movimientos y logs de actividad del servidor en tiempo real" },
-];
