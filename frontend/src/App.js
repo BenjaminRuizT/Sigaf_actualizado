@@ -9,6 +9,8 @@ import DashboardPage from "@/pages/DashboardPage";
 import AuditPage from "@/pages/AuditPage";
 import LogsPage from "@/pages/LogsPage";
 import AdminPage from "@/pages/AdminPage";
+import AppLogsPage from "@/pages/AppLogsPage";
+import SecurityLogsPage from "@/pages/SecurityLogsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import DeployPage from "@/pages/DeployPage";
 import ReportsPage from "@/pages/ReportsPage";
@@ -41,6 +43,8 @@ function AppRoutes() {
       <Route path="/admin" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><AdminPage /></Layout></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Layout><SettingsPage /></Layout></ProtectedRoute>} />
       <Route path="/deploy" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><DeployPage /></Layout></ProtectedRoute>} />
+      <Route path="/app-logs" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><AppLogsPage /></Layout></ProtectedRoute>} />
+      <Route path="/security-logs" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><SecurityLogsPage /></Layout></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
