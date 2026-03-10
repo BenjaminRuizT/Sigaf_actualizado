@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-import os, logging, uuid, io, base64, asyncio, hashlib, hmac, json
+import os, logging, uuid, io, base64, asyncio
 from pathlib import Path
 from pydantic import BaseModel
 from typing import List, Optional
@@ -11,9 +11,6 @@ from datetime import datetime, timezone
 import jwt
 import bcrypt
 import openpyxl
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes as crypto_hashes
 from pdf_generator import generate_user_manual, generate_presentation
 
 ROOT_DIR = Path(__file__).parent
@@ -24,181 +21,11 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# ── Field Encryption (Fernet / AES-128-CBC + HMAC-SHA256) ─────────────────────
-# Key is derived from JWT_SECRET via PBKDF2 so it is never stored in plain text.
-# A fixed application-level salt is intentional here: we need deterministic key
-# derivation across restarts.  The actual secrecy comes from JWT_SECRET.
-_ENC_SALT = b"sigaf-field-enc-salt-v1"
-
-def _build_fernet() -> Fernet:
-    kdf = PBKDF2HMAC(
-        algorithm=crypto_hashes.SHA256(),
-        length=32,
-        salt=_ENC_SALT,
-        iterations=100_000,
-    )
-    raw_key = kdf.derive(SECRET_KEY.encode())
-    return Fernet(base64.urlsafe_b64encode(raw_key))
-
-_fernet = _build_fernet()
-
-def encrypt_field(value: str) -> str:
-    """Encrypt a string field and return a base64url-encoded ciphertext prefixed with 'enc:'."""
-    if not value:
-        return value
-    return "enc:" + _fernet.encrypt(value.encode()).decode()
-
-def decrypt_field(value: str) -> str:
-    """Decrypt a field encrypted by encrypt_field(). Returns value unchanged if not encrypted."""
-    if not value or not str(value).startswith("enc:"):
-        return value
-    try:
-        return _fernet.decrypt(value[4:].encode()).decode()
-    except Exception:
-        return value  # Return as-is if decryption fails (e.g. data from before encryption was enabled)
-
-# Sensitive fields that are encrypted at rest in the equipment collection
-_SENSITIVE_EQ_FIELDS = ("serie", "factura")
-
-def encrypt_equipment(doc: dict) -> dict:
-    """Return a copy of doc with sensitive equipment fields encrypted."""
-    out = dict(doc)
-    for f in _SENSITIVE_EQ_FIELDS:
-        if f in out and out[f] and not str(out[f]).startswith("enc:"):
-            out[f] = encrypt_field(str(out[f]))
-    return out
-
-def decrypt_equipment(doc: dict) -> dict:
-    """Return a copy of doc with sensitive equipment fields decrypted."""
-    if not doc:
-        return doc
-    out = dict(doc)
-    for f in _SENSITIVE_EQ_FIELDS:
-        if f in out:
-            out[f] = decrypt_field(str(out[f]))
-    return out
-
-# ── Audit Digital Signature (HMAC-SHA256) ─────────────────────────────────────
-_HMAC_KEY = hashlib.sha256(f"sigaf-audit-sign:{SECRET_KEY}".encode()).digest()
-
-def _audit_payload(audit: dict, scans: list) -> str:
-    """Build a canonical, deterministic string from audit data to sign."""
-    sorted_scans = sorted(
-        [{"b": s.get("codigo_barras", ""), "c": s.get("classification", "")} for s in scans],
-        key=lambda x: x["b"]
-    )
-    payload = {
-        "audit_id":        audit.get("id", ""),
-        "cr_tienda":       audit.get("cr_tienda", ""),
-        "auditor_id":      audit.get("auditor_id", ""),
-        "started_at":      audit.get("started_at", ""),
-        "finished_at":     audit.get("finished_at", ""),
-        "total_equipment": audit.get("total_equipment", 0),
-        "located_count":   audit.get("located_count", 0),
-        "not_found_count": audit.get("not_found_count", 0),
-        "not_found_value": audit.get("not_found_value", 0),
-        "scans":           sorted_scans,
-    }
-    return json.dumps(payload, ensure_ascii=False, sort_keys=True)
-
-def sign_audit(audit: dict, scans: list) -> dict:
-    """Return a signature object {hash, algorithm, signed_at}."""
-    payload_str = _audit_payload(audit, scans)
-    digest = hmac.new(_HMAC_KEY, payload_str.encode(), hashlib.sha256).hexdigest()
-    return {
-        "hash":       digest,
-        "algorithm":  "HMAC-SHA256",
-        "signed_at":  datetime.now(timezone.utc).isoformat(),
-        "signed_by":  audit.get("auditor_name", "system"),
-    }
-
-def verify_audit_signature(audit: dict, scans: list) -> bool:
-    """Re-compute the signature and compare with the stored hash."""
-    stored = (audit.get("signature") or {}).get("hash")
-    if not stored:
-        return False
-    payload_str = _audit_payload(audit, scans)
-    expected = hmac.new(_HMAC_KEY, payload_str.encode(), hashlib.sha256).hexdigest()
-    return hmac.compare_digest(stored, expected)
-
 app = FastAPI(title="SIGAF API")
 api_router = APIRouter(prefix="/api")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-# ==================== SECURITY AUDIT LOGS ====================
-# A structured event log for security-relevant actions, distinct from
-# the HTTP request log (app_logs).  Never raises — logging must never
-# block or crash a business operation.
-
-class SecEvent:
-    """Constants for security event types."""
-    LOGIN_SUCCESS    = "LOGIN_SUCCESS"
-    LOGIN_FAILED     = "LOGIN_FAILED"
-    ACCOUNT_LOCKED   = "ACCOUNT_LOCKED"
-    ACCOUNT_UNLOCKED = "ACCOUNT_UNLOCKED"
-    UNLOCK_REQUESTED = "UNLOCK_REQUESTED"
-    PASSWORD_CHANGED = "PASSWORD_CHANGED"
-    USER_CREATED     = "USER_CREATED"
-    USER_UPDATED     = "USER_UPDATED"
-    USER_DELETED     = "USER_DELETED"
-    ROLE_CHANGED     = "ROLE_CHANGED"
-    AUDIT_FINALIZED  = "AUDIT_FINALIZED"
-    AUDIT_DELETED    = "AUDIT_DELETED"
-    AUDIT_CANCELLED  = "AUDIT_CANCELLED"
-    EQUIPMENT_EDITED = "EQUIPMENT_EDITED"
-    DATA_RESET       = "DATA_RESET"
-    SIGNATURE_VALID   = "SIGNATURE_VALID"
-    SIGNATURE_INVALID = "SIGNATURE_INVALID"
-
-class SecLevel:
-    INFO     = "INFO"
-    WARNING  = "WARNING"
-    CRITICAL = "CRITICAL"
-
-_SEC_LEVEL_MAP = {
-    SecEvent.LOGIN_SUCCESS:    SecLevel.INFO,
-    SecEvent.LOGIN_FAILED:     SecLevel.WARNING,
-    SecEvent.ACCOUNT_LOCKED:   SecLevel.CRITICAL,
-    SecEvent.ACCOUNT_UNLOCKED: SecLevel.WARNING,
-    SecEvent.UNLOCK_REQUESTED: SecLevel.WARNING,
-    SecEvent.PASSWORD_CHANGED: SecLevel.WARNING,
-    SecEvent.USER_CREATED:     SecLevel.WARNING,
-    SecEvent.USER_UPDATED:     SecLevel.WARNING,
-    SecEvent.USER_DELETED:     SecLevel.CRITICAL,
-    SecEvent.ROLE_CHANGED:     SecLevel.CRITICAL,
-    SecEvent.AUDIT_FINALIZED:  SecLevel.INFO,
-    SecEvent.AUDIT_DELETED:    SecLevel.CRITICAL,
-    SecEvent.AUDIT_CANCELLED:  SecLevel.WARNING,
-    SecEvent.EQUIPMENT_EDITED: SecLevel.WARNING,
-    SecEvent.DATA_RESET:       SecLevel.CRITICAL,
-    SecEvent.SIGNATURE_VALID:  SecLevel.INFO,
-    SecEvent.SIGNATURE_INVALID: SecLevel.CRITICAL,
-}
-
-async def sec_log(
-    event: str,
-    actor_email: Optional[str] = None,
-    actor_id: Optional[str] = None,
-    target: Optional[str] = None,
-    detail: Optional[dict] = None,
-    ip: Optional[str] = None,
-) -> None:
-    """Insert one security event into db.security_logs.  Never raises."""
-    try:
-        await db.security_logs.insert_one({
-            "ts":          datetime.now(timezone.utc).isoformat(),
-            "event":       event,
-            "level":       _SEC_LEVEL_MAP.get(event, SecLevel.INFO),
-            "actor_email": actor_email,
-            "actor_id":    actor_id,
-            "target":      target,
-            "detail":      detail or {},
-            "ip":          ip,
-        })
-    except Exception:
-        pass  # Security logging must never crash business logic
 
 # ==================== REQUEST LOGGING MIDDLEWARE ====================
 import time as _time
@@ -422,8 +249,6 @@ async def login(input: LoginInput):
     if not verify_password(input.password, user["password_hash"]):
         new_attempts = await _record_failed_login(user["id"], now_iso)
         if new_attempts >= _LOGIN_MAX_ATTEMPTS:
-            await sec_log(SecEvent.ACCOUNT_LOCKED, actor_email=user["email"], actor_id=user["id"],
-                          detail={"reason": "max_attempts_exceeded", "attempts": new_attempts})
             raise HTTPException(403, {
                 "code": "ACCOUNT_LOCKED",
                 "remaining_minutes": _LOGIN_LOCK_SECONDS // 60,
@@ -431,8 +256,6 @@ async def login(input: LoginInput):
                 "user_id": user["id"],
                 "email": user["email"]
             })
-        await sec_log(SecEvent.LOGIN_FAILED, actor_email=user["email"], actor_id=user["id"],
-                      detail={"attempt": new_attempts, "remaining": _LOGIN_MAX_ATTEMPTS - new_attempts})
         attempts_left = _LOGIN_MAX_ATTEMPTS - new_attempts
         detail = "Credenciales inválidas"
         if attempts_left <= 2:
@@ -447,8 +270,6 @@ async def login(input: LoginInput):
     )
     token = create_token(user["id"], user["email"], user["perfil"], user["nombre"])
     safe_user = {k: v for k, v in user.items() if k not in ("password_hash",)}
-    await sec_log(SecEvent.LOGIN_SUCCESS, actor_email=user["email"], actor_id=user["id"],
-                  detail={"perfil": user["perfil"]})
     return {"token": token, "user": safe_user}
 
 @api_router.post("/auth/request-unlock")
@@ -466,8 +287,6 @@ async def request_unlock(input: UnlockRequestInput):
                        "unlock_request_at": datetime.now(timezone.utc).isoformat(),
                        "unlock_request_reason": (input.reason or "").strip()[:500]}}
         )
-        await sec_log(SecEvent.UNLOCK_REQUESTED, actor_email=user["email"], actor_id=user["id"],
-                      detail={"has_reason": bool(input.reason)})
     return {"ok": True}
 
 @api_router.get("/admin/unlock-requests")
@@ -493,10 +312,6 @@ async def unlock_user(user_id: str, admin=Depends(get_current_user)):
                    "unlock_request_at": None, "unlocked_by": admin["nombre"],
                    "unlocked_at": datetime.now(timezone.utc).isoformat()}}
     )
-    await sec_log(SecEvent.ACCOUNT_UNLOCKED,
-                  actor_email=admin["email"], actor_id=admin["sub"],
-                  target=target["email"],
-                  detail={"unlocked_by": admin["nombre"]})
     return {"message": f"Usuario {target['email']} desbloqueado"}
 
 @api_router.get("/admin/app-logs")
@@ -528,37 +343,6 @@ async def clear_app_logs(current_user=Depends(get_current_user)):
     result = await db.app_logs.delete_many({})
     return {"deleted": result.deleted_count}
 
-@api_router.get("/admin/security-logs")
-async def get_security_logs(
-    current_user=Depends(get_current_user),
-    limit: int = 300,
-    level: Optional[str] = None,
-    event: Optional[str] = None,
-    actor_email: Optional[str] = None,
-):
-    """Super Admin: retrieve structured security event logs."""
-    if current_user["perfil"] != "Super Administrador":
-        raise HTTPException(403, "Acceso denegado")
-    query: dict = {}
-    if level:
-        query["level"] = level.upper()
-    if event:
-        query["event"] = {"$regex": event, "$options": "i"}
-    if actor_email:
-        query["actor_email"] = {"$regex": actor_email, "$options": "i"}
-    logs = await db.security_logs.find(query, {"_id": 0}).sort("ts", -1).limit(min(limit, 2000)).to_list(2000)
-    return logs
-
-@api_router.delete("/admin/security-logs")
-async def clear_security_logs(current_user=Depends(get_current_user)):
-    """Super Admin: purge security logs older than 90 days (or all if forced)."""
-    if current_user["perfil"] != "Super Administrador":
-        raise HTTPException(403, "Acceso denegado")
-    from datetime import timedelta
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
-    result = await db.security_logs.delete_many({"ts": {"$lt": cutoff}})
-    return {"deleted": result.deleted_count, "cutoff": cutoff}
-
 
 @api_router.get("/auth/me")
 async def get_me(user=Depends(get_current_user)):
@@ -583,8 +367,6 @@ async def update_profile(input: ProfileUpdateInput, user=Depends(get_current_use
     await db.users.update_one({"id": user["sub"]}, {"$set": update})
     updated = await db.users.find_one({"id": user["sub"]}, {"_id": 0, "password_hash": 0})
     new_token = create_token(updated["id"], updated["email"], updated["perfil"], updated["nombre"])
-    if "password_hash" in update:
-        await sec_log(SecEvent.PASSWORD_CHANGED, actor_email=user["email"], actor_id=user["sub"])
     return {"user": updated, "token": new_token}
 
 # ==================== REPORTS ====================
@@ -698,12 +480,12 @@ async def get_store_equipment(cr_tienda: str, search: Optional[str] = None, page
             {"codigo_barras": {"$regex": search, "$options": "i"}},
             {"no_activo": {"$regex": search, "$options": "i"}},
             {"descripcion": {"$regex": search, "$options": "i"}},
+            {"serie": {"$regex": search, "$options": "i"}}
         ]
     skip = (page - 1) * limit
     total = await db.equipment.count_documents(query)
     equipment = await db.equipment.find(query, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
-    return {"equipment": [decrypt_equipment(e) for e in equipment], "total": total,
-            "page": page, "pages": max(1, (total + limit - 1) // limit)}
+    return {"equipment": equipment, "total": total, "page": page, "pages": max(1, (total + limit - 1) // limit)}
 
 # ==================== AUDITS ====================
 @api_router.post("/audits")
@@ -903,19 +685,6 @@ async def finalize_audit(audit_id: str, input: Optional[FinalizeWithPhotosInput]
     all_scans = await db.audit_scans.find({"audit_id": audit_id}, {"_id": 0}).to_list(10000)
     movements = await db.movements.find({"audit_id": audit_id}, {"_id": 0}).to_list(1000)
 
-    # ── Digital Signature ────────────────────────────────────────────────
-    signature = sign_audit(updated_audit, all_scans)
-    await db.audits.update_one({"id": audit_id}, {"$set": {"signature": signature}})
-    updated_audit["signature"] = signature
-
-    # Security audit log
-    await sec_log(SecEvent.AUDIT_FINALIZED,
-                  actor_email=user["email"], actor_id=user["sub"],
-                  target=audit_id,
-                  detail={"tienda": updated_audit.get("tienda"), "plaza": updated_audit.get("plaza"),
-                           "status": final_status, "not_found": not_found_count,
-                           "signature": signature["hash"][:16] + "…"})
-
     return {
         "audit": updated_audit,
         "summary": {
@@ -926,29 +695,6 @@ async def finalize_audit(audit_id: str, input: Optional[FinalizeWithPhotosInput]
             "not_found_deprecated": len([e for e in not_found_items if e.get("depreciado", False)])
         },
         "scans": all_scans, "not_found_items": not_found_items, "movements": movements
-    }
-
-@api_router.get("/audits/{audit_id}/verify-signature")
-async def verify_audit_sig(audit_id: str, user=Depends(get_current_user)):
-    """Verify the HMAC-SHA256 digital signature of a finalized audit."""
-    audit = await db.audits.find_one({"id": audit_id}, {"_id": 0})
-    if not audit:
-        raise HTTPException(404, "Auditoría no encontrada")
-    if audit.get("status") == "in_progress":
-        raise HTTPException(400, "La auditoría aún no ha sido finalizada")
-    if not audit.get("signature"):
-        await sec_log(SecEvent.SIGNATURE_INVALID, actor_email=user["email"], actor_id=user["sub"],
-                      target=audit_id, detail={"reason": "no_signature"})
-        return {"valid": False, "reason": "Auditoría sin firma digital (fue finalizada antes de esta función)"}
-    scans = await db.audit_scans.find({"audit_id": audit_id}, {"_id": 0}).to_list(10000)
-    valid = verify_audit_signature(audit, scans)
-    event = SecEvent.SIGNATURE_VALID if valid else SecEvent.SIGNATURE_INVALID
-    await sec_log(event, actor_email=user["email"], actor_id=user["sub"],
-                  target=audit_id, detail={"tienda": audit.get("tienda"), "valid": valid})
-    return {
-        "valid": valid,
-        "signature": audit.get("signature"),
-        "reason": None if valid else "Los datos de la auditoría han sido modificados después de su firma"
     }
 
 @api_router.post("/audits/{audit_id}/cancel")
@@ -969,8 +715,6 @@ async def cancel_audit(audit_id: str, input: AuditCancelInput, user=Depends(get_
     await db.stores.update_one({"cr_tienda": audit["cr_tienda"]}, {"$set": {
         "audited": False, "last_audit_id": None, "audit_status": None
     }})
-    await sec_log(SecEvent.AUDIT_CANCELLED, actor_email=user["email"], actor_id=user["sub"],
-                  target=audit_id, detail={"tienda": audit.get("tienda"), "reason": input.reason.strip()})
     return {"message": "Auditoría cancelada", "cancel_reason": input.reason.strip()}
 
 @api_router.post("/audits/{audit_id}/register-unknown-surplus")
@@ -1105,9 +849,6 @@ async def delete_audit(audit_id: str, user=Depends(get_current_user)):
             "audited": False, "last_audit_date": None, "last_audit_id": None, "audit_status": None
         }})
     await db.audits.delete_one({"id": audit_id})
-    await sec_log(SecEvent.AUDIT_DELETED, actor_email=user["email"], actor_id=user["sub"],
-                  target=audit_id, detail={"tienda": audit.get("tienda"), "plaza": audit.get("plaza"),
-                                            "status": audit.get("status")})
     return {"message": "Audit deleted", "cr_tienda": cr_tienda}
 
 # ==================== MOVEMENTS ====================
@@ -1722,15 +1463,12 @@ async def create_user(input: UserCreateInput, user=Depends(get_current_user)):
                 "password_hash": hash_password(input.password), "perfil": input.perfil,
                 "created_at": datetime.now(timezone.utc).isoformat()}
     await db.users.insert_one(new_user)
-    await sec_log(SecEvent.USER_CREATED, actor_email=user["email"], actor_id=user["sub"],
-                  target=input.email, detail={"perfil": input.perfil})
     return {k: v for k, v in new_user.items() if k not in ("_id", "password_hash")}
 
 @api_router.put("/admin/users/{user_id}")
 async def update_user(user_id: str, input: UserUpdateInput, user=Depends(get_current_user)):
     if user["perfil"] != "Super Administrador":
         raise HTTPException(403, "Access denied")
-    target_before = await db.users.find_one({"id": user_id}, {"_id": 0})
     update = {}
     if input.nombre:
         update["nombre"] = input.nombre
@@ -1745,36 +1483,22 @@ async def update_user(user_id: str, input: UserUpdateInput, user=Depends(get_cur
     result = await db.users.update_one({"id": user_id}, {"$set": update})
     if result.matched_count == 0:
         raise HTTPException(404, "User not found")
-    # Log role change as a CRITICAL event
-    if input.perfil and target_before and input.perfil != target_before.get("perfil"):
-        await sec_log(SecEvent.ROLE_CHANGED, actor_email=user["email"], actor_id=user["sub"],
-                      target=(target_before or {}).get("email"),
-                      detail={"from": target_before.get("perfil"), "to": input.perfil})
-    elif "password_hash" in update:
-        await sec_log(SecEvent.PASSWORD_CHANGED, actor_email=user["email"], actor_id=user["sub"],
-                      target=(target_before or {}).get("email"),
-                      detail={"changed_by_admin": True})
-    else:
-        await sec_log(SecEvent.USER_UPDATED, actor_email=user["email"], actor_id=user["sub"],
-                      target=(target_before or {}).get("email"),
-                      detail={"fields": [k for k in update if k != "password_hash"]})
     return await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
 
 @api_router.delete("/admin/users/{user_id}")
 async def delete_user(user_id: str, user=Depends(get_current_user)):
     if user["perfil"] != "Super Administrador":
         raise HTTPException(403, "Access denied")
+    # Prevent self-deletion
     if user_id == user["sub"]:
         raise HTTPException(400, "No puede eliminarse a si mismo")
+    # Prevent deleting backup admin
     target = await db.users.find_one({"id": user_id}, {"_id": 0})
     if target and target.get("is_backup"):
         raise HTTPException(400, "No se puede eliminar este usuario")
     result = await db.users.delete_one({"id": user_id})
     if result.deleted_count == 0:
         raise HTTPException(404, "User not found")
-    await sec_log(SecEvent.USER_DELETED, actor_email=user["email"], actor_id=user["sub"],
-                  target=(target or {}).get("email"),
-                  detail={"perfil": (target or {}).get("perfil")})
     return {"message": "User deleted"}
 
 @api_router.get("/admin/equipment")
@@ -1791,8 +1515,7 @@ async def admin_get_equipment(search: Optional[str] = None, plaza: Optional[str]
     skip = (page - 1) * limit
     total = await db.equipment.count_documents(query)
     items = await db.equipment.find(query, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
-    return {"items": [decrypt_equipment(i) for i in items], "total": total,
-            "page": page, "pages": max(1, (total + limit - 1) // limit)}
+    return {"items": items, "total": total, "page": page, "pages": max(1, (total + limit - 1) // limit)}
 
 @api_router.put("/admin/equipment/{equip_id}")
 async def admin_update_equipment(equip_id: str, input: EquipmentUpdateInput, user=Depends(get_current_user)):
@@ -1805,17 +1528,10 @@ async def admin_update_equipment(equip_id: str, input: EquipmentUpdateInput, use
         current = await db.equipment.find_one({"id": equip_id}, {"_id": 0})
         if current:
             update["valor_real"] = round(max(0, update.get("costo", current.get("costo", 0)) - update.get("depreciacion", current.get("depreciacion", 0))), 2)
-    # Encrypt sensitive fields before saving
-    for f in _SENSITIVE_EQ_FIELDS:
-        if f in update and update[f] and not str(update[f]).startswith("enc:"):
-            update[f] = encrypt_field(str(update[f]))
     result = await db.equipment.update_one({"id": equip_id}, {"$set": update})
     if result.matched_count == 0:
         raise HTTPException(404, "Equipment not found")
-    await sec_log(SecEvent.EQUIPMENT_EDITED, actor_email=user["email"], actor_id=user["sub"],
-                  target=equip_id, detail={"fields": list(update.keys())})
-    updated = await db.equipment.find_one({"id": equip_id}, {"_id": 0})
-    return decrypt_equipment(updated)
+    return await db.equipment.find_one({"id": equip_id}, {"_id": 0})
 
 @api_router.get("/admin/stores")
 async def admin_get_stores(search: Optional[str] = None, plaza: Optional[str] = None, page: int = 1, limit: int = 50, user=Depends(get_current_user)):
@@ -1924,8 +1640,6 @@ async def reset_data(maf_file: UploadFile = File(...), users_file: UploadFile = 
     count_eq = await db.equipment.count_documents({})
     count_stores = await db.stores.count_documents({})
     count_users = await db.users.count_documents({"is_backup": {"$ne": True}})
-    await sec_log(SecEvent.DATA_RESET, actor_email=user["email"], actor_id=user["sub"],
-                  detail={"equipment": count_eq, "stores": count_stores, "users": count_users})
     return {"message": "Data reset complete", "equipment": count_eq, "stores": count_stores, "users": count_users}
 
 @api_router.get("/admin/template/{template_type}")
@@ -2005,7 +1719,7 @@ async def import_data():
             }
         stores_dict[cr_tienda]["total_equipment"] += 1
 
-        equipment_list.append(encrypt_equipment({
+        equipment_list.append({
             "id": str(uuid.uuid4()), "cr_plaza": cr_plaza, "plaza": plaza,
             "cr_tienda": cr_tienda, "tienda": tienda, "codigo_barras": codigo_barras,
             "no_activo": no_activo, "mes_adquisicion": mes_adq, "año_adquisicion": año_adq,
@@ -2014,7 +1728,7 @@ async def import_data():
             "marca": marca, "modelo": modelo, "serie": serie,
             "meses_transcurridos": meses_trans, "vida_util_restante": vida_restante,
             "valor_real": valor_real, "depreciado": vida_restante <= 0
-        }))
+        })
     wb.close()
 
     if stores_dict:
@@ -2047,11 +1761,6 @@ async def import_data():
     await db.audit_scans.create_index([("audit_id", 1), ("classification", 1)]) # summary by class
     await db.audits.create_index([("status", 1), ("started_at", -1)])           # audit logs
     await db.audits.create_index([("plaza", 1), ("status", 1)])                 # dashboard plaza filter
-    await db.security_logs.create_index([("ts", -1)])                           # security log queries
-    await db.security_logs.create_index([("level", 1), ("ts", -1)])             # filter by severity
-    await db.security_logs.create_index([("actor_email", 1), ("ts", -1)])       # filter by user
-    await db.app_logs.create_index([("ts", -1)])                                # app log time queries
-    await db.app_logs.create_index([("is_error", 1), ("ts", -1)])               # error filter
 
     if users_path.exists():
         uwb = openpyxl.load_workbook(users_path, read_only=True)
