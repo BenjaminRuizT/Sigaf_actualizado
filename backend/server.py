@@ -430,7 +430,8 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
 # get_current_user validates the session_id embedded in the JWT.
 # Only one session per user is allowed at a time.
 
-async def create_session(user_id: str, email: str, perfil: str) -> str:
+async def create_session(user_id: str, email: str, perfil: str,
+                         ip: str = "unknown", user_agent: str = "") -> str:
     """Create a new session record and return its session_id."""
     session_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
@@ -441,6 +442,8 @@ async def create_session(user_id: str, email: str, perfil: str) -> str:
         "perfil": perfil,
         "created_at": now,
         "last_seen": now,
+        "ip": ip,
+        "user_agent": user_agent[:200] if user_agent else "",
     })
     return session_id
 
@@ -472,7 +475,7 @@ async def _record_failed_login(user_id: str, now_iso: str) -> int:
     return new_attempts
 
 @api_router.post("/auth/login")
-async def login(input: LoginInput):
+async def login(input: LoginInput, request: StarletteRequest):
     email_key = input.email.strip().lower()
     # Try exact match first, then case-insensitive fallback
     user = await db.users.find_one({"email": email_key}, {"_id": 0})
@@ -537,15 +540,21 @@ async def login(input: LoginInput):
         {"user_id": user["id"]}, {"_id": 0}
     ).to_list(100)
 
+    # Capture IP and user-agent for new session metadata
+    _req_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    _req_ip = _req_ip.split(",")[0].strip()  # take first IP if comma-separated proxy chain
+    _req_ua = request.headers.get("User-Agent", "")
+
     if existing_sessions:
         # Return 409 Conflict so the frontend can show the session conflict dialog
-        # Include enough info for the user to decide what to do
         safe_sessions = [
             {
                 "id": s["id"],
                 "created_at": s.get("created_at"),
                 "last_seen": s.get("last_seen"),
                 "perfil": s.get("perfil"),
+                "ip": s.get("ip", "desconocida"),
+                "user_agent": s.get("user_agent", ""),
             }
             for s in existing_sessions
         ]
@@ -559,7 +568,7 @@ async def login(input: LoginInput):
         })
 
     # No conflict — create session and return token
-    session_id = await create_session(user["id"], user["email"], user["perfil"])
+    session_id = await create_session(user["id"], user["email"], user["perfil"], _req_ip, _req_ua)
     token = create_token(user["id"], user["email"], user["perfil"], user["nombre"], session_id)
     safe_user = {k: v for k, v in user.items() if k not in ("password_hash",)}
     await sec_log(SecEvent.LOGIN_SUCCESS, actor_email=user["email"], actor_id=user["id"],
@@ -567,7 +576,7 @@ async def login(input: LoginInput):
     return {"token": token, "user": safe_user}
 
 @api_router.post("/auth/login/force")
-async def login_force(input: LoginInput):
+async def login_force(input: LoginInput, request: StarletteRequest):
     """Close all existing sessions for the user and log in fresh."""
     email_key = input.email.strip().lower()
     user = await db.users.find_one({"email": email_key}, {"_id": 0})
@@ -579,9 +588,12 @@ async def login_force(input: LoginInput):
         raise HTTPException(403, {"code": "ACCOUNT_LOCKED", "remaining_minutes": 30,
                                    "unlock_requested": bool(user.get("unlock_requested")),
                                    "user_id": user["id"], "email": user["email"]})
+    _req_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
+    _req_ip = _req_ip.split(",")[0].strip()
+    _req_ua = request.headers.get("User-Agent", "")
     # Close ALL existing sessions, then create new one
     await close_sessions(user["id"])
-    session_id = await create_session(user["id"], user["email"], user["perfil"])
+    session_id = await create_session(user["id"], user["email"], user["perfil"], _req_ip, _req_ua)
     token = create_token(user["id"], user["email"], user["perfil"], user["nombre"], session_id)
     safe_user = {k: v for k, v in user.items() if k not in ("password_hash",)}
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -608,7 +620,8 @@ async def get_my_sessions(user=Depends(get_current_user)):
     ).sort("created_at", -1).to_list(100)
     current_sid = user.get("sid")
     return [{"id": s["id"], "created_at": s.get("created_at"),
-             "last_seen": s.get("last_seen"), "is_current": s["id"] == current_sid}
+             "last_seen": s.get("last_seen"), "is_current": s["id"] == current_sid,
+             "ip": s.get("ip", "desconocida"), "user_agent": s.get("user_agent", "")}
             for s in sessions]
 
 @api_router.post("/auth/sessions/close-others")
