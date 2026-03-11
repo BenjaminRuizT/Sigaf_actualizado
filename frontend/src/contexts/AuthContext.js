@@ -9,6 +9,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const logoutRef = useRef(null);
+  // Ref to the api instance so closeOtherSessions/logout can use it after init
+  const apiRef = useRef(null);
 
   useEffect(() => {
     if (token) {
@@ -42,7 +44,6 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    // Notify backend to close this session (best-effort)
     try {
       const t = localStorage.getItem("sigaf_token");
       if (t) await axios.post(`${API}/auth/logout`, {}, { headers: { Authorization: `Bearer ${t}` } });
@@ -52,9 +53,9 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  // Uses apiRef (set below) so it always has the correct Authorization header
   const closeOtherSessions = async () => {
-    const t = localStorage.getItem("sigaf_token");
-    if (t) await axios.post(`${API}/auth/sessions/close-others`, {}, { headers: { Authorization: `Bearer ${t}` } });
+    if (apiRef.current) await apiRef.current.post("/auth/sessions/close-others");
   };
 
   logoutRef.current = logout;
@@ -72,9 +73,7 @@ export function AuthProvider({ children }) {
       response => response,
       error => {
         const status = error?.response?.status;
-        const detail = error?.response?.data?.detail;
         if (status === 401) {
-          // Session closed by another login or token expired
           localStorage.removeItem("sigaf_token");
           if (logoutRef.current) logoutRef.current();
         }
@@ -82,6 +81,8 @@ export function AuthProvider({ children }) {
       }
     );
 
+    // Store ref so closeOtherSessions and others can use it without circular deps
+    apiRef.current = instance;
     return instance;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
