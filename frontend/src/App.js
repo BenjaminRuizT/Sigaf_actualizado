@@ -46,7 +46,7 @@ function AppRoutes() {
       <Route path="/app-logs" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><SystemLogsPage /></Layout></ProtectedRoute>} />
       <Route path="/security-logs" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><SystemLogsPage defaultTab="security" /></Layout></ProtectedRoute>} />
       <Route path="/system-logs" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><SystemLogsPage /></Layout></ProtectedRoute>} />
-      <Route path="/admin-history" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><SystemLogsPage defaultTab="history" /></Layout></ProtectedRoute>} />
+      <Route path="/admin-history" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><AdminPage defaultTab="history" /></Layout></ProtectedRoute>} />
       <Route path="/equipment-search" element={<ProtectedRoute><Layout><EquipmentSearchPage /></Layout></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
