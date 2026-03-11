@@ -9,8 +9,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import AuditPage from "@/pages/AuditPage";
 import LogsPage from "@/pages/LogsPage";
 import AdminPage from "@/pages/AdminPage";
-import AppLogsPage from "@/pages/AppLogsPage";
-import SecurityLogsPage from "@/pages/SecurityLogsPage";
+import SystemLogsPage from "@/pages/SystemLogsPage";
 import EquipmentSearchPage from "@/pages/EquipmentSearchPage";
 import AdminHistoryPage from "@/pages/AdminHistoryPage";
 import SettingsPage from "@/pages/SettingsPage";
@@ -45,8 +44,9 @@ function AppRoutes() {
       <Route path="/admin" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><AdminPage /></Layout></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Layout><SettingsPage /></Layout></ProtectedRoute>} />
       <Route path="/deploy" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><DeployPage /></Layout></ProtectedRoute>} />
-      <Route path="/app-logs" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><AppLogsPage /></Layout></ProtectedRoute>} />
-      <Route path="/security-logs" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><SecurityLogsPage /></Layout></ProtectedRoute>} />
+      <Route path="/app-logs" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><SystemLogsPage /></Layout></ProtectedRoute>} />
+      <Route path="/security-logs" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><SystemLogsPage defaultTab="security" /></Layout></ProtectedRoute>} />
+      <Route path="/system-logs" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><SystemLogsPage /></Layout></ProtectedRoute>} />
       <Route path="/equipment-search" element={<ProtectedRoute><Layout><EquipmentSearchPage /></Layout></ProtectedRoute>} />
       <Route path="/admin-history" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><AdminHistoryPage /></Layout></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
