@@ -19,7 +19,8 @@ import { toast } from "sonner";
 import {
   Scan, CheckCircle, AlertTriangle, XCircle, ArrowRightLeft, Trash2, ArrowLeft,
   FileCheck, Package, HelpCircle, StickyNote, ArrowUpDown, X, WifiOff, RefreshCw,
-  CloudOff, Cloud, Camera, PlusCircle, Ban, TrendingDown, TrendingUp, ShieldCheck, ShieldX
+  CloudOff, Cloud, Camera, PlusCircle, Ban, TrendingDown, TrendingUp, ShieldCheck, ShieldX,
+  Lock, Clock
 } from "lucide-react";
 
 const classColors = {
@@ -209,6 +210,16 @@ export default function AuditPage() {
             const sigRes = await api.get(`/audits/${auditId}/verify-signature`);
             setSigVerify({ valid: sigRes.data.valid, signature: sigRes.data.signature, checked_at: new Date().toLocaleTimeString("es-MX") });
           } catch { /* silencioso — no bloquear carga */ }
+        }
+        // Si la auditoría está en pending_photos, reabrir el diálogo de fotos automáticamente
+        if (res.data.status === "pending_photos") {
+          setPendingFinalize({
+            hasAB: res.data.needs_photo_ab && !res.data.photo_ab,
+            hasTransf: res.data.needs_photo_transf && !res.data.photo_transf,
+          });
+          setPhotoABCapture(null);
+          setPhotoTransfCapture(null);
+          setPhotoDialog(true);
         }
       }
     } catch { toast.error(t("common.error")); }
@@ -487,8 +498,16 @@ export default function AuditPage() {
               <Ban className="h-4 w-4" /> Cancelar
             </Button>
           )}
-          <Badge variant="outline" className={`text-xs ${isActive ? "bg-blue-500/15 text-blue-600 border-blue-500/30" : audit?.status === "cancelada" ? "bg-red-500/15 text-red-600 border-red-500/30" : "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"}`}>
-            {isActive ? t("dashboard.inProgress") : audit?.status === "cancelada" ? "CANCELADA" : t("audit.auditCompleted")}
+          <Badge variant="outline" className={`text-xs ${
+            isActive ? "bg-blue-500/15 text-blue-600 border-blue-500/30" :
+            audit?.status === "cancelada" ? "bg-red-500/15 text-red-600 border-red-500/30" :
+            audit?.status === "pending_photos" ? "bg-amber-500/15 text-amber-700 border-amber-500/40" :
+            "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+          }`}>
+            {isActive ? t("dashboard.inProgress") :
+             audit?.status === "cancelada" ? "CANCELADA" :
+             audit?.status === "pending_photos" ? "⏳ PENDIENTE FOTOS" :
+             t("audit.auditCompleted")}
           </Badge>
         </div>
       </div>
@@ -533,6 +552,47 @@ export default function AuditPage() {
       {isActive && syncing && (
         <Card className="border-blue-500/50 bg-blue-500/10"><CardContent className="p-3 flex items-center gap-3"><RefreshCw className="h-5 w-5 text-blue-600 animate-spin shrink-0" /><p className="text-sm font-medium text-blue-700">Sincronizando escaneos pendientes...</p></CardContent></Card>
       )}
+      {/* ── Pending Photos Banner ── */}
+      {audit?.status === "pending_photos" && (() => {
+        const deadline = audit.photos_deadline ? new Date(audit.photos_deadline) : null;
+        const now = new Date();
+        const hoursLeft = deadline ? Math.max(0, Math.ceil((deadline - now) / 3600000)) : null;
+        const isUrgent = hoursLeft !== null && hoursLeft <= 4;
+        return (
+          <Card className={`border-2 ${isUrgent ? "border-red-500/60 bg-red-500/8" : "border-amber-500/60 bg-amber-500/8"}`}>
+            <CardContent className="p-4 flex items-start gap-3">
+              <Lock className={`h-6 w-6 shrink-0 mt-0.5 ${isUrgent ? "text-red-600" : "text-amber-600"}`} />
+              <div className="flex-1 space-y-1">
+                <p className={`font-semibold text-sm ${isUrgent ? "text-red-700" : "text-amber-700"}`}>
+                  Auditoría pendiente de fotos
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Esta auditoría fue procesada correctamente pero faltan las fotos de los formatos físicos para quedar completa.
+                </p>
+                {hoursLeft !== null && (
+                  <div className={`flex items-center gap-1.5 text-xs font-medium ${isUrgent ? "text-red-600" : "text-amber-600"}`}>
+                    <Clock className="h-3.5 w-3.5" />
+                    {hoursLeft > 0
+                      ? `Tiempo restante: ${hoursLeft} hora${hoursLeft !== 1 ? "s" : ""} — la auditoría será eliminada automáticamente al vencer el plazo`
+                      : "⚠ Plazo vencido — la auditoría será eliminada en breve"}
+                  </div>
+                )}
+              </div>
+              <Button size="sm" className="gap-1.5 shrink-0"
+                onClick={() => {
+                  setPendingFinalize({
+                    hasAB: audit.needs_photo_ab && !audit.photo_ab,
+                    hasTransf: audit.needs_photo_transf && !audit.photo_transf,
+                  });
+                  setPhotoABCapture(null); setPhotoTransfCapture(null);
+                  setPhotoDialog(true);
+                }}>
+                <Camera className="h-4 w-4" /> Tomar fotos
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      })()}
       {isActive && offlineQueue.length > 0 && !syncing && isOnline && (
         <Card className="border-blue-500/30"><CardContent className="p-3 flex items-center gap-3">
           <Cloud className="h-5 w-5 text-blue-500 shrink-0" />

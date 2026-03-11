@@ -621,9 +621,11 @@ ${(a.photo_ab || a.photo_transf) ? `
                         <TableCell>
                           <Badge variant="outline" className={`text-[10px] ${
                             item.status === "completed" ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" :
+                            item.status === "pending_photos" ? "bg-amber-500/15 text-amber-700 border-amber-500/40" :
                             item.status === "cancelada" ? "bg-gray-500/10 text-gray-500 border-gray-400/30" :
                             "bg-blue-500/15 text-blue-600 border-blue-500/30"}`}>
                             {item.status === "completed" ? t("logs.completed") :
+                             item.status === "pending_photos" ? "⏳ PENDIENTE FOTOS" :
                               item.status === "cancelada" ? "Cancelada" : t("dashboard.inProgress")}
                           </Badge>
                         </TableCell>
@@ -672,9 +674,10 @@ ${(a.photo_ab || a.photo_transf) ? `
               <div className="flex items-center gap-3 flex-wrap">
                 <Badge variant="outline" className={`text-xs ${
                   selectedAudit.status === "completed" ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" :
+                  selectedAudit.status === "pending_photos" ? "bg-amber-500/15 text-amber-700 border-amber-500/40" :
                   selectedAudit.status === "cancelada" ? "bg-gray-500/10 text-gray-500 border-gray-400/30" :
                   "bg-blue-500/15 text-blue-600 border-blue-500/30"}`}>
-                  {selectedAudit.status === "completed" ? t("logs.completed") : selectedAudit.status === "cancelada" ? "CANCELADA" : t("dashboard.inProgress")}
+                  {selectedAudit.status === "completed" ? t("logs.completed") : selectedAudit.status === "pending_photos" ? "⏳ PENDIENTE FOTOS" : selectedAudit.status === "cancelada" ? "CANCELADA" : t("dashboard.inProgress")}
                 </Badge>
                 <span className="text-xs text-muted-foreground">Inicio: {fmtDate(selectedAudit.started_at)}</span>
                 {selectedAudit.finished_at && <span className="text-xs text-muted-foreground">Fin: {fmtDate(selectedAudit.finished_at)}</span>}
