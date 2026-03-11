@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useSortable } from "@/hooks/useSortable";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -651,8 +652,13 @@ ${(a.photo_ab || a.photo_transf) ? `
       </Tabs>
 
       {/* ── Audit Summary Dialog ── */}
-      <Dialog open={!!selectedAudit} onOpenChange={(open) => { if (!open) { setSelectedAudit(null); setAuditSummary(null); setAuditSigVerify(null); } }}>
-        <DialogContent className="max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto" data-testid="audit-summary-dialog">
+      <Dialog open={!!selectedAudit} onOpenChange={(open) => { if (!open && !lightbox) { setSelectedAudit(null); setAuditSummary(null); setAuditSigVerify(null); } }}>
+        <DialogContent
+          className="max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto" data-testid="audit-summary-dialog"
+          onInteractOutside={(e) => { if (lightbox) e.preventDefault(); }}
+          onPointerDownOutside={(e) => { if (lightbox) e.preventDefault(); }}
+          onEscapeKeyDown={(e) => { if (lightbox) { e.preventDefault(); setLightbox(null); } }}
+        >
           <DialogHeader>
             <DialogTitle className="font-heading uppercase tracking-tight">{selectedAudit?.tienda}</DialogTitle>
             <DialogDescription>CR: {selectedAudit?.cr_tienda} &middot; {selectedAudit?.plaza} &middot; Auditor: {selectedAudit?.auditor_name}</DialogDescription>
@@ -888,19 +894,19 @@ ${(a.photo_ab || a.photo_transf) ? `
       </Dialog>
 
       {/* Lightbox de fotos */}
-      {lightbox && (
-        <div className="fixed inset-0 z-[200] bg-black/90 flex flex-col items-center justify-center p-4"
+      {lightbox && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/90 flex flex-col items-center justify-center p-4"
           onClick={() => setLightbox(null)}>
           <div className="w-full max-w-4xl flex flex-col gap-3" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <p className="text-white font-semibold text-sm tracking-wide uppercase">{lightbox.title}</p>
               <div className="flex gap-2">
                 <button className="flex items-center gap-1.5 text-xs bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 rounded-md transition"
-                  onClick={() => { const a = document.createElement("a"); a.href = lightbox.src; a.download = lightbox.filename; a.click(); }}>
+                  onClick={(e) => { e.stopPropagation(); const a = document.createElement("a"); a.href = lightbox.src; a.download = lightbox.filename; a.click(); }}>
                   <ImageDown className="h-4 w-4" /> Descargar
                 </button>
                 <button className="flex items-center gap-1.5 text-xs bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 rounded-md transition"
-                  onClick={() => setLightbox(null)}>
+                  onClick={(e) => { e.stopPropagation(); setLightbox(null); }}>
                   <X className="h-4 w-4" /> Cerrar
                 </button>
               </div>
@@ -908,7 +914,8 @@ ${(a.photo_ab || a.photo_transf) ? `
             <img src={lightbox.src} alt={lightbox.title}
               className="w-full max-h-[80vh] object-contain rounded-lg border border-white/20 shadow-2xl"/>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

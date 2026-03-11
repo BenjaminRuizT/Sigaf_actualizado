@@ -341,9 +341,17 @@ export default function AuditPage() {
       const movements = sumRes.data?.movements || [];
       const hasAB = movements.some(m => ["alta","baja","disposal"].includes(m.type));
       const hasTransf = movements.some(m => m.type === "transfer");
-      if (hasAB || hasTransf) {
-        // Solo pedir foto si hay movimientos que documentar
-        setPendingFinalize({ hasAB, hasTransf });
+      // Consultar settings para saber si se debe pedir foto
+      let photoRequiredAB = true, photoRequiredTransf = true;
+      try {
+        const sRes = await api.get("/system-settings/public");
+        photoRequiredAB = sRes.data.photo_required_ab !== false;
+        photoRequiredTransf = sRes.data.photo_required_transf !== false;
+      } catch { /* usar defaults */ }
+      const needsPhoto = (hasAB && photoRequiredAB) || (hasTransf && photoRequiredTransf);
+      if (needsPhoto) {
+        // Solo pedir foto si hay movimientos que documentar Y la config lo requiere
+        setPendingFinalize({ hasAB: hasAB && photoRequiredAB, hasTransf: hasTransf && photoRequiredTransf });
         setPhotoABCapture(null);
         setPhotoTransfCapture(null);
         setPhotoDialog(true);

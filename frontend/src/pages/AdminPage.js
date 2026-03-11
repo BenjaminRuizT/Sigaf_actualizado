@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Users, Monitor, Search, ChevronLeft, ChevronRight, ArrowUpDown, RotateCcw, AlertTriangle, Eye, EyeOff, Download, Upload, FileSpreadsheet, ShieldAlert } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Monitor, Search, ChevronLeft, ChevronRight, ArrowUpDown, RotateCcw, AlertTriangle, Eye, EyeOff, Download, Upload, FileSpreadsheet, ShieldAlert, Settings, Camera } from "lucide-react";
 
 
 export default function AdminPage() {
@@ -36,6 +36,8 @@ export default function AdminPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [mafFile, setMafFile] = useState(null);
   const [usersFile, setUsersFile] = useState(null);
+  const [sysSettings, setSysSettings] = useState({ photo_required_ab: true, photo_required_transf: true });
+  const [sysSettingsSaving, setSysSettingsSaving] = useState(false);
 
   // Unlock requests (Super Admin only)
   const [unlockRequests, setUnlockRequests] = useState([]);
@@ -76,6 +78,20 @@ export default function AdminPage() {
   useEffect(() => { fetchEquipment(); }, [fetchEquipment]);
   useEffect(() => { fetchPlazas(); }, [fetchPlazas]);
   useEffect(() => { fetchUnlockRequests(); }, [fetchUnlockRequests]);
+  useEffect(() => {
+    api.get("/admin/system-settings").then(r => setSysSettings(r.data)).catch(() => {});
+  }, [api]);
+
+  const handleSaveSysSettings = async (newSettings) => {
+    setSysSettingsSaving(true);
+    try {
+      const res = await api.put("/admin/system-settings", newSettings);
+      setSysSettings(res.data);
+      toast.success("Configuración guardada");
+    } catch { toast.error("Error al guardar configuración"); }
+    finally { setSysSettingsSaving(false); }
+  };
+
 
   const handleSaveUser = async () => {
     try {
@@ -192,9 +208,10 @@ export default function AdminPage() {
       )}
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid w-full grid-cols-2" data-testid="admin-tabs">
+        <TabsList className="grid w-full grid-cols-3" data-testid="admin-tabs">
           <TabsTrigger value="users" data-testid="admin-tab-users" className="gap-2"><Users className="h-4 w-4" /> {t("admin.users")}</TabsTrigger>
           <TabsTrigger value="equipment" data-testid="admin-tab-equipment" className="gap-2"><Monitor className="h-4 w-4" /> {t("admin.equipment")}</TabsTrigger>
+          <TabsTrigger value="settings" className="gap-2"><Settings className="h-4 w-4" /> Configuración</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-4">
@@ -265,6 +282,55 @@ export default function AdminPage() {
           )}
         </TabsContent>
       </Tabs>
+
+        {/* Pestaña Configuración */}
+        <TabsContent value="settings" className="space-y-4 mt-4">
+          <Card>
+            <CardContent className="p-5 space-y-5">
+              <div>
+                <p className="font-heading font-bold uppercase tracking-tight text-base flex items-center gap-2">
+                  <Camera className="h-4 w-4 text-primary" /> Fotos al Finalizar Auditoría
+                </p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Controla si se solicita foto del formato físico al finalizar una auditoría con movimientos.
+                </p>
+              </div>
+
+              {/* Toggle AB */}
+              <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                <div className="space-y-0.5">
+                  <p className="font-medium text-sm">Foto Formato ALTAS / BAJAS</p>
+                  <p className="text-xs text-muted-foreground">Se solicita cuando hay equipos dados de alta o de baja en la auditoría</p>
+                </div>
+                <button
+                  onClick={() => handleSaveSysSettings({ ...sysSettings, photo_required_ab: !sysSettings.photo_required_ab })}
+                  disabled={sysSettingsSaving}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${sysSettings.photo_required_ab ? "bg-primary" : "bg-muted-foreground/30"}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${sysSettings.photo_required_ab ? "translate-x-6" : "translate-x-1"}`} />
+                </button>
+              </div>
+
+              {/* Toggle Transferencias */}
+              <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                <div className="space-y-0.5">
+                  <p className="font-medium text-sm">Foto Formato TRANSFERENCIAS</p>
+                  <p className="text-xs text-muted-foreground">Se solicita cuando hay equipos transferidos entre tiendas en la auditoría</p>
+                </div>
+                <button
+                  onClick={() => handleSaveSysSettings({ ...sysSettings, photo_required_transf: !sysSettings.photo_required_transf })}
+                  disabled={sysSettingsSaving}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${sysSettings.photo_required_transf ? "bg-primary" : "bg-muted-foreground/30"}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${sysSettings.photo_required_transf ? "translate-x-6" : "translate-x-1"}`} />
+                </button>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Nota: si no hay movimientos del tipo correspondiente, no se solicitará foto independientemente de esta configuración.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
 
       {/* User Create/Edit Dialog */}
       <Dialog open={!!userDialog} onOpenChange={() => setUserDialog(null)}>
