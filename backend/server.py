@@ -2113,12 +2113,15 @@ async def delete_user(user_id: str, user=Depends(get_current_user)):
 @api_router.get("/equipment/search")
 async def search_equipment_public(
     q: str,
+    limit: int = 50,
     user=Depends(get_current_user)
 ):
     """All profiles: search equipment by barcode, no_activo, serie, descripcion or tienda."""
     q = q.strip()
     if not q or len(q) < 2:
         raise HTTPException(400, "La búsqueda requiere al menos 2 caracteres")
+    # Cap at 2000 to avoid memory issues; 0 = no limit (use 2000 as practical max)
+    effective_limit = max(1, min(limit, 2000)) if limit > 0 else 2000
     query = {"$or": [
         {"codigo_barras": {"$regex": q, "$options": "i"}},
         {"no_activo":     {"$regex": q, "$options": "i"}},
@@ -2127,8 +2130,12 @@ async def search_equipment_public(
         {"tienda":        {"$regex": q, "$options": "i"}},
         {"marca":         {"$regex": q, "$options": "i"}},
     ]}
-    items = await db.equipment.find(query, {"_id": 0}).limit(50).to_list(50)
-    return {"results": [decrypt_equipment(i) for i in items], "total": len(items)}
+    # Fetch one extra to detect if there are more results beyond the limit
+    items = await db.equipment.find(query, {"_id": 0}).limit(effective_limit + 1).to_list(effective_limit + 1)
+    has_more = len(items) > effective_limit
+    if has_more:
+        items = items[:effective_limit]
+    return {"results": [decrypt_equipment(i) for i in items], "total": len(items), "has_more": has_more}
 
 @api_router.get("/admin/equipment")
 async def admin_get_equipment(search: Optional[str] = None, plaza: Optional[str] = None, page: int = 1, limit: int = 50, user=Depends(get_current_user)):
