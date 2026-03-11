@@ -281,10 +281,9 @@ export default function AdminPage() {
             </div>
           )}
         </TabsContent>
-      </Tabs>
 
         {/* Pestaña Configuración */}
-        <TabsContent value="settings" className="space-y-4 mt-4">
+        <TabsContent value="settings" className="space-y-4">
           <Card>
             <CardContent className="p-5 space-y-5">
               <div>
@@ -295,7 +294,6 @@ export default function AdminPage() {
                   Controla si se solicita foto del formato físico al finalizar una auditoría con movimientos.
                 </p>
               </div>
-
               {/* Toggle AB */}
               <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
                 <div className="space-y-0.5">
@@ -309,7 +307,6 @@ export default function AdminPage() {
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${sysSettings.photo_required_ab ? "translate-x-6" : "translate-x-1"}`} />
                 </button>
               </div>
-
               {/* Toggle Transferencias */}
               <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
                 <div className="space-y-0.5">
@@ -323,14 +320,13 @@ export default function AdminPage() {
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${sysSettings.photo_required_transf ? "translate-x-6" : "translate-x-1"}`} />
                 </button>
               </div>
-
               <p className="text-xs text-muted-foreground">
                 Nota: si no hay movimientos del tipo correspondiente, no se solicitará foto independientemente de esta configuración.
               </p>
             </CardContent>
           </Card>
         </TabsContent>
-
+      </Tabs>
 
       {/* User Create/Edit Dialog */}
       <Dialog open={!!userDialog} onOpenChange={() => setUserDialog(null)}>
