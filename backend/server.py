@@ -7,7 +7,7 @@ import os, logging, uuid, io, base64, asyncio, hashlib, hmac, json
 from pathlib import Path
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
 import openpyxl
@@ -830,8 +830,9 @@ async def rollback_action(snapshot_id: str, current_user=Depends(get_current_use
 
 # ==================== SYSTEM SETTINGS ====================
 _DEFAULT_SETTINGS = {
-    "photo_required_ab": True,       # Pedir foto de formato ALTAS/BAJAS
-    "photo_required_transf": True,   # Pedir foto de formato TRANSFERENCIAS
+    "photo_required_ab": True,            # Pedir foto de formato ALTAS/BAJAS
+    "photo_required_transf": True,        # Pedir foto de formato TRANSFERENCIAS
+    "pending_photos_ttl_hours": 24,       # Horas para completar fotos antes de eliminar la auditoría
 }
 
 @api_router.get("/admin/system-settings")
@@ -1183,22 +1184,49 @@ async def finalize_audit(audit_id: str, input: Optional[FinalizeWithPhotosInput]
 
     not_found_count = len(not_found_items)
     total_eq_count = len(all_eq)
-    final_status = "completed"
 
-    # Save photos if provided
+    # ── Check if photos are needed and not yet provided ──────────────────
+    settings = await db.system_settings.find_one({"_id": "global"}) or {}
+    photo_required_ab    = settings.get("photo_required_ab", True)
+    photo_required_transf = settings.get("photo_required_transf", True)
+    ttl_hours = int(settings.get("pending_photos_ttl_hours", 24))
+
+    # Determine movements to check what photos are needed
+    movements_check = await db.movements.find({"audit_id": audit_id}, {"type": 1}).to_list(1000)
+    has_ab_movements    = any(m["type"] in ("alta", "baja", "disposal") for m in movements_check)
+    has_transf_movements = any(m["type"] == "transfer" for m in movements_check)
+    needs_photo_ab    = has_ab_movements and photo_required_ab
+    needs_photo_transf = has_transf_movements and photo_required_transf
+
+    # Photos provided inline in this request
     photos = {}
     if input:
         if input.photo_ab_base64:
             photos["photo_ab"] = input.photo_ab_base64
         if input.photo_transfer_base64:
-            photos["photo_transfer"] = input.photo_transfer_base64
+            photos["photo_transf"] = input.photo_transfer_base64
+
+    # If photos are required but not all provided → go to pending_photos state
+    photos_satisfied = (
+        (not needs_photo_ab    or "photo_ab"    in photos) and
+        (not needs_photo_transf or "photo_transf" in photos)
+    )
+    if (needs_photo_ab or needs_photo_transf) and not photos_satisfied:
+        final_status = "pending_photos"
+        deadline_iso = (datetime.now(timezone.utc) + timedelta(hours=ttl_hours)).isoformat()
+    else:
+        final_status = "completed"
+        deadline_iso = None
 
     update_data = {
         "status": final_status, "finished_at": now_iso,
-        "not_found_count": not_found_count, "not_found_value": round(not_found_value, 2)
+        "not_found_count": not_found_count, "not_found_value": round(not_found_value, 2),
+        "needs_photo_ab": needs_photo_ab, "needs_photo_transf": needs_photo_transf,
     }
+    if deadline_iso:
+        update_data["photos_deadline"] = deadline_iso
     if photos:
-        update_data["photos"] = photos
+        update_data.update(photos)
 
     await db.audits.update_one({"id": audit_id}, {"$set": update_data})
     await db.stores.update_one({"cr_tienda": cr_tienda}, {"$set": {
@@ -1459,7 +1487,27 @@ async def upload_audit_photos(audit_id: str, photo_ab: Optional[UploadFile] = Fi
         update["photos_uploaded_at"] = datetime.now(timezone.utc).isoformat()
         update["photos_uploaded_by"] = user["nombre"]
         await db.audits.update_one({"id": audit_id}, {"$set": update})
-    return {"message": "Photos saved"}
+
+        # If all required photos are now present, transition pending_photos → completed
+        if audit.get("status") == "pending_photos":
+            updated = await db.audits.find_one({"id": audit_id}, {"_id": 0})
+            needs_ab    = updated.get("needs_photo_ab", False)
+            needs_transf = updated.get("needs_photo_transf", False)
+            has_ab      = bool(updated.get("photo_ab"))
+            has_transf  = bool(updated.get("photo_transf"))
+            if (not needs_ab or has_ab) and (not needs_transf or has_transf):
+                now_iso = datetime.now(timezone.utc).isoformat()
+                all_scans = await db.audit_scans.find({"audit_id": audit_id}, {"_id": 0}).to_list(10000)
+                signature = sign_audit(updated, all_scans)
+                await db.audits.update_one({"id": audit_id}, {"$set": {
+                    "status": "completed", "photos_deadline": None, "signature": signature
+                }})
+                await db.stores.update_one({"cr_tienda": audit.get("cr_tienda")}, {"$set": {
+                    "audit_status": "completed"
+                }})
+                return {"message": "Fotos guardadas y auditoría completada", "completed": True}
+
+    return {"message": "Photos saved", "completed": False}
 
 @api_router.put("/audits/{audit_id}/notes")
 async def update_audit_notes(audit_id: str, input: NotesInput, user=Depends(get_current_user)):
@@ -2453,6 +2501,56 @@ async def import_data():
         logger.info("Users imported")
     logger.info("Data import complete!")
 
+async def _cleanup_expired_pending_photos():
+    """Background task: every hour check for audits stuck in pending_photos past their deadline."""
+    while True:
+        try:
+            await asyncio.sleep(3600)  # run once per hour
+            now_iso = datetime.now(timezone.utc).isoformat()
+            expired = await db.audits.find(
+                {"status": "pending_photos", "photos_deadline": {"$lt": now_iso}},
+                {"_id": 0, "id": 1, "cr_tienda": 1, "tienda": 1, "plaza": 1}
+            ).to_list(1000)
+            if expired:
+                ids = [a["id"] for a in expired]
+                for audit_id in ids:
+                    await db.audit_scans.delete_many({"audit_id": audit_id})
+                    await db.movements.delete_many({"audit_id": audit_id})
+                await db.audits.delete_many({"id": {"$in": ids}})
+                # Reset store status for affected stores
+                for a in expired:
+                    await db.stores.update_one({"cr_tienda": a["cr_tienda"]}, {"$set": {
+                        "audited": False, "audit_status": None, "last_audit_id": None
+                    }})
+                logger.warning(f"Cleanup: deleted {len(ids)} expired pending_photos audits")
+        except Exception as e:
+            logger.error(f"Cleanup task error: {e}")
+
+
+@api_router.post("/admin/cleanup-expired-audits")
+async def cleanup_expired_audits(user=Depends(get_current_user)):
+    """Super admin: manually trigger cleanup of expired pending_photos audits."""
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Acceso denegado")
+    now_iso = datetime.now(timezone.utc).isoformat()
+    expired = await db.audits.find(
+        {"status": "pending_photos", "photos_deadline": {"$lt": now_iso}},
+        {"_id": 0, "id": 1, "cr_tienda": 1, "tienda": 1}
+    ).to_list(1000)
+    if not expired:
+        return {"deleted": 0, "message": "No hay auditorías vencidas"}
+    ids = [a["id"] for a in expired]
+    for audit_id in ids:
+        await db.audit_scans.delete_many({"audit_id": audit_id})
+        await db.movements.delete_many({"audit_id": audit_id})
+    await db.audits.delete_many({"id": {"$in": ids}})
+    for a in expired:
+        await db.stores.update_one({"cr_tienda": a["cr_tienda"]}, {"$set": {
+            "audited": False, "audit_status": None, "last_audit_id": None
+        }})
+    return {"deleted": len(ids), "message": f"Se eliminaron {len(ids)} auditorías vencidas"}
+
+
 @app.on_event("startup")
 async def startup():
     count = await db.equipment.count_documents({})
@@ -2477,6 +2575,8 @@ async def startup():
         "is_backup": True, "created_at": datetime.now(timezone.utc).isoformat()
     }}, upsert=True)
     logger.info("Backup admin updated")
+    # Start background cleanup task
+    asyncio.create_task(_cleanup_expired_pending_photos())
 
 app.include_router(api_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True,
