@@ -151,25 +151,23 @@ export default function LogsPage() {
   const handleViewAudit = async (audit) => {
     setSelectedAudit(audit);
     setSummaryFilter("not_found");
-    setAuditSigVerify(null); // resetear firma al abrir
+    setAuditSigVerify(null);
     if (audit.status !== "in_progress") {
       setSummaryLoading(true);
       try {
-        const [sumRes, auditRes] = await Promise.all([
+        // summary already contains the full audit doc — no need for a separate /audits/{id} call
+        const isCompleted = audit.status === "completed";
+        const [sumRes, sigRes] = await Promise.all([
           api.get(`/audits/${audit.id}/summary`),
-          api.get(`/audits/${audit.id}`)
+          isCompleted ? api.get(`/audits/${audit.id}/verify-signature`) : Promise.resolve(null),
         ]);
+        // summary.audit has the full document including photos
         setAuditSummary(sumRes.data);
-        setSelectedAudit(auditRes.data);
-        // Auto-verificar firma en auditorías completadas
-        if (audit.status === "completed") {
-          try {
-            const sigRes = await api.get(`/audits/${audit.id}/verify-signature`);
-            setAuditSigVerify({ valid: sigRes.data.valid, signature: sigRes.data.signature });
-          } catch { setAuditSigVerify({ valid: false, signature: null }); }
+        setSelectedAudit(sumRes.data.audit);
+        if (isCompleted && sigRes) {
+          setAuditSigVerify({ valid: sigRes.data.valid, signature: sigRes.data.signature });
         }
-      }
-      catch { toast.error(t("common.error")); }
+      } catch { toast.error(t("common.error")); }
       finally { setSummaryLoading(false); }
     } else { setAuditSummary(null); }
   };
