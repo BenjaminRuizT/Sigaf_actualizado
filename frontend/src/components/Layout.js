@@ -8,18 +8,19 @@ import { LayoutDashboard, ClipboardList, Shield, Settings, LogOut, Menu, Sun, Mo
 import { useState, useEffect, useRef } from "react";
 
 export default function Layout({ children }) {
-  const { user, logout, api } = useAuth();
+  const { user, logout, closeOtherSessions, api } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { t, language, changeLanguage } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [pendingUnlocks, setPendingUnlocks] = useState(0);
+  const [otherSessions, setOtherSessions] = useState(0);
+  const [closingOthers, setClosingOthers] = useState(false);
 
   const isAdmin = ["Administrador", "Super Administrador"].includes(user?.perfil);
   const isSuperAdmin = user?.perfil === "Super Administrador";
 
-  // Stable refs — avoid polling re-creating intervals on every render
   const apiRef = useRef(api);
   const isSuperAdminRef = useRef(isSuperAdmin);
   apiRef.current = api;
@@ -38,7 +39,38 @@ export default function Layout({ children }) {
     const id = setInterval(poll, 60000);
     return () => { active = false; clearInterval(id); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally empty — uses refs for latest values
+  }, []);
+
+  // Poll for other active sessions (every 2 minutes)
+  useEffect(() => {
+    let active = true;
+    const checkSessions = async () => {
+      try {
+        const res = await apiRef.current.get("/auth/sessions");
+        if (active) {
+          const others = (res.data || []).filter(s => !s.is_current).length;
+          setOtherSessions(others);
+        }
+      } catch { /* silencioso */ }
+    };
+    checkSessions();
+    const id = setInterval(checkSessions, 120000);
+    return () => { active = false; clearInterval(id); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleCloseOtherSessions = async () => {
+    setClosingOthers(true);
+    try {
+      await closeOtherSessions();
+      setOtherSessions(0);
+      const { toast } = await import("sonner");
+      toast.success("Otras sesiones cerradas. Solo queda la sesión actual activa.");
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("No se pudo cerrar las otras sesiones");
+    } finally { setClosingOthers(false); }
+  };
 
   const navItems = [
     { path: "/", icon: LayoutDashboard, label: t("nav.dashboard"), show: true },
@@ -54,7 +86,7 @@ export default function Layout({ children }) {
   ];
 
   const handleNav = (path) => { navigate(path); setOpen(false); };
-  const handleLogout = () => { logout(); navigate("/login"); };
+  const handleLogout = async () => { await logout(); navigate("/login"); };
   const isActive = (path) => location.pathname === path;
 
   const NavContent = () => (
@@ -87,6 +119,19 @@ export default function Layout({ children }) {
             "bg-amber-500/15 text-amber-600"
           }`}>{user?.perfil}</span>
         </div>
+        {otherSessions > 0 && (
+          <div className="mx-3 mb-1 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
+            <p className="text-xs text-amber-700 font-medium leading-tight">
+              ⚠ {otherSessions === 1 ? "1 sesión activa" : `${otherSessions} sesiones activas`} en otro{otherSessions > 1 ? "s" : ""} dispositivo{otherSessions > 1 ? "s" : ""}
+            </p>
+            <button
+              onClick={handleCloseOtherSessions}
+              disabled={closingOthers}
+              className="mt-1.5 text-[11px] text-amber-700 underline underline-offset-2 hover:text-amber-900 transition disabled:opacity-50">
+              {closingOthers ? "Cerrando..." : "Cerrar otras sesiones"}
+            </button>
+          </div>
+        )}
         <button onClick={handleLogout} data-testid="nav-logout"
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
           <LogOut className="h-4 w-4" /> {t("nav.logout")}
@@ -121,8 +166,11 @@ export default function Layout({ children }) {
             <Button variant="ghost" size="icon" onClick={toggleTheme} data-testid="theme-toggle-mobile">
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => changeLanguage(language === "es" ? "en" : "es")} data-testid="lang-toggle-mobile">
+            <Button variant="ghost" size="sm" className="gap-1.5 px-2 font-medium text-xs"
+              onClick={() => changeLanguage(language === "es" ? "en" : language === "en" ? "pt" : "es")}
+              data-testid="lang-toggle-mobile">
               <Globe className="h-4 w-4" />
+              {language === "es" ? "ES" : language === "en" ? "EN" : "PT"}
             </Button>
           </div>
         </header>
@@ -136,8 +184,11 @@ export default function Layout({ children }) {
             <Button variant="ghost" size="icon" onClick={toggleTheme} data-testid="theme-toggle-desktop">
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => changeLanguage(language === "es" ? "en" : "es")} data-testid="lang-toggle-desktop">
+            <Button variant="ghost" size="sm" className="gap-1.5 px-2 font-medium text-xs"
+              onClick={() => changeLanguage(language === "es" ? "en" : language === "en" ? "pt" : "es")}
+              data-testid="lang-toggle-desktop">
               <Globe className="h-4 w-4" />
+              {language === "es" ? "ES" : language === "en" ? "EN" : "PT"}
             </Button>
           </div>
         </header>
