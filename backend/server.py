@@ -1225,7 +1225,10 @@ async def finalize_audit(audit_id: str, input: Optional[FinalizeWithPhotosInput]
 @api_router.get("/audits/{audit_id}/verify-signature")
 async def verify_audit_sig(audit_id: str, user=Depends(get_current_user)):
     """Verify the HMAC-SHA256 digital signature of a finalized audit."""
-    audit = await db.audits.find_one({"id": audit_id}, {"_id": 0})
+    audit, scans = await asyncio.gather(
+        db.audits.find_one({"id": audit_id}, {"_id": 0}),
+        db.audit_scans.find({"audit_id": audit_id}, {"_id": 0}).to_list(10000),
+    )
     if not audit:
         raise HTTPException(404, "Auditoría no encontrada")
     if audit.get("status") == "in_progress":
@@ -1234,7 +1237,6 @@ async def verify_audit_sig(audit_id: str, user=Depends(get_current_user)):
         await sec_log(SecEvent.SIGNATURE_INVALID, actor_email=user["email"], actor_id=user["sub"],
                       target=audit_id, detail={"reason": "no_signature"})
         return {"valid": False, "reason": "Auditoría sin firma digital (fue finalizada antes de esta función)"}
-    scans = await db.audit_scans.find({"audit_id": audit_id}, {"_id": 0}).to_list(10000)
     valid = verify_audit_signature(audit, scans)
     event = SecEvent.SIGNATURE_VALID if valid else SecEvent.SIGNATURE_INVALID
     await sec_log(event, actor_email=user["email"], actor_id=user["sub"],
@@ -1364,16 +1366,19 @@ async def register_unknown_surplus(audit_id: str, input: UnknownSurplusInput, us
 
 @api_router.get("/audits/{audit_id}/summary")
 async def get_audit_summary(audit_id: str, user=Depends(get_current_user)):
-    audit = await db.audits.find_one({"id": audit_id}, {"_id": 0})
+    # Fetch audit + scans + movements in parallel
+    audit, scans, movements = await asyncio.gather(
+        db.audits.find_one({"id": audit_id}, {"_id": 0}),
+        db.audit_scans.find({"audit_id": audit_id}, {"_id": 0}).to_list(10000),
+        db.movements.find({"audit_id": audit_id}, {"_id": 0}).to_list(1000),
+    )
     if not audit:
         raise HTTPException(404, "Audit not found")
-    scans = await db.audit_scans.find({"audit_id": audit_id}, {"_id": 0}).to_list(10000)
-    movements = await db.movements.find({"audit_id": audit_id}, {"_id": 0}).to_list(1000)
-    located = [s for s in scans if s["classification"] == "localizado"]
-    surplus = [s for s in scans if s["classification"] in ("sobrante", "sobrante_desconocido")]
-    not_found = [s for s in scans if s["classification"] == "no_localizado"]
-    nf_value = sum((s.get("equipment_data") or {}).get("valor_real", 0) for s in not_found)
-    nf_dep = len([s for s in not_found if (s.get("equipment_data") or {}).get("depreciado", False)])
+    located    = [s for s in scans if s["classification"] == "localizado"]
+    surplus    = [s for s in scans if s["classification"] in ("sobrante", "sobrante_desconocido")]
+    not_found  = [s for s in scans if s["classification"] == "no_localizado"]
+    nf_value   = sum((s.get("equipment_data") or {}).get("valor_real", 0) for s in not_found)
+    nf_dep     = len([s for s in not_found if (s.get("equipment_data") or {}).get("depreciado", False)])
     return {
         "audit": audit, "located": located, "surplus": surplus, "not_found": not_found, "movements": movements,
         "stats": {"total_equipment": audit.get("total_equipment", 0), "located_count": len(located),
@@ -1569,8 +1574,14 @@ async def get_audit_logs(status: Optional[str] = None, search: Optional[str] = N
             {"cr_tienda": {"$regex": search, "$options": "i"}},
         ]
     skip = (page - 1) * limit
-    total = await db.audits.count_documents(query)
-    items = await db.audits.find(query, {"_id": 0}).sort("started_at", -1).skip(skip).limit(limit).to_list(limit)
+    # Projection: exclude heavy base64 photo fields and raw scans — not needed for the list view
+    _AUDIT_LIST_PROJECTION = {
+        "_id": 0, "photo_ab": 0, "photo_transf": 0,
+    }
+    total, items = await asyncio.gather(
+        db.audits.count_documents(query),
+        db.audits.find(query, _AUDIT_LIST_PROJECTION).sort("started_at", -1).skip(skip).limit(limit).to_list(limit)
+    )
     return {"items": items, "total": total, "page": page, "pages": max(1, (total + limit - 1) // limit)}
 
 # ==================== PDF DOWNLOADS ====================
@@ -2385,6 +2396,9 @@ async def import_data():
     await db.audit_scans.create_index([("audit_id", 1), ("classification", 1)]) # summary by class
     await db.audits.create_index([("status", 1), ("started_at", -1)])           # audit logs
     await db.audits.create_index([("plaza", 1), ("status", 1)])                 # dashboard plaza filter
+    await db.audits.create_index([("started_at", -1)])                          # default sort for list
+    await db.audit_scans.create_index([("audit_id", 1), ("scanned_at", -1)])   # summary sort
+    await db.movements.create_index([("audit_id", 1), ("created_at", -1)])      # movements by audit sorted
     await db.security_logs.create_index([("ts", -1)])                           # security log queries
     await db.security_logs.create_index([("level", 1), ("ts", -1)])             # filter by severity
     await db.security_logs.create_index([("actor_email", 1), ("ts", -1)])       # filter by user
