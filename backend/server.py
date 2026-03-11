@@ -696,6 +696,44 @@ async def rollback_action(snapshot_id: str, current_user=Depends(get_current_use
     }})
     return {"message": result_msg, "snapshot_id": snapshot_id}
 
+# ==================== SYSTEM SETTINGS ====================
+_DEFAULT_SETTINGS = {
+    "photo_required_ab": True,       # Pedir foto de formato ALTAS/BAJAS
+    "photo_required_transf": True,   # Pedir foto de formato TRANSFERENCIAS
+}
+
+@api_router.get("/admin/system-settings")
+async def get_system_settings(user=Depends(get_current_user)):
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Acceso denegado")
+    doc = await db.system_settings.find_one({"_id": "global"})
+    if not doc:
+        return _DEFAULT_SETTINGS.copy()
+    return {k: doc.get(k, v) for k, v in _DEFAULT_SETTINGS.items()}
+
+@api_router.put("/admin/system-settings")
+async def update_system_settings(settings: dict, user=Depends(get_current_user)):
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Acceso denegado")
+    # Only allow known keys
+    update = {k: bool(settings[k]) for k in _DEFAULT_SETTINGS if k in settings}
+    if not update:
+        raise HTTPException(400, "Sin campos válidos")
+    await db.system_settings.update_one(
+        {"_id": "global"}, {"$set": update}, upsert=True
+    )
+    await save_history("UPDATE_SETTINGS", user["email"], user["sub"],
+                       None, "Configuración del sistema", None, update)
+    return {k: update.get(k, v) for k, v in _DEFAULT_SETTINGS.items()}
+
+@api_router.get("/system-settings/public")
+async def get_public_settings(user=Depends(get_current_user)):
+    """All profiles: get settings needed for audit flow."""
+    doc = await db.system_settings.find_one({"_id": "global"})
+    if not doc:
+        return _DEFAULT_SETTINGS.copy()
+    return {k: doc.get(k, v) for k, v in _DEFAULT_SETTINGS.items()}
+
 
 @api_router.get("/auth/me")
 async def get_me(user=Depends(get_current_user)):
