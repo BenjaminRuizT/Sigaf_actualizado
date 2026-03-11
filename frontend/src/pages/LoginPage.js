@@ -111,6 +111,30 @@ export default function LoginPage() {
   // ── Vista: conflicto de sesión ──────────────────────────────────────────────
   if (sessionConflict) {
     const fmtDate = (iso) => iso ? new Date(iso).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }) : "—";
+    const timeAgo = (iso) => {
+      if (!iso) return "";
+      const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+      if (diff < 60) return `hace ${diff}s`;
+      if (diff < 3600) return `hace ${Math.floor(diff/60)} min`;
+      if (diff < 86400) return `hace ${Math.floor(diff/3600)} h`;
+      return `hace ${Math.floor(diff/86400)} días`;
+    };
+    const parseDevice = (ua = "") => {
+      if (!ua) return { device: "Dispositivo desconocido", browser: "" };
+      const ua_low = ua.toLowerCase();
+      let device = "Computadora";
+      if (/android/.test(ua_low)) device = "Android";
+      else if (/iphone|ipad/.test(ua_low)) device = "iPhone / iPad";
+      else if (/windows/.test(ua_low)) device = "Windows";
+      else if (/mac os/.test(ua_low)) device = "Mac";
+      else if (/linux/.test(ua_low)) device = "Linux";
+      let browser = "";
+      if (/edg\//.test(ua_low)) browser = "Edge";
+      else if (/chrome/.test(ua_low)) browser = "Chrome";
+      else if (/firefox/.test(ua_low)) browser = "Firefox";
+      else if (/safari/.test(ua_low)) browser = "Safari";
+      return { device, browser };
+    };
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-background">
         <div className="w-full max-w-md animate-slide-up">
@@ -130,16 +154,36 @@ export default function LoginPage() {
             <CardContent className="space-y-4">
               {/* Detalle de sesiones activas */}
               <div className="space-y-2">
-                {sessionConflict.sessions.map((s, i) => (
-                  <div key={s.id} className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/8 border border-amber-500/20">
-                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium">Sesión {i + 1}</p>
-                      <p className="text-xs text-muted-foreground">Iniciada: {fmtDate(s.created_at)}</p>
-                      <p className="text-xs text-muted-foreground">Último acceso: {fmtDate(s.last_seen)}</p>
+                {sessionConflict.sessions.map((s, i) => {
+                  const { device, browser } = parseDevice(s.user_agent);
+                  return (
+                    <div key={s.id} className="p-3 rounded-lg bg-amber-500/8 border border-amber-500/20 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                        <span className="text-xs font-semibold">Sesión {sessionConflict.sessions.length > 1 ? i + 1 : "activa"}</span>
+                        <span className="ml-auto text-[10px] text-amber-600 font-medium bg-amber-500/10 px-1.5 py-0.5 rounded">EN LÍNEA</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1 pl-4">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Dispositivo</p>
+                          <p className="text-xs font-medium">{device}{browser ? ` · ${browser}` : ""}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Dirección IP</p>
+                          <p className="text-xs font-mono font-medium">{s.ip || "desconocida"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Iniciada</p>
+                          <p className="text-xs">{fmtDate(s.created_at)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Último acceso</p>
+                          <p className="text-xs">{fmtDate(s.last_seen)} <span className="text-muted-foreground">({timeAgo(s.last_seen)})</span></p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <p className="text-xs text-muted-foreground">
                 Si cierras {sessionConflict.sessions.length === 1 ? "la sesión activa" : "las sesiones activas"}, el usuario que la tiene abierta perderá el acceso inmediatamente.

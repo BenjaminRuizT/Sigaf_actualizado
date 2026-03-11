@@ -650,7 +650,12 @@ ${(a.photo_ab || a.photo_transf) ? `
       </Tabs>
 
       {/* ── Audit Summary Dialog ── */}
-      <Dialog open={!!selectedAudit} onOpenChange={(open) => { if (!open && !lightbox) { setSelectedAudit(null); setAuditSummary(null); setAuditSigVerify(null); } }}>
+      {/* modal=false when lightbox open — disables Radix focus trap so lightbox buttons work */}
+      <Dialog
+        open={!!selectedAudit}
+        modal={!lightbox}
+        onOpenChange={(open) => { if (!open && !lightbox) { setSelectedAudit(null); setAuditSummary(null); setAuditSigVerify(null); } }}
+      >
         <DialogContent
           className="max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto" data-testid="audit-summary-dialog"
           onInteractOutside={(e) => { if (lightbox) e.preventDefault(); }}
@@ -900,7 +905,7 @@ ${(a.photo_ab || a.photo_transf) ? `
               <p className="text-white font-semibold text-sm tracking-wide uppercase">{lightbox.title}</p>
               <div className="flex gap-2">
                 <button className="flex items-center gap-1.5 text-xs bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 rounded-md transition"
-                  onClick={(e) => { e.stopPropagation(); const a = document.createElement("a"); a.href = lightbox.src; a.download = lightbox.filename; a.click(); }}>
+                  onClick={(e) => { e.stopPropagation(); const a = document.createElement("a"); a.href = lightbox.src; a.download = lightbox.filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); }}>
                   <ImageDown className="h-4 w-4" /> Descargar
                 </button>
                 <button className="flex items-center gap-1.5 text-xs bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 rounded-md transition"
