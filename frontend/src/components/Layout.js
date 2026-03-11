@@ -79,8 +79,7 @@ export default function Layout({ children }) {
     { path: "/admin", icon: Shield, label: t("nav.admin"), show: isSuperAdmin, badge: pendingUnlocks > 0 ? pendingUnlocks : null },
     { path: "/settings", icon: Settings, label: t("nav.settings"), show: true },
     { path: "/deploy", icon: Rocket, label: "Despliegue", show: isSuperAdmin },
-    { path: "/app-logs", icon: Activity, label: "Logs del Sistema", show: isSuperAdmin },
-    { path: "/security-logs", icon: ShieldCheck, label: "Auditoría de Seguridad", show: isSuperAdmin },
+    { path: "/system-logs", icon: Activity, label: "Logs del Sistema", show: isSuperAdmin },
     { path: "/equipment-search", icon: Package, label: "Consultar Equipo", show: true },
     { path: "/admin-history", icon: History, label: "Historial de Cambios", show: isSuperAdmin },
   ];
