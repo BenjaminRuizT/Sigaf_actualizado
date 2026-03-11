@@ -11,7 +11,6 @@ import LogsPage from "@/pages/LogsPage";
 import AdminPage from "@/pages/AdminPage";
 import SystemLogsPage from "@/pages/SystemLogsPage";
 import EquipmentSearchPage from "@/pages/EquipmentSearchPage";
-import AdminHistoryPage from "@/pages/AdminHistoryPage";
 import SettingsPage from "@/pages/SettingsPage";
 import DeployPage from "@/pages/DeployPage";
 import ReportsPage from "@/pages/ReportsPage";
@@ -47,8 +46,8 @@ function AppRoutes() {
       <Route path="/app-logs" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><SystemLogsPage /></Layout></ProtectedRoute>} />
       <Route path="/security-logs" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><SystemLogsPage defaultTab="security" /></Layout></ProtectedRoute>} />
       <Route path="/system-logs" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><SystemLogsPage /></Layout></ProtectedRoute>} />
+      <Route path="/admin-history" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><SystemLogsPage defaultTab="history" /></Layout></ProtectedRoute>} />
       <Route path="/equipment-search" element={<ProtectedRoute><Layout><EquipmentSearchPage /></Layout></ProtectedRoute>} />
-      <Route path="/admin-history" element={<ProtectedRoute requiredProfile="Super Administrador"><Layout><AdminHistoryPage /></Layout></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
