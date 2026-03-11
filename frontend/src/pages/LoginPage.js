@@ -17,7 +17,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { login, token } = useAuth();
+  const { login, loginForce, token } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -28,12 +28,17 @@ export default function LoginPage() {
   const [unlockSent, setUnlockSent] = useState(false);
   const [unlockLoading, setUnlockLoading] = useState(false);
 
+  // Session conflict state
+  const [sessionConflict, setSessionConflict] = useState(null); // { sessions, email, password }
+  const [forceLoading, setForceLoading] = useState(false);
+
   if (token) { navigate("/", { replace: true }); return null; }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setLockedState(null);
+    setSessionConflict(null);
     try {
       await login(email, password);
       toast.success(t("auth.welcome") + "!");
@@ -41,8 +46,15 @@ export default function LoginPage() {
     } catch (err) {
       const status = err?.response?.status;
       const detail = err?.response?.data?.detail;
+      // HTTP 409 = sesión activa detectada
+      if (status === 409 && typeof detail === "object" && detail?.code === "SESSION_CONFLICT") {
+        setSessionConflict({
+          sessions: detail.active_sessions || [],
+          email,
+          password,
+        });
       // HTTP 403 with code=ACCOUNT_LOCKED means the account is blocked
-      if (status === 403 && typeof detail === "object" && detail?.code === "ACCOUNT_LOCKED") {
+      } else if (status === 403 && typeof detail === "object" && detail?.code === "ACCOUNT_LOCKED") {
         setLockedState({
           userId: detail.user_id,
           email: detail.email || email,
@@ -79,6 +91,77 @@ export default function LoginPage() {
       setUnlockLoading(false);
     }
   };
+
+  const handleForceLogin = async () => {
+    if (!sessionConflict) return;
+    setForceLoading(true);
+    try {
+      await loginForce(sessionConflict.email, sessionConflict.password);
+      toast.success(t("auth.welcome") + "!");
+      navigate("/");
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      toast.error(typeof detail === "string" ? detail : "Error al iniciar sesión");
+      setSessionConflict(null);
+    } finally {
+      setForceLoading(false);
+    }
+  };
+
+  // ── Vista: conflicto de sesión ──────────────────────────────────────────────
+  if (sessionConflict) {
+    const fmtDate = (iso) => iso ? new Date(iso).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }) : "—";
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+        <div className="w-full max-w-md animate-slide-up">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 bg-amber-500/10">
+              <ShieldAlert className="h-8 w-8 text-amber-500" />
+            </div>
+            <h1 className="font-heading text-3xl font-bold uppercase tracking-tight">SIGAF</h1>
+          </div>
+          <Card className="border-amber-500/30 shadow-lg">
+            <CardHeader className="pb-2">
+              <h2 className="font-heading font-bold uppercase tracking-tight text-amber-600 text-lg">Sesión activa detectada</h2>
+              <p className="text-sm text-muted-foreground">
+                Ya existe {sessionConflict.sessions.length === 1 ? "una sesión activa" : `${sessionConflict.sessions.length} sesiones activas`} con este usuario. Solo se permite una sesión simultánea.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Detalle de sesiones activas */}
+              <div className="space-y-2">
+                {sessionConflict.sessions.map((s, i) => (
+                  <div key={s.id} className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/8 border border-amber-500/20">
+                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium">Sesión {i + 1}</p>
+                      <p className="text-xs text-muted-foreground">Iniciada: {fmtDate(s.created_at)}</p>
+                      <p className="text-xs text-muted-foreground">Último acceso: {fmtDate(s.last_seen)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Si cierras {sessionConflict.sessions.length === 1 ? "la sesión activa" : "las sesiones activas"}, el usuario que la tiene abierta perderá el acceso inmediatamente.
+              </p>
+              {/* Acciones */}
+              <div className="space-y-2 pt-1">
+                <Button className="w-full gap-2" onClick={handleForceLogin} disabled={forceLoading}>
+                  {forceLoading
+                    ? <div className="h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                    : <Lock className="h-4 w-4" />}
+                  Cerrar sesión{sessionConflict.sessions.length > 1 ? "es" : ""} activa{sessionConflict.sessions.length > 1 ? "s" : ""} e iniciar
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => setSessionConflict(null)}>
+                  Cancelar — regresar al inicio de sesión
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (lockedState) {
     return (
