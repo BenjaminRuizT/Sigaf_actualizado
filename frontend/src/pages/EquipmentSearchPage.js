@@ -17,6 +17,8 @@ export default function EquipmentSearchPage() {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
   const [history, setHistory] = useState([]); // [{ q, found, ts }]
+  const [limit, setLimit] = useState(50);
+  const [hasMore, setHasMore] = useState(false);
   const inputRef = useRef(null);
 
   const handleSearch = async (q = query) => {
@@ -25,9 +27,10 @@ export default function EquipmentSearchPage() {
     setLoading(true);
     setSelected(null);
     try {
-      const res = await api.get("/equipment/search", { params: { q: trimmed } });
+      const res = await api.get("/equipment/search", { params: { q: trimmed, limit } });
       const found = (res.data.results || []).length > 0;
       setResults(res.data.results || []);
+      setHasMore(res.data.has_more || false);
       // Agregar al historial de búsquedas
       setHistory(prev => [{ q: trimmed, found, count: res.data.results?.length || 0, ts: new Date() }, ...prev.slice(0, 19)]);
     } catch (err) {
@@ -77,6 +80,19 @@ export default function EquipmentSearchPage() {
                 autoFocus
               />
             </div>
+            {/* Selector de límite */}
+            <select
+              value={limit}
+              onChange={e => setLimit(Number(e.target.value))}
+              className="h-11 px-3 rounded-md border border-input bg-background text-sm font-medium min-w-[80px]"
+              title="Máximo de resultados"
+            >
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={200}>200</option>
+              <option value={500}>500</option>
+              <option value={0}>Todos</option>
+            </select>
             <Button onClick={() => handleSearch()} disabled={loading} className="h-11 px-6 gap-2">
               {loading
                 ? <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -114,6 +130,11 @@ export default function EquipmentSearchPage() {
             <p className="text-sm text-muted-foreground font-medium">
               {results.length === 0 ? "Sin resultados" : `${results.length} equipo${results.length !== 1 ? "s" : ""} encontrado${results.length !== 1 ? "s" : ""}`}
             </p>
+            {hasMore && (
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25">
+                <span className="text-xs text-amber-700 font-medium">⚠ Existen más equipos que no se muestran. Aumenta el límite de resultados en el selector o elige <strong>Todos</strong>.</span>
+              </div>
+            )}
             {results.length === 0 ? (
               <Card><CardContent className="p-8 text-center space-y-2">
                 <Package className="h-10 w-10 text-muted-foreground/30 mx-auto" />

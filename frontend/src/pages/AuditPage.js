@@ -144,10 +144,50 @@ export default function AuditPage() {
 
   // Unknown surplus
   const [unknownSurplusDialog, setUnknownSurplusDialog] = useState(null);
-  const [unknownForm, setUnknownForm] = useState({ codigo_barras: "", descripcion: "", marca: "", modelo: "", serie: "" });
+  const [unknownForm, setUnknownForm] = useState({ codigo_barras: "", descripcion: "", descripcion_otro: "", marca: "", marca_otro: "", modelo: "", serie: "" });
   const [savingUnknown, setSavingUnknown] = useState(false);
-  const unknownDescOptions = ["COMPUTADORA","LAPTOP","IMPRESORA","MONITOR","SERVIDOR","SWITCH","ROUTER","UPS","SCANNER","TABLET","PROYECTOR","TELEFONO IP","CAMARA","DVR/NVR","DISCO DURO EXTERNO","ACCESS POINT","IMPRESORA FISCAL","TECLADO/MOUSE","OTRO"];
-  const unknownMarcaOptions = ["EPSON","HP","DELL","LENOVO","ACER","ASUS","SAMSUNG","LG","CISCO","BROTHER","CANON","ZEBRA","HONEYWELL","APC","TOSHIBA","APPLE","HUAWEI","OTRO"];
+  // ── Catálogo de sobrante desconocido ─────────────────────────────────────
+  // Descripciones ordenadas alfabéticamente (revisión MAF OXXO completa)
+  const unknownDescOptions = [
+    "ACCESS POINT","CAMARA CCTV","COMPUTADORA","COMPUTADORA ALL IN ONE",
+    "DISCO DURO EXTERNO","DVR/NVR","IMPRESORA","IMPRESORA FISCAL",
+    "LAPTOP","LECTOR DE CODIGO DE BARRAS","MONITOR","NOBREAK / UPS",
+    "PROYECTOR","PUNTO DE VENTA","ROUTER","SCANNER / ESCANER",
+    "SERVIDOR","SWITCH","TABLET","TECLADO / MOUSE","TELEFONO IP",
+    "TERMINAL BANCARIA","OTRO"
+  ];
+
+  // Marcas filtradas según la descripción seleccionada
+  const MARCA_BY_DESC = {
+    "ACCESS POINT":              ["ARUBA","CISCO","D-LINK","HUAWEI","MERAKI","TP-LINK","UBIQUITI","OTRO"],
+    "CAMARA CCTV":               ["AXIS","BOSCH","DAHUA","HANWHA","HIKVISION","REOLINK","VERKADA","OTRO"],
+    "COMPUTADORA":               ["ACER","APPLE","ASUS","DELL","HP","LENOVO","OTRO"],
+    "COMPUTADORA ALL IN ONE":    ["ACER","APPLE","ASUS","DELL","HP","LENOVO","OTRO"],
+    "DISCO DURO EXTERNO":        ["SAMSUNG","SEAGATE","TOSHIBA","WD","OTRO"],
+    "DVR/NVR":                   ["AXIS","BOSCH","DAHUA","HIKVISION","OTRO"],
+    "IMPRESORA":                 ["BROTHER","CANON","EPSON","HP","LEXMARK","OTRO"],
+    "IMPRESORA FISCAL":          ["BIXOLON","EPSON","SAM4S","STAR","OTRO"],
+    "LAPTOP":                    ["ACER","APPLE","ASUS","DELL","HP","LENOVO","OTRO"],
+    "LECTOR DE CODIGO DE BARRAS":["DATALOGIC","HONEYWELL","REASA","ZEBRA","OTRO"],
+    "MONITOR":                   ["ACER","DELL","HP","LG","SAMSUNG","OTRO"],
+    "NOBREAK / UPS":             ["APC","BELKIN","CPS","EATON","KOBLENZ","TRIPP LITE","OTRO"],
+    "PROYECTOR":                 ["BENQ","CANON","EPSON","LG","OPTOMA","SONY","OTRO"],
+    "PUNTO DE VENTA":            ["HP","INGENICO","NEWLAND","PAX","REASA","VERIFONE","ZEBRA","OTRO"],
+    "ROUTER":                    ["CISCO","MERAKI","OTRO"],
+    "SCANNER / ESCANER":         ["BROTHER","CANON","EPSON","FUJITSU","HP","REASA","ZEBRA","OTRO"],
+    "SERVIDOR":                  ["CISCO","DELL","HP","IBM","LENOVO","OTRO"],
+    "SWITCH":                    ["CISCO","D-LINK","HP","MERAKI","TP-LINK","OTRO"],
+    "TABLET":                    ["APPLE","HONEYWELL","HUAWEI","LENOVO","SAMSUNG","ZEBRA","OTRO"],
+    "TECLADO / MOUSE":           ["HP","DELL","LOGITECH","MICROSOFT","OTRO"],
+    "TELEFONO IP":               ["CISCO","FANVIL","GRANDSTREAM","POLY","YEALINK","OTRO"],
+    "TERMINAL BANCARIA":         ["INGENICO","NEWLAND","PAX","VERIFONE","OTRO"],
+    "OTRO":                      ["AXIS","BOSCH","BROTHER","CANON","CISCO","DELL","EPSON","HP","HONEYWELL","HUAWEI","LENOVO","LG","MERAKI","REASA","SAMSUNG","ZEBRA","OTRO"],
+  };
+  const unknownMarcaOptions = MARCA_BY_DESC[unknownForm.descripcion] || [
+    "ACER","APC","APPLE","ASUS","AXIS","BOSCH","BROTHER","CANON","CISCO",
+    "DELL","EPSON","HONEYWELL","HP","HUAWEI","LENOVO","LG","MERAKI",
+    "REASA","SAMSUNG","TOSHIBA","ZEBRA","OTRO"
+  ];
 
   // Photo state — camera only, required when there are movements
   const [photoDialog, setPhotoDialog] = useState(false);
@@ -285,12 +325,22 @@ export default function AuditPage() {
   };
 
   const handleRegisterUnknown = async () => {
-    if (!unknownForm.descripcion || !unknownForm.marca || !unknownForm.modelo) {
+    const desc = unknownForm.descripcion === "OTRO" ? unknownForm.descripcion_otro.trim() : unknownForm.descripcion;
+    const marca = unknownForm.marca === "OTRO" ? unknownForm.marca_otro.trim() : unknownForm.marca;
+    if (!desc || !marca || !unknownForm.modelo) {
       toast.error("Completa todos los campos obligatorios"); return;
     }
+    if (unknownForm.descripcion === "OTRO" && !unknownForm.descripcion_otro.trim()) {
+      toast.error("Escribe la descripción del equipo"); return;
+    }
+    if (unknownForm.marca === "OTRO" && !unknownForm.marca_otro.trim()) {
+      toast.error("Escribe el nombre de la marca"); return;
+    }
     setSavingUnknown(true);
+    const payload = { ...unknownForm, descripcion: desc, marca };
+    delete payload.descripcion_otro; delete payload.marca_otro;
     try {
-      const res = await api.post(`/audits/${auditId}/register-unknown-surplus`, { ...unknownForm });
+      const res = await api.post(`/audits/${auditId}/register-unknown-surplus`, payload);
       const { equipment, movement } = res.data;
       // Update scan in local state — match by barcode only (classification may vary)
       setScans(prev => prev.map(s =>
@@ -300,7 +350,7 @@ export default function AuditPage() {
       ));
       toast.success(`Equipo registrado: ${equipment.descripcion} · ${equipment.marca} ${equipment.modelo}`);
       setUnknownSurplusDialog(null);
-      setUnknownForm({ codigo_barras: "", descripcion: "", marca: "", modelo: "", serie: "" });
+      setUnknownForm({ codigo_barras: "", descripcion: "", descripcion_otro: "", marca: "", marca_otro: "", modelo: "", serie: "" });
     } catch (err) {
       // Handle FastAPI validation errors (array) and string errors
       const detail = err.response?.data?.detail;
@@ -864,20 +914,46 @@ export default function AuditPage() {
               <p className="text-xs text-muted-foreground uppercase mb-0.5">Código de barras detectado</p>
               <p className="font-mono text-sm font-bold text-orange-600">{unknownForm.codigo_barras}</p>
             </div>
+            {/* Código de barras (editable por si el escáner leyó mal) */}
             <div className="space-y-1.5"><Label>Código de barras <span className="text-red-500">*</span></Label>
               <Input value={unknownForm.codigo_barras} onChange={e=>setUnknownForm(f=>({...f,codigo_barras:e.target.value}))} placeholder="Código de barras"/>
             </div>
+            {/* Descripción — ordenada alfabéticamente + OTRO con input manual */}
             <div className="space-y-1.5"><Label>Descripción del equipo <span className="text-red-500">*</span></Label>
-              <Select value={unknownForm.descripcion} onValueChange={v=>setUnknownForm(f=>({...f,descripcion:v}))}>
+              <Select value={unknownForm.descripcion}
+                onValueChange={v => setUnknownForm(f => ({ ...f, descripcion: v, marca: "", marca_otro: "" }))}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar tipo de equipo..."/></SelectTrigger>
-                <SelectContent>{unknownDescOptions.map(d=><SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {unknownDescOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
               </Select>
+              {unknownForm.descripcion === "OTRO" && (
+                <Input
+                  className="mt-1.5"
+                  value={unknownForm.descripcion_otro}
+                  onChange={e => setUnknownForm(f => ({ ...f, descripcion_otro: e.target.value }))}
+                  placeholder="Escribe la descripción del equipo..."
+                  autoFocus
+                />
+              )}
             </div>
+            {/* Marca — filtrada según descripción seleccionada + OTRO con input manual */}
             <div className="space-y-1.5"><Label>Marca <span className="text-red-500">*</span></Label>
-              <Select value={unknownForm.marca} onValueChange={v=>setUnknownForm(f=>({...f,marca:v}))}>
+              <Select value={unknownForm.marca}
+                onValueChange={v => setUnknownForm(f => ({ ...f, marca: v, marca_otro: "" }))}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar marca..."/></SelectTrigger>
-                <SelectContent>{unknownMarcaOptions.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {unknownMarcaOptions.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
               </Select>
+              {unknownForm.marca === "OTRO" && (
+                <Input
+                  className="mt-1.5"
+                  value={unknownForm.marca_otro}
+                  onChange={e => setUnknownForm(f => ({ ...f, marca_otro: e.target.value }))}
+                  placeholder="Escribe el nombre de la marca..."
+                />
+              )}
             </div>
             <div className="space-y-1.5"><Label>Modelo <span className="text-red-500">*</span></Label>
               <Input value={unknownForm.modelo} onChange={e=>setUnknownForm(f=>({...f,modelo:e.target.value}))} placeholder="Ej. FX890II, LaserJet Pro..."/>
