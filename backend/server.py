@@ -365,10 +365,11 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
-def create_token(user_id: str, email: str, perfil: str, nombre: str) -> str:
+def create_token(user_id: str, email: str, perfil: str, nombre: str, session_id: str = "") -> str:
     from datetime import timedelta
     expire = datetime.now(timezone.utc) + timedelta(hours=24)
-    return jwt.encode({"sub": user_id, "email": email, "perfil": perfil, "nombre": nombre, "exp": expire}, SECRET_KEY, algorithm="HS256")
+    return jwt.encode({"sub": user_id, "email": email, "perfil": perfil, "nombre": nombre,
+                       "sid": session_id, "exp": expire}, SECRET_KEY, algorithm="HS256")
 
 # ==================== ACCOUNT LOCKOUT CONSTANTS ====================
 _LOGIN_MAX_ATTEMPTS = 5     # consecutive failures before lock
@@ -387,7 +388,7 @@ def _seconds_since_iso(iso_str: str) -> float:
         return 0.0
 
 async def get_current_user(authorization: Optional[str] = Header(None)):
-    """Decode JWT and verify account is not locked. Raises 401 on any failure."""
+    """Decode JWT, verify account is not locked, and verify session is still active."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Not authenticated")
     try:
@@ -398,13 +399,11 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         raise HTTPException(401, "Invalid token")
 
     # Verify account lock status on every authenticated request
-    # This ensures that locking a user also invalidates their active sessions
     user_doc = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "locked": 1, "locked_at": 1})
     if user_doc and user_doc.get("locked"):
         locked_at_str = user_doc.get("locked_at") or ""
         elapsed = _seconds_since_iso(locked_at_str) if locked_at_str else _LOGIN_LOCK_SECONDS + 1
         if elapsed >= _LOGIN_LOCK_SECONDS:
-            # Auto-unlock in background — don't block the request
             await db.users.update_one(
                 {"id": payload["sub"]},
                 {"$set": {"locked": False, "failed_login_attempts": 0, "locked_at": None,
@@ -413,7 +412,47 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         else:
             raise HTTPException(401, "Account locked")
 
+    # Validate session is still active (session_id embedded in JWT)
+    sid = payload.get("sid")
+    if sid:
+        session = await db.active_sessions.find_one({"id": sid, "user_id": payload["sub"]})
+        if not session:
+            raise HTTPException(401, "Session closed")
+        # Update last_seen (fire-and-forget — don't block request)
+        await db.active_sessions.update_one(
+            {"id": sid}, {"$set": {"last_seen": datetime.now(timezone.utc).isoformat()}}
+        )
+
     return payload
+
+# ==================== ACTIVE SESSIONS ====================
+# Each login creates a session doc in db.active_sessions.
+# get_current_user validates the session_id embedded in the JWT.
+# Only one session per user is allowed at a time.
+
+async def create_session(user_id: str, email: str, perfil: str) -> str:
+    """Create a new session record and return its session_id."""
+    session_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    await db.active_sessions.insert_one({
+        "id": session_id,
+        "user_id": user_id,
+        "email": email,
+        "perfil": perfil,
+        "created_at": now,
+        "last_seen": now,
+    })
+    return session_id
+
+async def close_sessions(user_id: str, exclude_session_id: Optional[str] = None):
+    """Delete all active sessions for a user, optionally keeping one."""
+    query: dict = {"user_id": user_id}
+    if exclude_session_id:
+        query["id"] = {"$ne": exclude_session_id}
+    await db.active_sessions.delete_many(query)
+
+async def count_active_sessions(user_id: str) -> int:
+    return await db.active_sessions.count_documents({"user_id": user_id})
 
 # ==================== AUTH ROUTES ====================
 
@@ -492,13 +531,93 @@ async def login(input: LoginInput):
         {"$set": {"failed_login_attempts": 0, "locked": False, "locked_at": None,
                    "unlock_requested": False, "last_login": now_iso}}
     )
-    token = create_token(user["id"], user["email"], user["perfil"], user["nombre"])
+
+    # Check for existing active sessions
+    existing_sessions = await db.active_sessions.find(
+        {"user_id": user["id"]}, {"_id": 0}
+    ).to_list(100)
+
+    if existing_sessions:
+        # Return 409 Conflict so the frontend can show the session conflict dialog
+        # Include enough info for the user to decide what to do
+        safe_sessions = [
+            {
+                "id": s["id"],
+                "created_at": s.get("created_at"),
+                "last_seen": s.get("last_seen"),
+                "perfil": s.get("perfil"),
+            }
+            for s in existing_sessions
+        ]
+        raise HTTPException(409, {
+            "code": "SESSION_CONFLICT",
+            "active_sessions": safe_sessions,
+            "user_id": user["id"],
+            "email": user["email"],
+            "perfil": user["perfil"],
+            "nombre": user["nombre"],
+        })
+
+    # No conflict — create session and return token
+    session_id = await create_session(user["id"], user["email"], user["perfil"])
+    token = create_token(user["id"], user["email"], user["perfil"], user["nombre"], session_id)
     safe_user = {k: v for k, v in user.items() if k not in ("password_hash",)}
     await sec_log(SecEvent.LOGIN_SUCCESS, actor_email=user["email"], actor_id=user["id"],
                   detail={"perfil": user["perfil"]})
     return {"token": token, "user": safe_user}
 
-@api_router.post("/auth/request-unlock")
+@api_router.post("/auth/login/force")
+async def login_force(input: LoginInput):
+    """Close all existing sessions for the user and log in fresh."""
+    email_key = input.email.strip().lower()
+    user = await db.users.find_one({"email": email_key}, {"_id": 0})
+    if not user:
+        user = await db.users.find_one({"email": input.email.strip()}, {"_id": 0})
+    if not user or not verify_password(input.password, user["password_hash"]):
+        raise HTTPException(401, "Credenciales inválidas")
+    if user.get("locked"):
+        raise HTTPException(403, {"code": "ACCOUNT_LOCKED", "remaining_minutes": 30,
+                                   "unlock_requested": bool(user.get("unlock_requested")),
+                                   "user_id": user["id"], "email": user["email"]})
+    # Close ALL existing sessions, then create new one
+    await close_sessions(user["id"])
+    session_id = await create_session(user["id"], user["email"], user["perfil"])
+    token = create_token(user["id"], user["email"], user["perfil"], user["nombre"], session_id)
+    safe_user = {k: v for k, v in user.items() if k not in ("password_hash",)}
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one({"id": user["id"]}, {"$set": {"last_login": now_iso}})
+    await sec_log(SecEvent.LOGIN_SUCCESS, actor_email=user["email"], actor_id=user["id"],
+                  detail={"perfil": user["perfil"], "forced": True})
+    return {"token": token, "user": safe_user}
+
+@api_router.post("/auth/logout")
+async def logout(user=Depends(get_current_user)):
+    """Close the current session."""
+    sid = user.get("sid")
+    if sid:
+        await db.active_sessions.delete_one({"id": sid})
+    await sec_log(SecEvent.LOGIN_SUCCESS, actor_email=user["email"], actor_id=user["sub"],
+                  detail={"action": "logout"})
+    return {"message": "Sesión cerrada"}
+
+@api_router.get("/auth/sessions")
+async def get_my_sessions(user=Depends(get_current_user)):
+    """Return all active sessions for the current user."""
+    sessions = await db.active_sessions.find(
+        {"user_id": user["sub"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    current_sid = user.get("sid")
+    return [{"id": s["id"], "created_at": s.get("created_at"),
+             "last_seen": s.get("last_seen"), "is_current": s["id"] == current_sid}
+            for s in sessions]
+
+@api_router.post("/auth/sessions/close-others")
+async def close_other_sessions(user=Depends(get_current_user)):
+    """Keep the current session, close all others."""
+    sid = user.get("sid")
+    await close_sessions(user["sub"], exclude_session_id=sid)
+    return {"message": "Otras sesiones cerradas"}
+
 async def request_unlock(input: UnlockRequestInput):
     """No auth required — user is locked out and requesting manual unlock."""
     email_key = input.email.strip().lower()
@@ -2272,6 +2391,11 @@ async def import_data():
     await db.admin_history.create_index([("ts", -1)])                           # history queries
     await db.admin_history.create_index([("action", 1), ("ts", -1)])            # filter by action type
     await db.admin_history.create_index([("rolled_back", 1)])                   # pending rollbacks
+    await db.active_sessions.create_index([("user_id", 1)])                     # session lookup by user
+    await db.active_sessions.create_index([("id", 1)], unique=True)             # session lookup by id
+    await db.active_sessions.create_index(                                       # TTL: auto-expire after 25h
+        [("created_at", 1)], expireAfterSeconds=90000
+    )
     await db.app_logs.create_index([("ts", -1)])                                # app log time queries
     await db.app_logs.create_index([("is_error", 1), ("ts", -1)])               # error filter
 
