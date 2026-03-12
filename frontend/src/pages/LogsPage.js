@@ -119,7 +119,13 @@ export default function LogsPage() {
   useEffect(() => { fetchMovements(); }, [fetchMovements]);
   useEffect(() => { fetchAudits(); }, [fetchAudits]);
   useEffect(() => {
-    api.get("/stores/plazas").then(r => setAuditPlazasList(r.data || [])).catch(() => {});
+    api.get("/stores/plazas")
+      .then(r => {
+        // /stores/plazas returns objects {cr_plaza, plaza, store_count} — extract plaza strings
+        const plazas = (r.data || []).map(p => p.plaza).filter(Boolean).sort();
+        setAuditPlazasList(plazas);
+      })
+      .catch(() => {});
   }, [api]);
 
   const doExport = async (exportType, extraParams = {}, filename) => {

@@ -126,6 +126,7 @@ export default function AuditPage() {
   const [scanning, setScanning] = useState(false);
   const [flashClass, setFlashClass] = useState("");
   const [summary, setSummary] = useState(null);
+  const [sysSettings, setSysSettings] = useState(null); // system settings for TTL display
   const [transferDialog, setTransferDialog] = useState(null);
   const [finalizeDialog, setFinalizeDialog] = useState(false);
   const [sigVerify, setSigVerify] = useState(null); // null | { valid, signature, checked_at }
@@ -265,6 +266,9 @@ export default function AuditPage() {
   }, [api, audit?.cr_tienda]);
 
   useEffect(() => { Promise.all([fetchAudit(), fetchScans()]).finally(() => setLoading(false)); }, [fetchAudit, fetchScans]);
+  useEffect(() => {
+    api.get("/system-settings/public").then(r => setSysSettings(r.data)).catch(() => {});
+  }, [api]);
   useEffect(() => { if (audit?.cr_tienda) fetchStoreEquipment(); }, [audit?.cr_tienda, fetchStoreEquipment]);
   useEffect(() => { if (audit?.status === "in_progress" && inputRef.current) inputRef.current.focus(); }, [audit]);
 
@@ -605,10 +609,26 @@ export default function AuditPage() {
       )}
       {/* ── Pending Photos Banner ── */}
       {audit?.status === "pending_photos" && (() => {
-        const deadline = audit.photos_deadline ? new Date(audit.photos_deadline) : null;
+        // Recalculate deadline using current TTL setting + when audit was finalized.
+        // The stored photos_deadline was set with the TTL at the time of finalization,
+        // but the user wants to see time based on the CURRENT configured TTL.
+        // We fetch settings reactively via a state; fallback to stored deadline.
         const now = new Date();
-        const hoursLeft = deadline ? Math.max(0, Math.ceil((deadline - now) / 3600000)) : null;
+        let deadline = null;
+        if (sysSettings && (audit.finished_at || audit.started_at)) {
+          const baseTime = new Date(audit.finished_at || audit.started_at);
+          const ttlHours = Number(sysSettings.pending_photos_ttl_hours) || 24;
+          deadline = new Date(baseTime.getTime() + ttlHours * 3_600_000);
+        } else if (audit.photos_deadline) {
+          deadline = new Date(audit.photos_deadline);
+        }
+        const msLeft = deadline ? deadline - now : null;
+        const hoursLeft = msLeft !== null ? Math.max(0, Math.floor(msLeft / 3_600_000)) : null;
+        const minsLeft  = msLeft !== null ? Math.max(0, Math.floor((msLeft % 3_600_000) / 60_000)) : null;
         const isUrgent = hoursLeft !== null && hoursLeft <= 4;
+        const timeStr = hoursLeft !== null
+          ? (hoursLeft > 0 ? `${hoursLeft}h ${minsLeft}min` : (minsLeft > 0 ? `${minsLeft} min` : "menos de 1 min"))
+          : null;
         return (
           <Card className={`border-2 ${isUrgent ? "border-red-500/60 bg-red-500/8" : "border-amber-500/60 bg-amber-500/8"}`}>
             <CardContent className="p-4 flex items-start gap-3">
@@ -620,11 +640,11 @@ export default function AuditPage() {
                 <p className="text-xs text-muted-foreground">
                   Esta auditoría fue procesada correctamente pero faltan las fotos de los formatos físicos para quedar completa.
                 </p>
-                {hoursLeft !== null && (
+                {timeStr !== null && (
                   <div className={`flex items-center gap-1.5 text-xs font-medium ${isUrgent ? "text-red-600" : "text-amber-600"}`}>
                     <Clock className="h-3.5 w-3.5" />
-                    {hoursLeft > 0
-                      ? `Tiempo restante: ${hoursLeft} hora${hoursLeft !== 1 ? "s" : ""} — la auditoría será eliminada automáticamente al vencer el plazo`
+                    {(hoursLeft ?? 0) > 0 || (minsLeft ?? 0) > 0
+                      ? `Tiempo restante: ${timeStr} — la auditoría será eliminada automáticamente al vencer el plazo`
                       : "⚠ Plazo vencido — la auditoría será eliminada en breve"}
                   </div>
                 )}
@@ -781,12 +801,18 @@ export default function AuditPage() {
                               {scan.equipment_data?.marca ? ` · ${scan.equipment_data.marca}` : ""}
                             </p>
                           )}
-                          {/* Modelo y serie */}
+                          {/* Modelo y serie con separadores */}
                           {(scan.equipment_data?.modelo || scan.equipment_data?.serie) && (
                             <p className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 truncate">
-                              {scan.equipment_data?.modelo ? `Mod: ${scan.equipment_data.modelo}` : ""}
-                              {scan.equipment_data?.modelo && scan.equipment_data?.serie ? " · " : ""}
-                              {scan.equipment_data?.serie ? `S/N: ${scan.equipment_data.serie}` : ""}
+                              {scan.equipment_data?.modelo && (
+                                <span><span className="text-muted-foreground/50">Mod·</span>{scan.equipment_data.modelo}</span>
+                              )}
+                              {scan.equipment_data?.modelo && scan.equipment_data?.serie && (
+                                <span className="mx-1 text-muted-foreground/40">•</span>
+                              )}
+                              {scan.equipment_data?.serie && (
+                                <span><span className="text-muted-foreground/50">S/N·</span>{scan.equipment_data.serie}</span>
+                              )}
                             </p>
                           )}
                         </div>
