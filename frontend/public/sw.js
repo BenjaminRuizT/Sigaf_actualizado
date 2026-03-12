@@ -1,32 +1,28 @@
-const CACHE_NAME = 'sigaf-cache-v3';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-];
-
-const CACHEABLE_API_PATHS = [
-  '/api/stores/plazas',
-  '/api/dashboard/stats',
-];
+const CACHE_NAME = 'sigaf-cache-v4';
+const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];
+const CACHEABLE_API_PATHS = ['/api/stores/plazas', '/api/dashboard/stats'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
-  // Do NOT skipWaiting — wait until user confirms refresh to activate
+  // Activate immediately — but notify clients so they can show an update banner
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) =>
-      Promise.all(cacheNames.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name)))
+    caches.keys().then((names) =>
+      Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n)))
     )
   );
+  // Notify all clients that a new version is now active
+  self.clients.matchAll({ includeUncontrolled: true }).then((clients) => {
+    clients.forEach((client) => client.postMessage({ type: 'SW_ACTIVATED' }));
+  });
   self.clients.claim();
 });
 
-// When a new SW is waiting, notify all clients
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
@@ -36,9 +32,9 @@ self.addEventListener('message', (event) => {
 function isCacheableApi(url) {
   return CACHEABLE_API_PATHS.some(path => url.includes(path));
 }
-
 function isAuditReadApi(url) {
-  return (url.includes('/api/audits/') || url.includes('/api/stores/')) && !url.includes('/scan') && !url.includes('/finalize');
+  return (url.includes('/api/audits/') || url.includes('/api/stores/')) &&
+         !url.includes('/scan') && !url.includes('/finalize');
 }
 
 self.addEventListener('fetch', (event) => {
@@ -47,7 +43,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' && url.includes('/api/')) {
     event.respondWith(
       fetch(event.request).catch(() =>
-        new Response(JSON.stringify({ error: 'offline', message: 'Sin conexión a internet.' }), {
+        new Response(JSON.stringify({ error: 'offline', message: 'Sin conexión.' }), {
           headers: { 'Content-Type': 'application/json' }, status: 503
         })
       )
@@ -67,7 +63,7 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() =>
           caches.match(event.request).then((cached) =>
-            cached || new Response(JSON.stringify({ error: 'offline', message: 'Sin conexión' }), {
+            cached || new Response(JSON.stringify({ error: 'offline' }), {
               headers: { 'Content-Type': 'application/json' }, status: 503
             })
           )
@@ -79,7 +75,7 @@ self.addEventListener('fetch', (event) => {
   if (url.includes('/api/')) {
     event.respondWith(
       fetch(event.request).catch(() =>
-        new Response(JSON.stringify({ error: 'offline', message: 'Sin conexión' }), {
+        new Response(JSON.stringify({ error: 'offline' }), {
           headers: { 'Content-Type': 'application/json' }, status: 503
         })
       )
