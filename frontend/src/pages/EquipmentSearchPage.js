@@ -19,6 +19,7 @@ export default function EquipmentSearchPage() {
   const [history, setHistory] = useState([]); // [{ q, found, ts }]
   const [limit, setLimit] = useState(50);
   const [hasMore, setHasMore] = useState(false);
+  const [equipPage, setEquipPage] = useState(1);
   const inputRef = useRef(null);
 
   const handleSearch = async (q = query) => {
@@ -31,6 +32,7 @@ export default function EquipmentSearchPage() {
       const found = (res.data.results || []).length > 0;
       setResults(res.data.results || []);
       setHasMore(res.data.has_more || false);
+      setEquipPage(1); // reset page on new search
       // Agregar al historial de búsquedas
       setHistory(prev => [{ q: trimmed, found, count: res.data.results?.length || 0, ts: new Date() }, ...prev.slice(0, 19)]);
     } catch (err) {
@@ -83,14 +85,14 @@ export default function EquipmentSearchPage() {
             {/* Selector de límite */}
             <select
               value={limit}
-              onChange={e => setLimit(Number(e.target.value))}
+              onChange={e => { setLimit(Number(e.target.value)); setEquipPage(1); }}
               className="h-11 px-3 rounded-md border border-input bg-background text-sm font-medium min-w-[80px]"
               title="Máximo de resultados"
             >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
               <option value={50}>50</option>
               <option value={100}>100</option>
-              <option value={200}>200</option>
-              <option value={500}>500</option>
               <option value={0}>Todos</option>
             </select>
             <Button onClick={() => handleSearch()} disabled={loading} className="h-11 px-6 gap-2">
@@ -140,29 +142,72 @@ export default function EquipmentSearchPage() {
                 <Package className="h-10 w-10 text-muted-foreground/30 mx-auto" />
                 <p className="text-sm text-muted-foreground">No se encontró ningún equipo con esa búsqueda</p>
               </CardContent></Card>
-            ) : (
-              results.map(eq => (
-                <Card key={eq.id}
-                  className={`cursor-pointer transition-all hover:shadow-md ${selected?.id === eq.id ? "ring-2 ring-primary" : ""}`}
-                  onClick={() => setSelected(eq)}>
-                  <CardContent className="p-3 flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <Package className="h-4 w-4 text-primary" />
+            ) : (() => {
+              const PAGE_SIZE = limit > 0 ? limit : results.length;
+              const totalPages = Math.ceil(results.length / PAGE_SIZE);
+              const safeEqPage = Math.min(equipPage, totalPages);
+              const pageItems = results.slice((safeEqPage - 1) * PAGE_SIZE, safeEqPage * PAGE_SIZE);
+              return (
+                <>
+                  {/* Controles de paginación — solo si hay más de una página */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between gap-2 py-1">
+                      <button
+                        onClick={() => setEquipPage(p => Math.max(1, p - 1))}
+                        disabled={safeEqPage === 1}
+                        className="h-7 px-2.5 rounded border text-xs font-medium disabled:opacity-30 hover:bg-muted transition"
+                      >← Ant.</button>
+                      <span className="text-xs text-muted-foreground">
+                        Pág. <strong>{safeEqPage}</strong> de <strong>{totalPages}</strong>
+                        <span className="ml-2 opacity-60">(mostrando {pageItems.length} de {results.length})</span>
+                      </span>
+                      <button
+                        onClick={() => setEquipPage(p => Math.min(totalPages, p + 1))}
+                        disabled={safeEqPage === totalPages}
+                        className="h-7 px-2.5 rounded border text-xs font-medium disabled:opacity-30 hover:bg-muted transition"
+                      >Sig. →</button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm truncate">{eq.descripcion || "Sin descripción"}</p>
-                      <p className="text-xs text-muted-foreground font-mono truncate">{eq.codigo_barras}</p>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">{eq.marca || "—"}</Badge>
-                        <span className="text-xs text-muted-foreground truncate max-w-[140px]">{eq.tienda}</span>
-                        {eq.depreciado && <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-600 border-amber-500/30">Depreciado</Badge>}
-                      </div>
+                  )}
+                  {pageItems.map(eq => (
+                    <Card key={eq.id}
+                      className={`cursor-pointer transition-all hover:shadow-md ${selected?.id === eq.id ? "ring-2 ring-primary" : ""}`}
+                      onClick={() => setSelected(eq)}>
+                      <CardContent className="p-3 flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <Package className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm truncate">{eq.descripcion || "Sin descripción"}</p>
+                          <p className="text-xs text-muted-foreground font-mono truncate">{eq.codigo_barras}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{eq.marca || "—"}</Badge>
+                            <span className="text-xs text-muted-foreground truncate max-w-[140px]">{eq.tienda}</span>
+                            {eq.depreciado && <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-600 border-amber-500/30">Depreciado</Badge>}
+                          </div>
+                        </div>
+                        <p className="text-sm font-mono font-bold text-primary shrink-0">{fmtM(eq.valor_real)}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {/* Controles de paginación — inferior */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <button
+                        onClick={() => setEquipPage(p => Math.max(1, p - 1))}
+                        disabled={safeEqPage === 1}
+                        className="h-7 px-2.5 rounded border text-xs font-medium disabled:opacity-30 hover:bg-muted transition"
+                      >← Ant.</button>
+                      <span className="text-xs text-muted-foreground">Pág. {safeEqPage}/{totalPages}</span>
+                      <button
+                        onClick={() => setEquipPage(p => Math.min(totalPages, p + 1))}
+                        disabled={safeEqPage === totalPages}
+                        className="h-7 px-2.5 rounded border text-xs font-medium disabled:opacity-30 hover:bg-muted transition"
+                      >Sig. →</button>
                     </div>
-                    <p className="text-sm font-mono font-bold text-primary shrink-0">{fmtM(eq.valor_real)}</p>
-                  </CardContent>
-                </Card>
-              ))
-            )}
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {/* Detalle */}

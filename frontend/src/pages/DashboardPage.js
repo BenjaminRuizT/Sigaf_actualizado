@@ -281,8 +281,22 @@ export default function DashboardPage() {
                     <div key={i} className="flex justify-between text-sm">
                       <span className="text-muted-foreground">{label}</span>
                       {val !== null ? <span className="font-mono font-medium">{val}</span> : (
-                        <Badge variant="outline" className={selectedStore.audited ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" : ""}>
-                          {selectedStore.audited ? t("dashboard.audited") : t("dashboard.notAudited")}
+                        <Badge variant="outline" className={
+                          selectedStore.audit_status === "pending_photos"
+                            ? "bg-amber-500/15 text-amber-700 border-amber-500/40"
+                            : selectedStore.audit_status === "in_progress"
+                              ? "bg-blue-500/15 text-blue-600 border-blue-500/30"
+                              : selectedStore.audited
+                                ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                                : ""
+                        }>
+                          {selectedStore.audit_status === "pending_photos"
+                            ? "⏳ Pendiente Fotos"
+                            : selectedStore.audit_status === "in_progress"
+                              ? "En Progreso"
+                              : selectedStore.audited
+                                ? t("dashboard.audited")
+                                : t("dashboard.notAudited")}
                         </Badge>
                       )}
                     </div>

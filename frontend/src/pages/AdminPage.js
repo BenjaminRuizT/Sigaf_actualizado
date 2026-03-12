@@ -304,9 +304,8 @@ export default function AdminPage({ defaultTab = "users" }) {
       )}
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid w-full grid-cols-4" data-testid="admin-tabs">
+        <TabsList className="grid w-full grid-cols-3" data-testid="admin-tabs">
           <TabsTrigger value="users" data-testid="admin-tab-users" className="gap-2"><Users className="h-4 w-4" /> {t("admin.users")}</TabsTrigger>
-          <TabsTrigger value="equipment" data-testid="admin-tab-equipment" className="gap-2"><Monitor className="h-4 w-4" /> {t("admin.equipment")}</TabsTrigger>
           <TabsTrigger value="settings" className="gap-2"><Settings className="h-4 w-4" /> Configuración</TabsTrigger>
           <TabsTrigger value="history" className="gap-2" onClick={() => { if (!histLoaded) fetchHistory(); }}>
             <History className="h-4 w-4" /> Historial
@@ -341,49 +340,6 @@ export default function AdminPage({ defaultTab = "users" }) {
               ))}
             </TableBody>
           </Table></ScrollArea></div></Card>
-        </TabsContent>
-
-        <TabsContent value="equipment" className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Select value={eqPlaza} onValueChange={v => { setEqPlaza(v); setEqPage(1); }}><SelectTrigger className="w-48" data-testid="eq-plaza-filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{t("dashboard.allPlazas")}</SelectItem>{plazas.map(p => <SelectItem key={p.cr_plaza || p.plaza} value={p.plaza}>{p.plaza}</SelectItem>)}</SelectContent></Select>
-            <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder={t("admin.searchEquipment")} value={eqSearch} onChange={e => { setEqSearch(e.target.value); setEqPage(1); }} className="pl-10" data-testid="eq-search-input" /></div>
-          </div>
-          <Card><div className="overflow-x-auto"><ScrollArea className="h-[500px]"><Table style={{minWidth:600}}>
-            <TableHeader><TableRow>
-              <TableHead><eqSort.SortHeader col="codigo_barras">{t("audit.barcode")}</eqSort.SortHeader></TableHead>
-              <TableHead><eqSort.SortHeader col="descripcion">{t("audit.description")}</eqSort.SortHeader></TableHead>
-              <TableHead><eqSort.SortHeader col="marca">{t("audit.brand")}</eqSort.SortHeader></TableHead>
-              <TableHead><eqSort.SortHeader col="modelo">{t("audit.model")}</eqSort.SortHeader></TableHead>
-              <TableHead>{t("logs.store")}</TableHead>
-              <TableHead className="text-right"><eqSort.SortHeader col="costo">{t("audit.cost")}</eqSort.SortHeader></TableHead>
-              <TableHead className="text-right"><eqSort.SortHeader col="valor_real">{t("audit.realValue")}</eqSort.SortHeader></TableHead>
-              <TableHead><eqSort.SortHeader col="depreciado">{t("audit.deprecated")}</eqSort.SortHeader></TableHead>
-              <TableHead className="text-right">{t("common.actions")}</TableHead>
-            </TableRow></TableHeader>
-            <TableBody>
-              {eqSort.sorted(equipment.items).map(eq => (
-                <TableRow key={eq.id} data-testid={`eq-row-${eq.id}`}>
-                  <TableCell className="font-mono text-xs">{eq.codigo_barras}</TableCell>
-                  <TableCell className="text-sm">{eq.descripcion}</TableCell>
-                  <TableCell className="text-sm">{eq.marca}</TableCell>
-                  <TableCell className="text-sm">{eq.modelo}</TableCell>
-                  <TableCell className="text-sm truncate max-w-[120px]">{eq.tienda}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">{fmtMoney(eq.costo)}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">{fmtMoney(eq.valor_real)}</TableCell>
-                  <TableCell><Badge variant={eq.depreciado ? "destructive" : "outline"} className="text-[10px]">{eq.depreciado ? "Si" : "No"}</Badge></TableCell>
-                  <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => openEditEq(eq)} data-testid={`edit-eq-${eq.id}`}><Pencil className="h-4 w-4" /></Button></TableCell>
-                </TableRow>
-              ))}
-              {equipment.items.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">{t("common.noResults")}</TableCell></TableRow>}
-            </TableBody>
-          </Table></ScrollArea></div></Card>
-          {equipment.pages > 1 && (
-            <div className="flex items-center justify-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setEqPage(p => Math.max(1, p - 1))} disabled={eqPage === 1} data-testid="eq-prev"><ChevronLeft className="h-4 w-4" /></Button>
-              <span className="text-sm text-muted-foreground font-mono">{eqPage} / {equipment.pages}</span>
-              <Button variant="outline" size="sm" onClick={() => setEqPage(p => Math.min(equipment.pages, p + 1))} disabled={eqPage === equipment.pages} data-testid="eq-next"><ChevronRight className="h-4 w-4" /></Button>
-            </div>
-          )}
         </TabsContent>
 
         {/* Pestaña Configuración */}
@@ -641,20 +597,6 @@ export default function AdminPage({ defaultTab = "users" }) {
       </Dialog>
 
       {/* Equipment Edit Dialog */}
-      <Dialog open={!!editEq} onOpenChange={() => setEditEq(null)}>
-        <DialogContent data-testid="eq-edit-dialog">
-          <DialogHeader><DialogTitle className="font-heading uppercase tracking-tight">{t("admin.edit")} {t("admin.equipment")}</DialogTitle></DialogHeader>
-          <div className="space-y-4"><div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label>{t("audit.description")}</Label><Input value={eqForm.descripcion || ""} onChange={e => setEqForm(f => ({ ...f, descripcion: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>{t("audit.brand")}</Label><Input value={eqForm.marca || ""} onChange={e => setEqForm(f => ({ ...f, marca: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>{t("audit.model")}</Label><Input value={eqForm.modelo || ""} onChange={e => setEqForm(f => ({ ...f, modelo: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>{t("audit.serial")}</Label><Input value={eqForm.serie || ""} onChange={e => setEqForm(f => ({ ...f, serie: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>{t("audit.cost")}</Label><Input type="number" value={eqForm.costo || ""} onChange={e => setEqForm(f => ({ ...f, costo: parseFloat(e.target.value) }))} /></div>
-            <div className="space-y-2"><Label>Depreciación</Label><Input type="number" value={eqForm.depreciacion || ""} onChange={e => setEqForm(f => ({ ...f, depreciacion: parseFloat(e.target.value) }))} /></div>
-          </div></div>
-          <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setEditEq(null)}>{t("admin.cancel")}</Button><Button onClick={handleSaveEquipment} data-testid="eq-save">{t("admin.save")}</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Reset Data Dialog */}
       <Dialog open={resetDialog} onOpenChange={(v) => { setResetDialog(v); if (!v) { setMafFile(null); setUsersFile(null); } }}>
