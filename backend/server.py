@@ -1898,14 +1898,17 @@ async def get_movement_logs(type: Optional[str] = None, search: Optional[str] = 
             "alta_total_value": round(av[0]["t"], 2) if av else 0}
 
 @api_router.get("/logs/audits")
-async def get_audit_logs(status: Optional[str] = None, search: Optional[str] = None, page: int = 1, limit: int = 50, user=Depends(get_current_user)):
+async def get_audit_logs(status: Optional[str] = None, search: Optional[str] = None, plaza: Optional[str] = None, page: int = 1, limit: int = 50, user=Depends(get_current_user)):
     query = {}
     if status:
         query["status"] = status
+    if plaza:
+        query["plaza"] = plaza
     if search:
         query["$or"] = [
             {"tienda": {"$regex": search, "$options": "i"}},
             {"cr_tienda": {"$regex": search, "$options": "i"}},
+            {"plaza": {"$regex": search, "$options": "i"}},
         ]
     skip = (page - 1) * limit
     # Projection: exclude heavy base64 photo fields and raw scans — not needed for the list view
