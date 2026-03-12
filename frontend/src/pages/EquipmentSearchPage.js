@@ -70,24 +70,26 @@ export default function EquipmentSearchPage() {
       {/* Barra de búsqueda */}
       <Card>
         <CardContent className="p-4 space-y-3">
+          {/* Input full-width on all screens */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              ref={inputRef}
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ej: 03363282 · TC52 · ESCANER · CORDILLERAS..."
+              className="pl-9 h-11 text-base font-mono w-full"
+              autoFocus
+            />
+          </div>
+          {/* Controls row: selector + button */}
           <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                ref={inputRef}
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ej: 03363282 · TC52 · ESCANER · CORDILLERAS..."
-                className="pl-9 h-11 text-base font-mono"
-                autoFocus
-              />
-            </div>
             {/* Selector de límite */}
             <select
               value={limit}
               onChange={e => { setLimit(Number(e.target.value)); setEquipPage(1); }}
-              className="h-11 px-3 rounded-md border border-input bg-background text-sm font-medium min-w-[80px]"
+              className="h-11 px-3 rounded-md border border-input bg-background text-sm font-medium flex-1 min-w-0"
               title="Registros por página"
             >
               <option value={10}>10 por pág.</option>
@@ -96,7 +98,7 @@ export default function EquipmentSearchPage() {
               <option value={100}>100 por pág.</option>
               <option value={0}>Todos</option>
             </select>
-            <Button onClick={() => handleSearch()} disabled={loading} className="h-11 px-6 gap-2">
+            <Button onClick={() => handleSearch()} disabled={loading} className="h-11 px-6 gap-2 flex-shrink-0">
               {loading
                 ? <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 : <Search className="h-4 w-4" />}

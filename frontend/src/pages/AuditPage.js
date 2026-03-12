@@ -781,6 +781,14 @@ export default function AuditPage() {
                               {scan.equipment_data?.marca ? ` · ${scan.equipment_data.marca}` : ""}
                             </p>
                           )}
+                          {/* Modelo y serie */}
+                          {(scan.equipment_data?.modelo || scan.equipment_data?.serie) && (
+                            <p className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 truncate">
+                              {scan.equipment_data?.modelo ? `Mod: ${scan.equipment_data.modelo}` : ""}
+                              {scan.equipment_data?.modelo && scan.equipment_data?.serie ? " · " : ""}
+                              {scan.equipment_data?.serie ? `S/N: ${scan.equipment_data.serie}` : ""}
+                            </p>
+                          )}
                         </div>
                         <Badge className={`text-[10px] ${classColors[scan.classification]||""}`}>
                           {scan.classification==="localizado"?t("audit.located"):scan.classification==="sobrante"?t("audit.surplus"):t("audit.surplusUnknown")}
@@ -1162,8 +1170,16 @@ export default function AuditPage() {
                   // Si todavía no se llamó a finalize, la auditoría sigue in_progress — no pasa nada
                   // Si ya se llamó finalize y el backend puso pending_photos, hacer reload
                   await fetchAudit();
-                  const settings_res = await api.get("/system-settings/public").catch(() => ({ data: { pending_photos_ttl_hours: 24 } }));
-                  const hours = settings_res.data?.pending_photos_ttl_hours ?? 24;
+                  // Calculate hours from the actual deadline stored in the audit (avoids settings TTL bug)
+                  const freshAudit = (await api.get(`/audits/${auditId}`).catch(() => null))?.data;
+                  let hours = 24;
+                  if (freshAudit?.photos_deadline) {
+                    const msLeft = new Date(freshAudit.photos_deadline) - new Date();
+                    hours = Math.max(1, Math.ceil(msLeft / 3_600_000));
+                  } else {
+                    const sRes = await api.get("/system-settings/public").catch(() => null);
+                    hours = Number(sRes?.data?.pending_photos_ttl_hours) || 24;
+                  }
                   toast.info(`La auditoría quedó en espera de fotos. Tienes ${hours} hora${hours !== 1 ? "s" : ""} para completarla antes de que sea eliminada.`, { duration: 8000 });
                 }}>
                 <X className="h-4 w-4" />

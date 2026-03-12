@@ -51,8 +51,10 @@ export default function LogsPage() {
 
   const [auditData, setAuditData] = useState({ items: [], total: 0, page: 1, pages: 1 });
   const [auditFilter, setAuditFilter] = useState("all");
+  const [auditPlazaFilter, setAuditPlazaFilter] = useState("all");
   const [auditPage, setAuditPage] = useState(1);
   const [auditGlobalStats, setAuditGlobalStats] = useState(null);
+  const [auditPlazasList, setAuditPlazasList] = useState([]);
 
   const [selectedAudit, setSelectedAudit] = useState(null);
   const [auditSummary, setAuditSummary] = useState(null);
@@ -102,6 +104,7 @@ export default function LogsPage() {
     try {
       const params = { page: auditPage, limit: 50 };
       if (auditFilter !== "all") params.status = auditFilter;
+      if (auditPlazaFilter !== "all") params.plaza = auditPlazaFilter;
       if (searchDebounced) params.search = searchDebounced;
       const [res, statsRes] = await Promise.all([
         api.get("/logs/audits", { params }),
@@ -110,11 +113,14 @@ export default function LogsPage() {
       setAuditData(res.data);
       if (statsRes.data) setAuditGlobalStats(statsRes.data);
     } catch {}
-  }, [api, auditPage, auditFilter, searchDebounced]);
+  }, [api, auditPage, auditFilter, auditPlazaFilter, searchDebounced]);
 
   useEffect(() => { fetchClassifications(); }, [fetchClassifications]);
   useEffect(() => { fetchMovements(); }, [fetchMovements]);
   useEffect(() => { fetchAudits(); }, [fetchAudits]);
+  useEffect(() => {
+    api.get("/stores/plazas").then(r => setAuditPlazasList(r.data || [])).catch(() => {});
+  }, [api]);
 
   const doExport = async (exportType, extraParams = {}, filename) => {
     setExporting(true);
@@ -611,15 +617,26 @@ ${(a.photo_ab || a.photo_transf) ? `
             </div>
           )}
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <Select value={auditFilter} onValueChange={v => { setAuditFilter(v); setAuditPage(1); }}>
-              <SelectTrigger className="w-48" data-testid="audit-filter"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("logs.all")}</SelectItem>
-                <SelectItem value="in_progress">{t("dashboard.inProgress")}</SelectItem>
-                <SelectItem value="completed">{t("logs.completed")}</SelectItem>
-                <SelectItem value="cancelada">Cancelada</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2 flex-wrap">
+              <Select value={auditFilter} onValueChange={v => { setAuditFilter(v); setAuditPage(1); }}>
+                <SelectTrigger className="w-44" data-testid="audit-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("logs.all")}</SelectItem>
+                  <SelectItem value="in_progress">{t("dashboard.inProgress")}</SelectItem>
+                  <SelectItem value="completed">{t("logs.completed")}</SelectItem>
+                  <SelectItem value="cancelada">Cancelada</SelectItem>
+                </SelectContent>
+              </Select>
+              {auditPlazasList.length > 0 && (
+                <Select value={auditPlazaFilter} onValueChange={v => { setAuditPlazaFilter(v); setAuditPage(1); }}>
+                  <SelectTrigger className="w-44"><SelectValue placeholder="Todas las plazas" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las plazas</SelectItem>
+                    {auditPlazasList.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
             <div className="flex gap-2 flex-wrap">
               {isSuperAdmin && (
                 <Button
