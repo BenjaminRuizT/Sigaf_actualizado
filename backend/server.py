@@ -1374,6 +1374,23 @@ async def finalize_audit(audit_id: str, input: Optional[FinalizeWithPhotosInput]
 
     cr_tienda = audit["cr_tienda"]
     scans = await db.audit_scans.find({"audit_id": audit_id}, {"_id": 0}).to_list(10000)
+
+    # ── Auto-cancel if no equipment was scanned ──────────────────────────────
+    # Finalizing an audit with zero scans is equivalent to not auditing at all.
+    # Cancel it automatically so no ghost audits remain in the system.
+    if not scans:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await db.audits.update_one({"id": audit_id}, {"$set": {
+            "status": "cancelada", "finished_at": now_iso,
+            "cancel_reason": "Auto-cancelada: ningún equipo fue escaneado al finalizar"
+        }})
+        await db.stores.update_one({"cr_tienda": cr_tienda}, {"$set": {
+            "audited": False, "last_audit_id": None, "audit_status": None
+        }})
+        await sec_log(SecEvent.AUDIT_CANCELLED, actor_email=user["email"], actor_id=user["sub"],
+                      target=audit_id, detail={"tienda": audit.get("tienda"), "reason": "no_scans"})
+        raise HTTPException(400, "No se escaneó ningún equipo. La auditoría fue cancelada automáticamente.")
+
     scanned_ids = set(s["equipment_id"] for s in scans if s["equipment_id"])
     scanned_barcodes = set(s["codigo_barras"] for s in scans)
 
@@ -1421,21 +1438,38 @@ async def finalize_audit(audit_id: str, input: Optional[FinalizeWithPhotosInput]
     photo_required_transf = settings.get("photo_required_transf", True)
     ttl_hours = int(settings.get("pending_photos_ttl_hours", 24))
 
-    # Determine movements to check what photos are needed.
-    # IMPORTANT: auto_generated=True bajas are system-created for no_localizado items — they do NOT
-    # require a photo. Only MANUAL movements (sobrante altas, manual disposals, transfers) trigger photos.
-    movements_check = await db.movements.find({"audit_id": audit_id}, {"type": 1, "auto_generated": 1}).to_list(1000)
-    manual_movements = [m for m in movements_check if not m.get("auto_generated")]
-    has_alta_movements  = any(m["type"] == "alta" for m in manual_movements)
-    has_baja_movements  = any(m["type"] in ("baja", "disposal") for m in manual_movements)
-    has_transf_movements = any(m["type"] == "transfer" for m in manual_movements)
-    # Apply per-type photo settings
+    # ── Determine which manual movements exist for this audit ────────────────
+    # Rules:
+    #   • ALTA movements only come from sobrante_desconocido registration → always require photo if setting is ON
+    #   • BAJA/disposal manual movements = auditor explicitly disposed equipment → require photo if setting ON
+    #   • TRANSFER movements → require photo if setting ON
+    #   • Auto-generated BAJA movements (no_localizado) = created by finalize itself; they may or may not
+    #     have the auto_generated flag (older docs may lack it). We identify them by:
+    #     auto_generated=True OR (type="baja" AND status="pending" AND created_by_id=system)
+    #     The safest approach: ALTA movements are NEVER auto-generated (only manual sobrante creates them).
+    #     BAJA movements can be auto-generated. So we use type-specific logic:
+    #       - has_alta  = any movement with type="alta" for this audit  (always manual)
+    #       - has_baja  = any movement with type in ("baja","disposal") AND auto_generated IS NOT True
+    #       - has_transf = any movement with type="transfer" (always manual)
+    movements_check = await db.movements.find(
+        {"audit_id": audit_id},
+        {"type": 1, "auto_generated": 1, "status": 1}
+    ).to_list(1000)
+
+    # ALTA movements are ALWAYS manual — sobrante_desconocido workflow only
+    has_alta_movements = any(m["type"] == "alta" for m in movements_check)
+    # BAJA/disposal: exclude auto_generated=True; also exclude cancelled ones (won't request photo)
+    has_baja_movements = any(
+        m["type"] in ("baja", "disposal")
+        and not m.get("auto_generated")
+        and m.get("status") != "cancelled"
+        for m in movements_check
+    )
+    # TRANSFER movements are always manual
+    has_transf_movements = any(m["type"] == "transfer" for m in movements_check)
+
     needs_photo_ab    = (has_alta_movements and photo_required_alta) or (has_baja_movements and photo_required_baja)
     needs_photo_transf = has_transf_movements and photo_required_transf
-    # If there are NO manual movements at all, no photos needed and audit completes normally
-    if not manual_movements and not has_transf_movements:
-        needs_photo_ab = False
-        needs_photo_transf = False
 
     # Photos provided inline in this request
     photos = {}
@@ -2788,6 +2822,41 @@ async def cleanup_expired_audits(user=Depends(get_current_user)):
             "audited": False, "audit_status": None, "last_audit_id": None
         }})
     return {"deleted": len(ids), "message": f"Se eliminaron {len(ids)} auditorías vencidas"}
+
+
+@api_router.post("/admin/fix-pending-photos")
+async def fix_pending_photos_no_longer_needed(user=Depends(get_current_user)):
+    """Super admin: complete pending_photos audits that no longer require photos per current settings."""
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Acceso denegado")
+    settings = await db.system_settings.find_one({"_id": "global"}, {"_id": 0}) or {}
+    photo_required_alta  = settings.get("photo_required_alta", True)
+    photo_required_baja  = settings.get("photo_required_baja", True)
+    photo_required_transf = settings.get("photo_required_transf", True)
+
+    pending = await db.audits.find({"status": "pending_photos"}, {"_id": 0}).to_list(1000)
+    fixed = 0
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for audit in pending:
+        needs_ab    = audit.get("needs_photo_ab", False)
+        needs_transf = audit.get("needs_photo_transf", False)
+        has_photo_ab    = bool(audit.get("photo_ab"))
+        has_photo_transf = bool(audit.get("photo_transf"))
+        # Re-evaluate: does this audit STILL require photos?
+        still_needs_ab    = needs_ab and not has_photo_ab and (photo_required_alta or photo_required_baja)
+        still_needs_transf = needs_transf and not has_photo_transf and photo_required_transf
+        if not still_needs_ab and not still_needs_transf:
+            # Photos no longer required — mark as completed
+            await db.audits.update_one({"id": audit["id"]}, {"$set": {
+                "status": "completed", "finished_at": now_iso,
+                "photos_deadline": None, "needs_photo_ab": False, "needs_photo_transf": False,
+                "fix_note": "Auto-completed by fix-pending-photos: photo settings changed"
+            }})
+            await db.stores.update_one({"cr_tienda": audit["cr_tienda"]}, {"$set": {
+                "audited": True, "audit_status": "completed"
+            }})
+            fixed += 1
+    return {"fixed": fixed, "message": f"Se completaron {fixed} auditorías que ya no requieren fotos"}
 
 
 @app.on_event("startup")
