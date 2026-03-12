@@ -1049,6 +1049,20 @@ async def global_cross_analysis(
 
 
 
+
+@api_router.post("/auth/validate-password")
+async def validate_password(body: dict, user=Depends(get_current_user)):
+    """Validate the current user's password."""
+    pwd = body.get("password", "")
+    user_doc = await db.users.find_one({"id": user["sub"]}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(404, "Usuario no encontrado")
+    from passlib.context import CryptContext
+    _ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    if not _ctx.verify(pwd, user_doc.get("password_hash", "")):
+        raise HTTPException(401, "Contraseña incorrecta")
+    return {"valid": True}
+
 @api_router.get("/auth/me")
 async def get_me(user=Depends(get_current_user)):
     user_doc = await db.users.find_one({"id": user["sub"]}, {"_id": 0, "password_hash": 0})
@@ -1225,6 +1239,19 @@ async def create_audit(input: AuditCreateInput, user=Depends(get_current_user)):
     await db.stores.update_one({"cr_tienda": input.cr_tienda}, {"$set": {"audit_status": "in_progress", "last_audit_id": audit["id"]}})
     return {k: v for k, v in audit.items() if k != "_id"}
 
+
+@api_router.get("/audits/stats/summary")
+async def audits_stats_summary(user=Depends(get_current_user)):
+    """Stats: total audits done and stores audited."""
+    total_audits = await db.audits.count_documents({"status": {"$in": ["completed", "incompleto"]}})
+    stores_audited = await db.audits.distinct("cr_tienda", {"status": {"$in": ["completed", "incompleto"]}})
+    total_stores = await db.stores.count_documents({})
+    return {
+        "total_audits": total_audits,
+        "stores_audited": len(stores_audited),
+        "total_stores": total_stores,
+    }
+
 @api_router.get("/audits/{audit_id}")
 async def get_audit(audit_id: str, user=Depends(get_current_user)):
     audit = await db.audits.find_one({"id": audit_id}, {"_id": 0})
@@ -1380,12 +1407,21 @@ async def finalize_audit(audit_id: str, input: Optional[FinalizeWithPhotosInput]
     photo_required_transf = settings.get("photo_required_transf", True)
     ttl_hours = int(settings.get("pending_photos_ttl_hours", 24))
 
-    # Determine movements to check what photos are needed
-    movements_check = await db.movements.find({"audit_id": audit_id}, {"type": 1}).to_list(1000)
-    has_ab_movements    = any(m["type"] in ("alta", "baja", "disposal") for m in movements_check)
-    has_transf_movements = any(m["type"] == "transfer" for m in movements_check)
-    needs_photo_ab    = has_ab_movements and photo_required_ab
+    # Determine movements to check what photos are needed.
+    # IMPORTANT: auto_generated=True bajas are system-created for no_localizado items — they do NOT
+    # require a photo. Only MANUAL movements (sobrante altas, manual disposals, transfers) trigger photos.
+    movements_check = await db.movements.find({"audit_id": audit_id}, {"type": 1, "auto_generated": 1}).to_list(1000)
+    manual_movements = [m for m in movements_check if not m.get("auto_generated")]
+    has_alta_movements  = any(m["type"] == "alta" for m in manual_movements)
+    has_baja_movements  = any(m["type"] in ("baja", "disposal") for m in manual_movements)
+    has_transf_movements = any(m["type"] == "transfer" for m in manual_movements)
+    # Apply per-type photo settings
+    needs_photo_ab    = (has_alta_movements and photo_required_alta) or (has_baja_movements and photo_required_baja)
     needs_photo_transf = has_transf_movements and photo_required_transf
+    # If there are NO manual movements at all, no photos needed and audit completes normally
+    if not manual_movements and not has_transf_movements:
+        needs_photo_ab = False
+        needs_photo_transf = False
 
     # Photos provided inline in this request
     photos = {}
@@ -2776,3 +2812,71 @@ app.add_middleware(AppLogMiddleware)
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+@api_router.post("/admin/import-users")
+async def import_users_bulk(file: UploadFile = File(...), user=Depends(get_current_user)):
+    """Super Admin: bulk import users from Excel file."""
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Acceso denegado")
+    content = await file.read()
+    import io
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(content))
+        ws = wb.active
+    except Exception:
+        raise HTTPException(400, "No se pudo leer el archivo Excel. Verifica que sea un archivo .xlsx válido.")
+
+    REQUIRED_COLS = {"nombre", "email", "password", "perfil"}
+    # Read header row
+    headers = [str(ws.cell(1, c).value or "").strip().lower() for c in range(1, ws.max_column + 1)]
+    missing = REQUIRED_COLS - set(headers)
+    if missing:
+        raise HTTPException(400, f"Columnas faltantes en el archivo: {', '.join(sorted(missing))}. Columnas requeridas: nombre, email, password, perfil")
+
+    VALID_PERFILES = {"Administrador", "Socio Tecnologico", "Super Administrador"}
+    errors = []
+    users_to_create = []
+    for row_idx in range(2, ws.max_rows + 1):
+        row = {headers[c]: str(ws.cell(row_idx, c + 1).value or "").strip() for c in range(len(headers))}
+        nombre = row.get("nombre", "")
+        email  = row.get("email", "")
+        pwd    = row.get("password", "")
+        perfil = row.get("perfil", "")
+        if not nombre and not email:
+            continue  # skip empty rows
+        row_errors = []
+        if not nombre: row_errors.append("nombre vacío")
+        if not email or "@" not in email: row_errors.append("email inválido")
+        if not pwd or len(pwd) < 6: row_errors.append("contraseña muy corta (min 6 chars)")
+        if perfil not in VALID_PERFILES: row_errors.append(f"perfil '{perfil}' inválido (use: Administrador, Socio Tecnologico)")
+        if row_errors:
+            errors.append(f"Fila {row_idx}: {'; '.join(row_errors)}")
+        else:
+            users_to_create.append({"nombre": nombre, "email": email, "password": pwd, "perfil": perfil})
+
+    if errors:
+        raise HTTPException(422, {"message": "Errores de validación en el archivo", "errors": errors})
+    if not users_to_create:
+        raise HTTPException(400, "El archivo no contiene usuarios válidos")
+
+    created = 0
+    skipped = 0
+    for u in users_to_create:
+        existing = await db.users.find_one({"email": u["email"]})
+        if existing:
+            skipped += 1
+            continue
+        await db.users.insert_one({
+            "id": str(uuid.uuid4()), "nombre": u["nombre"], "email": u["email"],
+            "password_hash": hash_password(u["password"]), "perfil": u["perfil"],
+            "is_active": True, "created_at": datetime.now(timezone.utc).isoformat(),
+            "is_backup": False
+        })
+        created += 1
+
+    await save_history(HistAction.CREATE_USER, user["email"], user["sub"], "bulk_import",
+                       f"Importación masiva: {created} creados, {skipped} omitidos")
+    return {"created": created, "skipped": skipped,
+            "message": f"Importación completada: {created} usuario(s) creado(s), {skipped} omitido(s) (email ya existe)"}
+
+
