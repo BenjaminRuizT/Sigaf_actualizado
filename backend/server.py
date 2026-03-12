@@ -922,20 +922,31 @@ async def cross_analysis(audit_id: str, user=Depends(get_current_user)):
     scans = await db.audit_scans.find({"audit_id": audit_id}, {"_id": 0}).to_list(10000)
     no_loc = [s for s in scans if s.get("classification") == "no_localizado"]
     sobrante = [s for s in scans if s.get("classification") in ("sobrante", "sobrante_desconocido")]
+    suggestions = _build_cross_suggestions(no_loc, sobrante, audits_map={audit_id: audit})
+    return {"suggestions": suggestions, "total": len(suggestions),
+            "no_localizado_count": len(no_loc), "sobrante_count": len(sobrante)}
 
+
+def _build_cross_suggestions(no_loc, sobrante, audits_map=None):
+    """Core matching logic shared by per-audit and global cross-analysis."""
     suggestions = []
     for nl in no_loc:
         nl_eq = nl.get("equipment_data") or {}
-        nl_desc = (nl_eq.get("descripcion") or "").upper()
+        nl_desc  = (nl_eq.get("descripcion") or "").upper()
         nl_marca = (nl_eq.get("marca") or "").upper()
         nl_modelo = (nl_eq.get("modelo") or "").upper()
-        nl_valor = float(nl_eq.get("valor_real") or 0)
+        nl_valor  = float(nl_eq.get("valor_real") or 0)
+        nl_audit  = (audits_map or {}).get(nl.get("audit_id"), {})
         for sb in sobrante:
+            # Skip same scan
+            if nl.get("id") == sb.get("id"):
+                continue
             sb_eq = sb.get("equipment_data") or {}
-            sb_desc = (sb_eq.get("descripcion") or "").upper()
+            sb_desc  = (sb_eq.get("descripcion") or "").upper()
             sb_marca = (sb_eq.get("marca") or "").upper()
             sb_modelo = (sb_eq.get("modelo") or "").upper()
-            sb_valor = float(sb_eq.get("valor_real") or 0)
+            sb_valor  = float(sb_eq.get("valor_real") or 0)
+            sb_audit  = (audits_map or {}).get(sb.get("audit_id"), {})
             score = 0
             matches = []
             if nl_desc and sb_desc and nl_desc == sb_desc:
@@ -957,6 +968,9 @@ async def cross_analysis(audit_id: str, user=Depends(get_current_user)):
                     "matches": matches,
                     "no_localizado": {
                         "scan_id": nl.get("id"),
+                        "audit_id": nl.get("audit_id"),
+                        "tienda": nl_audit.get("tienda", ""),
+                        "plaza": nl_audit.get("plaza", ""),
                         "codigo_barras": nl.get("codigo_barras"),
                         "descripcion": nl_eq.get("descripcion"),
                         "marca": nl_eq.get("marca"),
@@ -967,6 +981,9 @@ async def cross_analysis(audit_id: str, user=Depends(get_current_user)):
                     },
                     "sobrante": {
                         "scan_id": sb.get("id"),
+                        "audit_id": sb.get("audit_id"),
+                        "tienda": sb_audit.get("tienda", ""),
+                        "plaza": sb_audit.get("plaza", ""),
                         "codigo_barras": sb.get("codigo_barras"),
                         "descripcion": sb_eq.get("descripcion") or sb.get("descripcion_manual"),
                         "marca": sb_eq.get("marca") or sb.get("marca_manual"),
@@ -976,8 +993,57 @@ async def cross_analysis(audit_id: str, user=Depends(get_current_user)):
                     }
                 })
     suggestions.sort(key=lambda x: x["score"], reverse=True)
-    return {"suggestions": suggestions, "total": len(suggestions),
-            "no_localizado_count": len(no_loc), "sobrante_count": len(sobrante)}
+    return suggestions
+
+
+@api_router.get("/cross-analysis/global")
+async def global_cross_analysis(
+    plaza: Optional[str] = None,
+    limit: int = 2000,
+    user=Depends(get_current_user)
+):
+    """Super Admin: global cross-analysis across ALL audits — no_localizado vs sobrante."""
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Solo Super Administrador")
+
+    # Fetch completed/incompleto audits (optionally filtered by plaza)
+    audit_q = {"status": {"$in": ["completed", "incompleto", "pending_photos"]}}
+    if plaza:
+        audit_q["plaza"] = plaza
+    audits = await db.audits.find(audit_q, {"_id": 0, "id": 1, "tienda": 1, "plaza": 1, "cr_tienda": 1, "finished_at": 1}).to_list(5000)
+    if not audits:
+        return {"suggestions": [], "total": 0, "no_localizado_count": 0, "sobrante_count": 0,
+                "audits_analyzed": 0, "plazas": []}
+
+    audit_ids = [a["id"] for a in audits]
+    audits_map = {a["id"]: a for a in audits}
+
+    # Fetch all relevant scans in parallel
+    no_loc_task = db.audit_scans.find(
+        {"audit_id": {"$in": audit_ids}, "classification": "no_localizado"},
+        {"_id": 0}
+    ).to_list(limit)
+    sobrante_task = db.audit_scans.find(
+        {"audit_id": {"$in": audit_ids}, "classification": {"$in": ["sobrante", "sobrante_desconocido"]}},
+        {"_id": 0}
+    ).to_list(limit)
+    no_loc, sobrante = await asyncio.gather(no_loc_task, sobrante_task)
+
+    suggestions = _build_cross_suggestions(no_loc, sobrante, audits_map=audits_map)
+
+    # Distinct plazas for filter UI
+    plazas = sorted({a.get("plaza", "") for a in audits if a.get("plaza")})
+
+    return {
+        "suggestions": suggestions,
+        "total": len(suggestions),
+        "no_localizado_count": len(no_loc),
+        "sobrante_count": len(sobrante),
+        "audits_analyzed": len(audits),
+        "plazas": plazas,
+    }
+
+
 
 
 
