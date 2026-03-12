@@ -411,19 +411,26 @@ export default function AuditPage() {
         setSigVerify({ valid: sigRes.data.valid, signature: sigRes.data.signature, checked_at: new Date().toLocaleTimeString("es-MX") });
       } catch { /* silencioso */ }
       const movements = sumRes.data?.movements || [];
-      const hasAB = movements.some(m => ["alta","baja","disposal"].includes(m.type));
-      const hasTransf = movements.some(m => m.type === "transfer");
-      // Consultar settings para saber si se debe pedir foto
-      let photoRequiredAB = true, photoRequiredTransf = true;
+      // IMPORTANT: Only MANUAL movements trigger photo requirements.
+      // auto_generated=true movements are system-created bajas for no_localizado items.
+      const manualMovements = movements.filter(m => !m.auto_generated);
+      const hasAlta  = manualMovements.some(m => m.type === "alta");
+      const hasBaja  = manualMovements.some(m => m.type === "baja" || m.type === "disposal");
+      const hasTransf = manualMovements.some(m => m.type === "transfer");
+      // Fetch settings using the correct separate fields
+      let photoRequiredAlta = true, photoRequiredBaja = true, photoRequiredTransf = true;
       try {
         const sRes = await api.get("/system-settings/public");
-        photoRequiredAB = sRes.data.photo_required_ab !== false;
+        photoRequiredAlta  = sRes.data.photo_required_alta  !== false;
+        photoRequiredBaja  = sRes.data.photo_required_baja  !== false;
         photoRequiredTransf = sRes.data.photo_required_transf !== false;
-      } catch { /* usar defaults */ }
-      const needsPhoto = (hasAB && photoRequiredAB) || (hasTransf && photoRequiredTransf);
+      } catch { /* use defaults */ }
+      const needsPhotoAB    = (hasAlta && photoRequiredAlta) || (hasBaja && photoRequiredBaja);
+      const needsPhotoTransf = hasTransf && photoRequiredTransf;
+      const needsPhoto = needsPhotoAB || needsPhotoTransf;
       if (needsPhoto) {
-        // Solo pedir foto si hay movimientos que documentar Y la config lo requiere
-        setPendingFinalize({ hasAB: hasAB && photoRequiredAB, hasTransf: hasTransf && photoRequiredTransf });
+        // Only request photo if there are movements to document AND config requires it
+        setPendingFinalize({ hasAB: needsPhotoAB, hasTransf: needsPhotoTransf });
         setPhotoABCapture(null);
         setPhotoTransfCapture(null);
         setPhotoDialog(true);
