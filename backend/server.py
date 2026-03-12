@@ -830,7 +830,8 @@ async def rollback_action(snapshot_id: str, current_user=Depends(get_current_use
 
 # ==================== SYSTEM SETTINGS ====================
 _DEFAULT_SETTINGS = {
-    "photo_required_ab": True,            # Pedir foto de formato ALTAS/BAJAS
+    "photo_required_alta": True,          # Pedir foto de formato ALTAS
+    "photo_required_baja": True,          # Pedir foto de formato BAJAS
     "photo_required_transf": True,        # Pedir foto de formato TRANSFERENCIAS
     "pending_photos_ttl_hours": 24,       # Horas para completar fotos antes de eliminar la auditoría
 }
@@ -866,6 +867,120 @@ async def get_public_settings(user=Depends(get_current_user)):
     if not doc:
         return _DEFAULT_SETTINGS.copy()
     return {k: doc.get(k, v) for k, v in _DEFAULT_SETTINGS.items()}
+
+
+@api_router.get("/catalog/equipment-types")
+async def get_equipment_catalog(user=Depends(get_current_user)):
+    """Get dynamic catalog of descriptions and brands from the MAF + curated additions."""
+    # Base curated catalog covering all known OXXO equipment types
+    CURATED_DESCRIPTIONS = [
+        "ACCESS POINT", "CAMARA CCTV", "COMPUTADORA", "COMPUTADORA ALL IN ONE",
+        "DISCO DURO EXTERNO", "DVR/NVR", "ESCANER ID / LECTOR BIOMETRICO",
+        "IMPRESORA", "IMPRESORA FISCAL", "LAPTOP",
+        "LECTOR DE CODIGO DE BARRAS", "LECTOR DE HUELLA", "MONITOR",
+        "MONITOR P/PUNTO DE VENTA", "NOBREAK / UPS", "PROYECTOR",
+        "PUNTO DE VENTA", "REGULADOR DE ENERGIA", "ROUTER",
+        "SCANNER / ESCANER", "SERVIDOR", "SWITCH", "TABLET",
+        "TECLADO / MOUSE", "TELEFONO IP", "TERMINAL BANCARIA",
+        "REGULADOR/UPS/BATERIA", "HANDHELD P/PROCESOS", "OTRO"
+    ]
+    CURATED_BRANDS = [
+        "APC", "APPLE", "ARUBA", "AXIS", "BELKIN", "BIXOLON",
+        "BOSCH", "BROTHER", "CANON", "CISCO", "CPS", "D-LINK",
+        "DAHUA", "DATALOGIC", "DELL", "EATON", "EPSON", "FANVIL",
+        "FUJITSU", "GRANDSTREAM", "HANWHA", "HIKVISION", "HONEYWELL",
+        "HP", "HUAWEI", "IBM", "INGENICO", "KOBLENZ", "LENOVO",
+        "LEXMARK", "LG", "LOGITECH", "MERAKI", "MICROSOFT", "MOTOROLA",
+        "NEWLAND", "OPTOMA", "PAX", "POLY", "REASA", "REOLINK",
+        "SAMSUNG", "SAM4S", "SEAGATE", "STAR", "SYMETRY",
+        "TOSHIBA", "TP-LINK", "TRIPP LITE", "UBIQUITI", "VERIFONE",
+        "VERKADA", "WD", "YEALINK", "ZEBRA", "OTRO"
+    ]
+    # Also pull distinct values from the MAF for anything not in curated list
+    pipeline_desc = [{"$group": {"_id": "$descripcion"}}, {"$match": {"_id": {"$ne": None, "$ne": ""}}}, {"$limit": 500}]
+    pipeline_marca = [{"$group": {"_id": "$marca"}}, {"$match": {"_id": {"$ne": None, "$ne": ""}}}, {"$limit": 500}]
+    maf_descs, maf_marcas = await asyncio.gather(
+        db.equipment.aggregate(pipeline_desc).to_list(500),
+        db.equipment.aggregate(pipeline_marca).to_list(500),
+    )
+    all_desc = sorted(set(CURATED_DESCRIPTIONS) | {d["_id"].upper().strip() for d in maf_descs if d.get("_id")})
+    all_marca = sorted(set(CURATED_BRANDS) | {m["_id"].upper().strip() for m in maf_marcas if m.get("_id")})
+    # Move OTRO to end
+    if "OTRO" in all_desc: all_desc.remove("OTRO"); all_desc.append("OTRO")
+    if "OTRO" in all_marca: all_marca.remove("OTRO"); all_marca.append("OTRO")
+    return {"descriptions": all_desc, "brands": all_marca}
+
+
+@api_router.get("/audits/{audit_id}/cross-analysis")
+async def cross_analysis(audit_id: str, user=Depends(get_current_user)):
+    """Super Admin: compare no_localizado vs sobrante for potential matches (description, brand, model, value)."""
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Solo Super Administrador")
+    audit = await db.audits.find_one({"id": audit_id}, {"_id": 0})
+    if not audit:
+        raise HTTPException(404, "Audit not found")
+    scans = await db.audit_scans.find({"audit_id": audit_id}, {"_id": 0}).to_list(10000)
+    no_loc = [s for s in scans if s.get("classification") == "no_localizado"]
+    sobrante = [s for s in scans if s.get("classification") in ("sobrante", "sobrante_desconocido")]
+
+    suggestions = []
+    for nl in no_loc:
+        nl_eq = nl.get("equipment_data") or {}
+        nl_desc = (nl_eq.get("descripcion") or "").upper()
+        nl_marca = (nl_eq.get("marca") or "").upper()
+        nl_modelo = (nl_eq.get("modelo") or "").upper()
+        nl_valor = float(nl_eq.get("valor_real") or 0)
+        for sb in sobrante:
+            sb_eq = sb.get("equipment_data") or {}
+            sb_desc = (sb_eq.get("descripcion") or "").upper()
+            sb_marca = (sb_eq.get("marca") or "").upper()
+            sb_modelo = (sb_eq.get("modelo") or "").upper()
+            sb_valor = float(sb_eq.get("valor_real") or 0)
+            score = 0
+            matches = []
+            if nl_desc and sb_desc and nl_desc == sb_desc:
+                score += 40; matches.append("Descripción")
+            elif nl_desc and sb_desc and (nl_desc in sb_desc or sb_desc in nl_desc):
+                score += 20; matches.append("Descripción (parcial)")
+            if nl_marca and sb_marca and nl_marca == sb_marca:
+                score += 25; matches.append("Marca")
+            if nl_modelo and sb_modelo and nl_modelo == sb_modelo:
+                score += 25; matches.append("Modelo")
+            elif nl_modelo and sb_modelo and (nl_modelo in sb_modelo or sb_modelo in nl_modelo):
+                score += 15; matches.append("Modelo (parcial)")
+            if nl_valor > 0 and sb_valor > 0 and abs(nl_valor - sb_valor) / max(nl_valor, sb_valor) < 0.05:
+                score += 10; matches.append("Valor similar")
+            if score >= 40:
+                suggestions.append({
+                    "score": score,
+                    "confidence": "Alta" if score >= 75 else "Media" if score >= 50 else "Baja",
+                    "matches": matches,
+                    "no_localizado": {
+                        "scan_id": nl.get("id"),
+                        "codigo_barras": nl.get("codigo_barras"),
+                        "descripcion": nl_eq.get("descripcion"),
+                        "marca": nl_eq.get("marca"),
+                        "modelo": nl_eq.get("modelo"),
+                        "serie": nl_eq.get("serie"),
+                        "valor_real": nl_valor,
+                        "no_activo": nl_eq.get("no_activo"),
+                    },
+                    "sobrante": {
+                        "scan_id": sb.get("id"),
+                        "codigo_barras": sb.get("codigo_barras"),
+                        "descripcion": sb_eq.get("descripcion") or sb.get("descripcion_manual"),
+                        "marca": sb_eq.get("marca") or sb.get("marca_manual"),
+                        "modelo": sb_eq.get("modelo") or sb.get("modelo_manual"),
+                        "serie": sb_eq.get("serie") or sb.get("serie_manual"),
+                        "valor_real": sb_valor,
+                    }
+                })
+    suggestions.sort(key=lambda x: x["score"], reverse=True)
+    return {"suggestions": suggestions, "total": len(suggestions),
+            "no_localizado_count": len(no_loc), "sobrante_count": len(sobrante)}
+
+
+
 
 
 @api_router.get("/auth/me")
@@ -1019,10 +1134,16 @@ async def create_audit(input: AuditCreateInput, user=Depends(get_current_user)):
     store = await db.stores.find_one({"cr_tienda": input.cr_tienda}, {"_id": 0})
     if not store:
         raise HTTPException(404, "Store not found")
-    active = await db.audits.find_one({"cr_tienda": input.cr_tienda, "status": "in_progress"}, {"_id": 0})
+    # Check for active audit (in_progress) OR pending_photos (waiting for photos)
+    active = await db.audits.find_one(
+        {"cr_tienda": input.cr_tienda, "status": {"$in": ["in_progress", "pending_photos"]}},
+        {"_id": 0}
+    )
     if active:
-        # Ensure store is marked in_progress (may not be set if audit pre-dates this fix)
-        await db.stores.update_one({"cr_tienda": input.cr_tienda}, {"$set": {"audit_status": "in_progress", "last_audit_id": active["id"]}})
+        # Ensure store is marked correctly
+        await db.stores.update_one({"cr_tienda": input.cr_tienda}, {"$set": {
+            "audit_status": active["status"], "last_audit_id": active["id"]
+        }})
         return active
     audit = {
         "id": str(uuid.uuid4()), "cr_tienda": input.cr_tienda, "tienda": store["tienda"],
@@ -1187,7 +1308,9 @@ async def finalize_audit(audit_id: str, input: Optional[FinalizeWithPhotosInput]
 
     # ── Check if photos are needed and not yet provided ──────────────────
     settings = await db.system_settings.find_one({"_id": "global"}) or {}
-    photo_required_ab    = settings.get("photo_required_ab", True)
+    photo_required_alta  = settings.get("photo_required_alta", True)
+    photo_required_baja  = settings.get("photo_required_baja", True)
+    photo_required_ab    = photo_required_alta or photo_required_baja  # AB format needed if either is on
     photo_required_transf = settings.get("photo_required_transf", True)
     ttl_hours = int(settings.get("pending_photos_ttl_hours", 24))
 
