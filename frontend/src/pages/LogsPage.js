@@ -52,6 +52,7 @@ export default function LogsPage() {
   const [auditData, setAuditData] = useState({ items: [], total: 0, page: 1, pages: 1 });
   const [auditFilter, setAuditFilter] = useState("all");
   const [auditPage, setAuditPage] = useState(1);
+  const [auditGlobalStats, setAuditGlobalStats] = useState(null);
 
   const [selectedAudit, setSelectedAudit] = useState(null);
   const [auditSummary, setAuditSummary] = useState(null);
@@ -102,8 +103,12 @@ export default function LogsPage() {
       const params = { page: auditPage, limit: 50 };
       if (auditFilter !== "all") params.status = auditFilter;
       if (searchDebounced) params.search = searchDebounced;
-      const res = await api.get("/logs/audits", { params });
+      const [res, statsRes] = await Promise.all([
+        api.get("/logs/audits", { params }),
+        api.get("/audits/stats/summary").catch(() => ({ data: null })),
+      ]);
       setAuditData(res.data);
+      if (statsRes.data) setAuditGlobalStats(statsRes.data);
     } catch {}
   }, [api, auditPage, auditFilter, searchDebounced]);
 
@@ -584,6 +589,27 @@ ${(a.photo_ab || a.photo_transf) ? `
 
         {/* ── Audits Tab ── */}
         <TabsContent value="audits" className="space-y-4">
+          {/* Stats globales */}
+          {auditGlobalStats && (
+            <div className="grid grid-cols-3 gap-3">
+              <Card className="border-primary/20 bg-primary/5"><CardContent className="p-3 text-center">
+                <p className="text-2xl font-bold font-mono text-primary">{auditGlobalStats.total_audits}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Auditorías realizadas</p>
+              </CardContent></Card>
+              <Card className="border-emerald-500/20 bg-emerald-500/5"><CardContent className="p-3 text-center">
+                <p className="text-2xl font-bold font-mono text-emerald-600">{auditGlobalStats.stores_audited}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Tiendas auditadas</p>
+              </CardContent></Card>
+              <Card className="border-muted"><CardContent className="p-3 text-center">
+                <p className="text-2xl font-bold font-mono">
+                  {auditGlobalStats.total_stores > 0
+                    ? `${Math.round(auditGlobalStats.stores_audited / auditGlobalStats.total_stores * 100)}%`
+                    : "—"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Cobertura ({auditGlobalStats.stores_audited}/{auditGlobalStats.total_stores})</p>
+              </CardContent></Card>
+            </div>
+          )}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <Select value={auditFilter} onValueChange={v => { setAuditFilter(v); setAuditPage(1); }}>
               <SelectTrigger className="w-48" data-testid="audit-filter"><SelectValue /></SelectTrigger>

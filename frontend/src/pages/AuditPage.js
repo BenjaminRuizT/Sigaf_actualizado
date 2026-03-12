@@ -1107,8 +1107,8 @@ export default function AuditPage() {
       </Dialog>
 
       {/* Photo dialog — camera only, required */}
-      <Dialog open={photoDialog} onOpenChange={() => {}}>
-        <DialogContent className="max-w-lg" data-testid="photo-dialog">
+      <Dialog open={photoDialog} onOpenChange={(open) => { if (!open) { /* handled by custom close btn */ } }}>
+        <DialogContent className="max-w-lg [&>button:first-of-type]:hidden" data-testid="photo-dialog">
           <DialogHeader>
             <div className="flex items-start justify-between">
               <div>

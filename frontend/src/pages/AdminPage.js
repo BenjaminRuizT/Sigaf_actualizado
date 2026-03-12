@@ -33,11 +33,19 @@ export default function AdminPage({ defaultTab = "users" }) {
   const [eqForm, setEqForm] = useState({});
   const [resetDialog, setResetDialog] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetPasswordError, setResetPasswordError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [mafFile, setMafFile] = useState(null);
   const [usersFile, setUsersFile] = useState(null);
   const [sysSettings, setSysSettings] = useState({ photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24 });
   const [sysSettingsSaving, setSysSettingsSaving] = useState(false);
+
+  // Importación masiva de usuarios
+  const [importUsersDialog, setImportUsersDialog] = useState(false);
+  const [importUsersFile, setImportUsersFile] = useState(null);
+  const [importUsersLoading, setImportUsersLoading] = useState(false);
+  const [importUsersErrors, setImportUsersErrors] = useState([]);
 
   // ── History state ────────────────────────────────────────────────────────
   const ACTION_META = {
@@ -122,7 +130,8 @@ export default function AdminPage({ defaultTab = "users" }) {
   useEffect(() => { fetchPlazas(); }, [fetchPlazas]);
   useEffect(() => { fetchUnlockRequests(); }, [fetchUnlockRequests]);
   useEffect(() => {
-    api.get("/admin/system-settings").then(r => setSysSettings(r.data)).catch(() => {});
+    const DEFAULTS = { photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24 };
+    api.get("/admin/system-settings").then(r => setSysSettings({ ...DEFAULTS, ...r.data })).catch(() => {});
   }, [api]);
 
   const handleSaveSysSettings = async (newSettings) => {
@@ -164,17 +173,61 @@ export default function AdminPage({ defaultTab = "users" }) {
 
   const handleResetData = async () => {
     if (!mafFile || !usersFile) { toast.error("Debe adjuntar ambos archivos (MAF.xlsx y USUARIOS.xlsx)"); return; }
+    if (!resetPassword) { setResetPasswordError("Ingresa tu contraseña para confirmar"); return; }
+    setResetPasswordError("");
     setResetLoading(true);
     try {
+      // Validate password first
+      await api.post("/auth/validate-password", { password: resetPassword });
       const formData = new FormData();
       formData.append("maf_file", mafFile);
       formData.append("users_file", usersFile);
       const res = await api.post("/admin/reset-data", formData, { headers: { "Content-Type": "multipart/form-data" }, timeout: 120000 });
       toast.success(`Datos reiniciados: ${res.data.equipment} equipos, ${res.data.stores} tiendas, ${res.data.users} usuarios`);
-      setResetDialog(false); setMafFile(null); setUsersFile(null);
+      setResetDialog(false); setMafFile(null); setUsersFile(null); setResetPassword("");
       fetchUsers(); fetchEquipment();
-    } catch (err) { toast.error(err.response?.data?.detail || t("common.error")); }
+    } catch (err) {
+      if (err.response?.status === 401) {
+        setResetPasswordError("Contraseña incorrecta");
+      } else {
+        toast.error(err.response?.data?.detail || t("common.error"));
+      }
+    }
     finally { setResetLoading(false); }
+  };
+
+  const handleImportUsers = async () => {
+    if (!importUsersFile) { toast.error("Selecciona un archivo Excel"); return; }
+    setImportUsersLoading(true);
+    setImportUsersErrors([]);
+    try {
+      const fd = new FormData();
+      fd.append("file", importUsersFile);
+      const res = await api.post("/admin/import-users", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      toast.success(res.data.message);
+      setImportUsersDialog(false); setImportUsersFile(null);
+      fetchUsers();
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      if (detail?.errors) {
+        setImportUsersErrors(detail.errors);
+      } else {
+        toast.error(typeof detail === "string" ? detail : t("common.error"));
+      }
+    }
+    finally { setImportUsersLoading(false); }
+  };
+
+  const handleDownloadUsersTemplate = () => {
+    // Create a simple CSV-like template explanation as downloadable text
+    const headers = ["nombre", "email", "password", "perfil"];
+    const example = ["Juan Pérez", "juan.perez@oxxo.com", "Contraseña123", "Administrador"];
+    const example2 = ["María García", "maria.garcia@oxxo.com", "Password456", "Socio Tecnologico"];
+    let csv = headers.join(",") + "\n" + example.join(",") + "\n" + example2.join(",");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "plantilla_usuarios.csv";
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   };
 
   const handleDownloadTemplate = async (type) => {
@@ -261,7 +314,12 @@ export default function AdminPage({ defaultTab = "users" }) {
         </TabsList>
 
         <TabsContent value="users" className="space-y-4">
-          <div className="flex justify-end"><Button size="sm" onClick={openCreateUser} data-testid="create-user-btn" className="gap-2"><Plus className="h-4 w-4" /> {t("admin.create")}</Button></div>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => { setImportUsersDialog(true); setImportUsersFile(null); setImportUsersErrors([]); }} className="gap-2">
+              <Upload className="h-4 w-4" /> Importar Excel
+            </Button>
+            <Button size="sm" onClick={openCreateUser} data-testid="create-user-btn" className="gap-2"><Plus className="h-4 w-4" /> {t("admin.create")}</Button>
+          </div>
           <Card><div className="overflow-x-auto"><ScrollArea className="h-[500px]"><Table style={{minWidth:600}}>
             <TableHeader><TableRow>
               <TableHead><userSort.SortHeader col="nombre">{t("admin.name")}</userSort.SortHeader></TableHead>
@@ -672,11 +730,88 @@ export default function AdminPage({ defaultTab = "users" }) {
             </div>
           </div>
 
+          <DialogFooter className="gap-2 flex-col sm:flex-col">
+            {/* Confirmación con contraseña */}
+            <div className="w-full space-y-1.5">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Lock className="h-3.5 w-3.5 text-destructive" /> Confirmar con tu contraseña
+              </Label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Ingresa tu contraseña actual para confirmar"
+                  value={resetPassword}
+                  onChange={e => { setResetPassword(e.target.value); setResetPasswordError(""); }}
+                  className={`pr-10 ${resetPasswordError ? "border-destructive" : ""}`}
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" onClick={() => setShowPassword(s => !s)}>
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {resetPasswordError && <p className="text-xs text-destructive">{resetPasswordError}</p>}
+            </div>
+            <div className="flex gap-2 w-full justify-end">
+              <Button variant="outline" onClick={() => { setResetDialog(false); setMafFile(null); setUsersFile(null); setResetPassword(""); setResetPasswordError(""); }}>Cancelar</Button>
+              <Button variant="destructive" onClick={handleResetData} disabled={resetLoading || !mafFile || !usersFile || !resetPassword} data-testid="confirm-reset" className="gap-2">
+                {resetLoading ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : <RotateCcw className="h-4 w-4" />}
+                Reiniciar Datos
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Importación masiva de usuarios */}
+      <Dialog open={importUsersDialog} onOpenChange={v => { setImportUsersDialog(v); if (!v) { setImportUsersFile(null); setImportUsersErrors([]); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-heading uppercase tracking-tight flex items-center gap-2">
+              <Upload className="h-5 w-5 text-primary" /> Importar Usuarios desde Excel
+            </DialogTitle>
+            <DialogDescription>Carga masiva de usuarios desde un archivo .xlsx o .csv con la estructura requerida.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Estructura */}
+            <div className="bg-muted rounded-lg p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Estructura requerida</p>
+                <Button variant="ghost" size="sm" onClick={handleDownloadUsersTemplate} className="h-7 gap-1.5 text-xs">
+                  <FileSpreadsheet className="h-3.5 w-3.5" /> Descargar plantilla
+                </Button>
+              </div>
+              <div className="text-xs space-y-1">
+                <div className="flex gap-1 flex-wrap">
+                  {["nombre","email","password","perfil"].map(col => (
+                    <span key={col} className="font-mono bg-background border rounded px-1.5 py-0.5">{col}</span>
+                  ))}
+                </div>
+                <p className="text-muted-foreground">Perfiles válidos: <code>Administrador</code> · <code>Socio Tecnologico</code></p>
+                <p className="text-muted-foreground text-[11px]">La primera fila debe ser el encabezado. Los emails ya registrados serán omitidos.</p>
+              </div>
+            </div>
+            {/* File picker */}
+            <div className="space-y-2">
+              <Label className="font-medium">Archivo Excel <span className="text-destructive">*</span></Label>
+              <label className="flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background cursor-pointer hover:bg-muted transition-colors">
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground truncate">{importUsersFile ? importUsersFile.name : "Seleccionar archivo .xlsx..."}</span>
+                <input type="file" accept=".xlsx,.csv" className="hidden" onChange={e => { setImportUsersFile(e.target.files[0] || null); setImportUsersErrors([]); }} />
+              </label>
+              {importUsersFile && <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-xs">Archivo seleccionado</Badge>}
+            </div>
+            {/* Errores de validación */}
+            {importUsersErrors.length > 0 && (
+              <div className="bg-destructive/10 rounded-lg p-3 space-y-1 max-h-40 overflow-y-auto">
+                <p className="text-xs font-semibold text-destructive">Errores encontrados en el archivo:</p>
+                {importUsersErrors.map((e, i) => <p key={i} className="text-xs text-destructive">• {e}</p>)}
+              </div>
+            )}
+          </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setResetDialog(false); setMafFile(null); setUsersFile(null); }}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleResetData} disabled={resetLoading || !mafFile || !usersFile} data-testid="confirm-reset" className="gap-2">
-              {resetLoading ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : <RotateCcw className="h-4 w-4" />}
-              Reiniciar Datos
+            <Button variant="outline" onClick={() => setImportUsersDialog(false)}>Cancelar</Button>
+            <Button onClick={handleImportUsers} disabled={importUsersLoading || !importUsersFile} className="gap-2">
+              {importUsersLoading ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : <Upload className="h-4 w-4" />}
+              Importar Usuarios
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -684,3 +819,4 @@ export default function AdminPage({ defaultTab = "users" }) {
     </div>
   );
 }
+
