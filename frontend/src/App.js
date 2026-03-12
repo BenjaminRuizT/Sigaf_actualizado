@@ -18,25 +18,24 @@ import { useState, useEffect } from "react";
 import { RefreshCw, Sparkles, X } from "lucide-react";
 import "@/App.css";
 
-// ── Update banner — shown when a new Service Worker is waiting ──────────────
+// ── Update banner — shown when a new Service Worker has been activated ──────
 function UpdateBanner() {
   const [show, setShow] = useState(false);
-  const [swReg, setSwReg] = useState(null);
 
   useEffect(() => {
-    const handler = (e) => { setShow(true); setSwReg(e.detail?.reg || null); };
+    // Show banner whenever a new SW version is detected (waiting or already activated)
+    const handler = () => setShow(true);
     window.addEventListener('sw-update-available', handler);
+
+    // Also: check if the page was already loaded with a new SW by comparing versions
+    // If SW_ACTIVATED fires after load, it means the user's current session is stale
     return () => window.removeEventListener('sw-update-available', handler);
   }, []);
 
   if (!show) return null;
 
   const handleUpdate = () => {
-    if (swReg?.waiting) {
-      swReg.waiting.postMessage({ type: 'SKIP_WAITING' });
-    } else {
-      window.location.reload();
-    }
+    window.location.reload();
     setShow(false);
   };
 
@@ -46,13 +45,13 @@ function UpdateBanner() {
         <Sparkles className="h-5 w-5 shrink-0 text-yellow-300" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold leading-tight">Actualización disponible</p>
-          <p className="text-xs opacity-80 mt-0.5 leading-tight">Hay una nueva versión de SIGAF. Actualiza para ver las mejoras.</p>
+          <p className="text-xs opacity-80 mt-0.5 leading-tight">Hay una nueva versión de SIGAF. Recarga para ver las mejoras.</p>
         </div>
         <button
           onClick={handleUpdate}
           className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 transition rounded-lg px-3 py-1.5 text-xs font-semibold shrink-0"
         >
-          <RefreshCw className="h-3.5 w-3.5" /> Actualizar
+          <RefreshCw className="h-3.5 w-3.5" /> Recargar
         </button>
         <button onClick={() => setShow(false)} className="opacity-60 hover:opacity-100 transition shrink-0">
           <X className="h-4 w-4" />

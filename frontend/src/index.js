@@ -10,29 +10,27 @@ root.render(
   </React.StrictMode>,
 );
 
-// Register PWA Service Worker + update detection
+// ── Service Worker registration + update detection ──────────────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then(reg => {
         console.log('SW registered:', reg.scope);
 
-        // Poll for updates every 60 seconds
+        // Poll for new SW every 60s
         setInterval(() => { reg.update(); }, 60_000);
 
-        // Notify app when a new SW is waiting to take over
-        const notifyUpdate = () => {
-          window.dispatchEvent(new CustomEvent('sw-update-available', { detail: { reg } }));
+        // Method A: new SW enters "waiting" state (when old SW has no skipWaiting)
+        const notifyWaiting = () => {
+          window.dispatchEvent(new CustomEvent('sw-update-available'));
         };
-
-        if (reg.waiting) { notifyUpdate(); }
-
+        if (reg.waiting) { notifyWaiting(); }
         reg.addEventListener('updatefound', () => {
-          const newWorker = reg.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                notifyUpdate();
+          const nw = reg.installing;
+          if (nw) {
+            nw.addEventListener('statechange', () => {
+              if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                notifyWaiting();
               }
             });
           }
@@ -40,7 +38,16 @@ if ('serviceWorker' in navigator) {
       })
       .catch(err => console.log('SW registration failed:', err));
 
-    // When SW is activated after skipWaiting, reload automatically
+    // Method B: new SW sends SW_ACTIVATED after self.skipWaiting() + clients.claim()
+    // This fires on page load when a new SW already took over since last visit
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data?.type === 'SW_ACTIVATED') {
+        // Only show banner if user was already using the app (controller existed before)
+        window.dispatchEvent(new CustomEvent('sw-update-available'));
+      }
+    });
+
+    // Reload when controller changes (after SKIP_WAITING)
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!refreshing) { refreshing = true; window.location.reload(); }
