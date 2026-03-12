@@ -147,48 +147,56 @@ export default function AuditPage() {
   const [unknownSurplusDialog, setUnknownSurplusDialog] = useState(null);
   const [unknownForm, setUnknownForm] = useState({ codigo_barras: "", descripcion: "", descripcion_otro: "", marca: "", marca_otro: "", modelo: "", serie: "" });
   const [savingUnknown, setSavingUnknown] = useState(false);
-  // ── Catálogo de sobrante desconocido ─────────────────────────────────────
-  // Descripciones ordenadas alfabéticamente (revisión MAF OXXO completa)
-  const unknownDescOptions = [
-    "ACCESS POINT","CAMARA CCTV","COMPUTADORA","COMPUTADORA ALL IN ONE",
-    "DISCO DURO EXTERNO","DVR/NVR","IMPRESORA","IMPRESORA FISCAL",
-    "LAPTOP","LECTOR DE CODIGO DE BARRAS","MONITOR","NOBREAK / UPS",
-    "PROYECTOR","PUNTO DE VENTA","ROUTER","SCANNER / ESCANER",
-    "SERVIDOR","SWITCH","TABLET","TECLADO / MOUSE","TELEFONO IP",
-    "TERMINAL BANCARIA","OTRO"
-  ];
+  // ── Catálogo dinámico de sobrante desconocido (cargado desde el MAF) ────
+  const [catalogDesc, setCatalogDesc] = useState([]);
+  const [catalogMarca, setCatalogMarca] = useState([]);
+  useEffect(() => {
+    api.get("/catalog/equipment-types").then(res => {
+      setCatalogDesc(res.data.descriptions || []);
+      setCatalogMarca(res.data.brands || []);
+    }).catch(() => {
+      // Fallback curado si el endpoint falla
+      setCatalogDesc(["ACCESS POINT","CAMARA CCTV","COMPUTADORA","COMPUTADORA ALL IN ONE","DISCO DURO EXTERNO","DVR/NVR","ESCANER ID / LECTOR BIOMETRICO","IMPRESORA","IMPRESORA FISCAL","LAPTOP","LECTOR DE CODIGO DE BARRAS","MONITOR","MONITOR P/PUNTO DE VENTA","NOBREAK / UPS","PROYECTOR","PUNTO DE VENTA","REGULADOR DE ENERGIA","ROUTER","SCANNER / ESCANER","SERVIDOR","SWITCH","TABLET","TECLADO / MOUSE","TELEFONO IP","TERMINAL BANCARIA","OTRO"]);
+      setCatalogMarca(["APC","APPLE","AXIS","BOSCH","BROTHER","CANON","CISCO","DELL","EPSON","HANWHA","HIKVISION","HONEYWELL","HP","HUAWEI","LENOVO","LG","MERAKI","REASA","SAMSUNG","SYMETRY","ZEBRA","OTRO"]);
+    });
+  }, [api]);
 
   // Marcas filtradas según la descripción seleccionada
   const MARCA_BY_DESC = {
-    "ACCESS POINT":              ["ARUBA","CISCO","D-LINK","HUAWEI","MERAKI","TP-LINK","UBIQUITI","OTRO"],
-    "CAMARA CCTV":               ["AXIS","BOSCH","DAHUA","HANWHA","HIKVISION","REOLINK","VERKADA","OTRO"],
-    "COMPUTADORA":               ["ACER","APPLE","ASUS","DELL","HP","LENOVO","OTRO"],
-    "COMPUTADORA ALL IN ONE":    ["ACER","APPLE","ASUS","DELL","HP","LENOVO","OTRO"],
-    "DISCO DURO EXTERNO":        ["SAMSUNG","SEAGATE","TOSHIBA","WD","OTRO"],
-    "DVR/NVR":                   ["AXIS","BOSCH","DAHUA","HIKVISION","OTRO"],
-    "IMPRESORA":                 ["BROTHER","CANON","EPSON","HP","LEXMARK","OTRO"],
-    "IMPRESORA FISCAL":          ["BIXOLON","EPSON","SAM4S","STAR","OTRO"],
-    "LAPTOP":                    ["ACER","APPLE","ASUS","DELL","HP","LENOVO","OTRO"],
-    "LECTOR DE CODIGO DE BARRAS":["DATALOGIC","HONEYWELL","REASA","ZEBRA","OTRO"],
-    "MONITOR":                   ["ACER","DELL","HP","LG","SAMSUNG","OTRO"],
-    "NOBREAK / UPS":             ["APC","BELKIN","CPS","EATON","KOBLENZ","TRIPP LITE","OTRO"],
-    "PROYECTOR":                 ["BENQ","CANON","EPSON","LG","OPTOMA","SONY","OTRO"],
-    "PUNTO DE VENTA":            ["HP","INGENICO","NEWLAND","PAX","REASA","VERIFONE","ZEBRA","OTRO"],
-    "ROUTER":                    ["CISCO","MERAKI","OTRO"],
-    "SCANNER / ESCANER":         ["BROTHER","CANON","EPSON","FUJITSU","HP","REASA","ZEBRA","OTRO"],
-    "SERVIDOR":                  ["CISCO","DELL","HP","IBM","LENOVO","OTRO"],
-    "SWITCH":                    ["CISCO","D-LINK","HP","MERAKI","TP-LINK","OTRO"],
-    "TABLET":                    ["APPLE","HONEYWELL","HUAWEI","LENOVO","SAMSUNG","ZEBRA","OTRO"],
-    "TECLADO / MOUSE":           ["HP","DELL","LOGITECH","MICROSOFT","OTRO"],
-    "TELEFONO IP":               ["CISCO","FANVIL","GRANDSTREAM","POLY","YEALINK","OTRO"],
-    "TERMINAL BANCARIA":         ["INGENICO","NEWLAND","PAX","VERIFONE","OTRO"],
-    "OTRO":                      ["AXIS","BOSCH","BROTHER","CANON","CISCO","DELL","EPSON","HP","HONEYWELL","HUAWEI","LENOVO","LG","MERAKI","REASA","SAMSUNG","ZEBRA","OTRO"],
+    "ACCESS POINT":                      ["ARUBA","CISCO","D-LINK","HUAWEI","MERAKI","TP-LINK","UBIQUITI","OTRO"],
+    "CAMARA CCTV":                       ["AXIS","BOSCH","DAHUA","HANWHA","HIKVISION","REOLINK","VERKADA","OTRO"],
+    "COMPUTADORA":                       ["ACER","APPLE","ASUS","DELL","HP","LENOVO","OTRO"],
+    "COMPUTADORA ALL IN ONE":            ["ACER","APPLE","ASUS","DELL","HP","LENOVO","OTRO"],
+    "DISCO DURO EXTERNO":                ["SAMSUNG","SEAGATE","TOSHIBA","WD","OTRO"],
+    "DVR/NVR":                           ["AXIS","BOSCH","DAHUA","HIKVISION","OTRO"],
+    "ESCANER ID / LECTOR BIOMETRICO":    ["SYMETRY","HONEYWELL","HID","SUPREMA","OTRO"],
+    "IMPRESORA":                         ["BROTHER","CANON","EPSON","HP","LEXMARK","OTRO"],
+    "IMPRESORA FISCAL":                  ["BIXOLON","EPSON","SAM4S","STAR","OTRO"],
+    "LAPTOP":                            ["ACER","APPLE","ASUS","DELL","HP","LENOVO","OTRO"],
+    "LECTOR DE CODIGO DE BARRAS":        ["DATALOGIC","HONEYWELL","MOTOROLA","REASA","ZEBRA","OTRO"],
+    "LECTOR DE HUELLA":                  ["SYMETRY","HID","SUPREMA","OTRO"],
+    "MONITOR":                           ["ACER","DELL","HP","LG","SAMSUNG","OTRO"],
+    "MONITOR P/PUNTO DE VENTA":          ["ACER","DELL","HP","LG","SAMSUNG","OTRO"],
+    "NOBREAK / UPS":                     ["APC","BELKIN","CPS","EATON","KOBLENZ","TRIPP LITE","OTRO"],
+    "PROYECTOR":                         ["BENQ","CANON","EPSON","LG","OPTOMA","SONY","OTRO"],
+    "PUNTO DE VENTA":                    ["HP","INGENICO","NEWLAND","PAX","REASA","VERIFONE","ZEBRA","OTRO"],
+    "REGULADOR DE ENERGIA":              ["APC","CPS","KOBLENZ","TRIPP LITE","OTRO"],
+    "REGULADOR/UPS/BATERIA":             ["APC","CPS","EATON","KOBLENZ","TRIPP LITE","OTRO"],
+    "ROUTER":                            ["CISCO","MERAKI","OTRO"],
+    "SCANNER / ESCANER":                 ["BROTHER","CANON","EPSON","FUJITSU","HP","REASA","ZEBRA","OTRO"],
+    "SERVIDOR":                          ["CISCO","DELL","HP","IBM","LENOVO","OTRO"],
+    "SWITCH":                            ["CISCO","D-LINK","HP","MERAKI","TP-LINK","OTRO"],
+    "TABLET":                            ["APPLE","HONEYWELL","HUAWEI","LENOVO","SAMSUNG","ZEBRA","OTRO"],
+    "TECLADO / MOUSE":                   ["DELL","HP","LOGITECH","MICROSOFT","OTRO"],
+    "TELEFONO IP":                       ["CISCO","FANVIL","GRANDSTREAM","POLY","YEALINK","OTRO"],
+    "TERMINAL BANCARIA":                 ["INGENICO","NEWLAND","PAX","VERIFONE","OTRO"],
+    "HANDHELD P/PROCESOS":               ["HONEYWELL","MOTOROLA","REASA","ZEBRA","OTRO"],
+    "OTRO":                              catalogMarca,
   };
-  const unknownMarcaOptions = MARCA_BY_DESC[unknownForm.descripcion] || [
-    "ACER","APC","APPLE","ASUS","AXIS","BOSCH","BROTHER","CANON","CISCO",
-    "DELL","EPSON","HONEYWELL","HP","HUAWEI","LENOVO","LG","MERAKI",
-    "REASA","SAMSUNG","TOSHIBA","ZEBRA","OTRO"
-  ];
+
+  // Si la descripción no tiene mapeo específico → mostrar todas las marcas del catálogo
+  const unknownDescOptions = catalogDesc.length > 0 ? catalogDesc : ["OTRO"];
+  const unknownMarcaOptions = MARCA_BY_DESC[unknownForm.descripcion] || catalogMarca;
 
   // Photo state — camera only, required when there are movements
   const [photoDialog, setPhotoDialog] = useState(false);
@@ -347,6 +355,9 @@ export default function AuditPage() {
     if (unknownForm.marca === "OTRO" && !unknownForm.marca_otro.trim()) {
       toast.error("Escribe el nombre de la marca"); return;
     }
+    if (!unknownForm.serie.trim()) {
+      toast.error("El número de serie es obligatorio para sobrante desconocido"); return;
+    }
     setSavingUnknown(true);
     const payload = { ...unknownForm, descripcion: desc, marca };
     delete payload.descripcion_otro; delete payload.marca_otro;
@@ -453,11 +464,19 @@ export default function AuditPage() {
         fd.append("photo_transf", blob, "foto_transf.jpg");
       }
       fd.append("audit_id", auditId);
-      await api.post(`/audits/${auditId}/photos`, fd, { headers: { "Content-Type": "multipart/form-data" } });
-      toast.success("Fotos guardadas correctamente");
-    } catch { toast.info("Fotos registradas"); }
-    setPhotoDialog(false);
-    toast.success(t("audit.auditCompleted"));
+      const photoRes = await api.post(`/audits/${auditId}/photos`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setPhotoDialog(false);
+      // Reload the full audit state so status updates from pending_photos → completed
+      await fetchAudit();
+      if (photoRes.data?.completed) {
+        toast.success(t("audit.auditCompleted"));
+      } else {
+        toast.success("Fotos guardadas correctamente");
+      }
+    } catch {
+      setPhotoDialog(false);
+      toast.info("Fotos registradas");
+    }
   };
 
   const fmtMoney = (n) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
@@ -956,7 +975,28 @@ export default function AuditPage() {
       <Dialog open={!!transferDialog} onOpenChange={()=>setTransferDialog(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle className="font-heading uppercase tracking-tight">{t("audit.transfer")}</DialogTitle><DialogDescription>{t("audit.confirmTransfer")}</DialogDescription></DialogHeader>
-          {transferDialog&&(<div className="space-y-3"><div className="bg-muted rounded-lg p-3 space-y-1.5"><p className="text-xs text-muted-foreground uppercase">{t("audit.equipmentData")}</p><p className="font-mono text-sm">{transferDialog.codigo_barras}</p><p className="text-sm">{transferDialog.equipment_data?.descripcion} &middot; {transferDialog.equipment_data?.marca}</p></div><div className="flex items-center gap-3"><div className="flex-1 bg-muted rounded-lg p-3"><p className="text-xs text-muted-foreground uppercase">{t("audit.originStore")}</p><p className="text-sm font-medium mt-1">{transferDialog.origin_store?.tienda}</p></div><ArrowRightLeft className="h-5 w-5 text-primary shrink-0"/><div className="flex-1 bg-muted rounded-lg p-3"><p className="text-xs text-muted-foreground uppercase">{t("audit.destinationStore")}</p><p className="text-sm font-medium mt-1">{audit?.tienda}</p></div></div></div>)}
+          {transferDialog&&(<div className="space-y-3">
+  <div className="bg-muted rounded-lg p-3 space-y-1.5">
+    <p className="text-xs text-muted-foreground uppercase">{t("audit.equipmentData")}</p>
+    <p className="font-mono text-sm">{transferDialog.codigo_barras}</p>
+    <p className="text-sm">{transferDialog.equipment_data?.descripcion} &middot; {transferDialog.equipment_data?.marca}</p>
+  </div>
+  <div className="flex items-center gap-3">
+    <div className="flex-1 bg-muted rounded-lg p-3">
+      <p className="text-xs text-muted-foreground uppercase">{t("audit.originStore")}</p>
+      <p className="text-sm font-medium mt-0.5">{transferDialog.origin_store?.tienda}</p>
+      {transferDialog.origin_store?.plaza && <p className="text-xs text-muted-foreground">Plaza: {transferDialog.origin_store.plaza}</p>}
+      {transferDialog.origin_store?.cr_tienda && <p className="text-xs font-mono text-muted-foreground">CR: {transferDialog.origin_store.cr_tienda}</p>}
+    </div>
+    <ArrowRightLeft className="h-5 w-5 text-primary shrink-0"/>
+    <div className="flex-1 bg-muted rounded-lg p-3">
+      <p className="text-xs text-muted-foreground uppercase">{t("audit.destinationStore")}</p>
+      <p className="text-sm font-medium mt-0.5">{audit?.tienda}</p>
+      {audit?.plaza && <p className="text-xs text-muted-foreground">Plaza: {audit.plaza}</p>}
+      {audit?.cr_tienda && <p className="text-xs font-mono text-muted-foreground">CR: {audit.cr_tienda}</p>}
+    </div>
+  </div>
+</div>)}
           <DialogFooter className="gap-2"><Button variant="outline" onClick={()=>setTransferDialog(null)}>{t("common.cancel")}</Button><Button onClick={()=>handleTransfer(transferDialog)} className="gap-2"><ArrowRightLeft className="h-4 w-4"/>{t("audit.confirmTransfer")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1018,8 +1058,8 @@ export default function AuditPage() {
             <div className="space-y-1.5"><Label>Modelo <span className="text-red-500">*</span></Label>
               <Input value={unknownForm.modelo} onChange={e=>setUnknownForm(f=>({...f,modelo:e.target.value}))} placeholder="Ej. FX890II, LaserJet Pro..."/>
             </div>
-            <div className="space-y-1.5"><Label>Número de Serie</Label>
-              <Input value={unknownForm.serie} onChange={e=>setUnknownForm(f=>({...f,serie:e.target.value}))} placeholder="Número de serie (opcional)"/>
+            <div className="space-y-1.5"><Label>Número de Serie <span className="text-red-500">*</span></Label>
+              <Input value={unknownForm.serie} onChange={e=>setUnknownForm(f=>({...f,serie:e.target.value}))} placeholder="Número de serie del equipo"/>
             </div>
           </div>
           <DialogFooter className="gap-2">
@@ -1070,12 +1110,33 @@ export default function AuditPage() {
       <Dialog open={photoDialog} onOpenChange={() => {}}>
         <DialogContent className="max-w-lg" data-testid="photo-dialog">
           <DialogHeader>
-            <DialogTitle className="font-heading uppercase tracking-tight flex items-center gap-2">
-              <Camera className="h-5 w-5 text-primary" /> Foto de Formato de Movimiento
-            </DialogTitle>
-            <DialogDescription>
-              Es <strong>obligatorio</strong> tomar foto del formato de movimiento de activo para poder finalizar.
-            </DialogDescription>
+            <div className="flex items-start justify-between">
+              <div>
+                <DialogTitle className="font-heading uppercase tracking-tight flex items-center gap-2">
+                  <Camera className="h-5 w-5 text-primary" /> Foto de Formato de Movimiento
+                </DialogTitle>
+                <DialogDescription>
+                  Es <strong>obligatorio</strong> tomar foto del formato de movimiento de activo para poder finalizar.
+                </DialogDescription>
+              </div>
+              {/* Botón cerrar — deja la auditoría en pending_photos */}
+              <button
+                className="ml-3 mt-0.5 rounded-sm opacity-60 hover:opacity-100 transition"
+                title="Cerrar — continuar después"
+                onClick={async () => {
+                  setPhotoDialog(false);
+                  // Si la auditoría ya fue procesada (pending_photos), solo cerramos
+                  if (audit?.status === "pending_photos") return;
+                  // Si todavía no se llamó a finalize, la auditoría sigue in_progress — no pasa nada
+                  // Si ya se llamó finalize y el backend puso pending_photos, hacer reload
+                  await fetchAudit();
+                  const settings_res = await api.get("/system-settings/public").catch(() => ({ data: { pending_photos_ttl_hours: 24 } }));
+                  const hours = settings_res.data?.pending_photos_ttl_hours ?? 24;
+                  toast.info(`La auditoría quedó en espera de fotos. Tienes ${hours} hora${hours !== 1 ? "s" : ""} para completarla antes de que sea eliminada.`, { duration: 8000 });
+                }}>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </DialogHeader>
           <div className="space-y-5">
             {pendingFinalize?.hasAB && (

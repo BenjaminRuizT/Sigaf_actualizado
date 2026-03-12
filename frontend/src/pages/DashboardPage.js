@@ -219,15 +219,19 @@ export default function DashboardPage() {
                   className={`shrink-0 text-[10px] ${
                     store.audit_status === "in_progress"
                       ? "bg-blue-500/15 text-blue-600 border-blue-500/30"
-                      : store.audited
-                        ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
-                        : ""
+                      : store.audit_status === "pending_photos"
+                        ? "bg-amber-500/15 text-amber-700 border-amber-500/40"
+                        : store.audited
+                          ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                          : ""
                   }`}>
                   {store.audit_status === "in_progress"
                     ? "En Progreso"
-                    : store.audited
-                      ? t("dashboard.audited")
-                      : t("dashboard.notAudited")}
+                    : store.audit_status === "pending_photos"
+                      ? "⏳ Pend. Fotos"
+                      : store.audited
+                        ? t("dashboard.audited")
+                        : t("dashboard.notAudited")}
                 </Badge>
               </div>
               <div className="flex items-center gap-3 mt-3">

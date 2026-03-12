@@ -190,6 +190,8 @@ export default function EquipmentSearchPage() {
                     <div className="grid grid-cols-1 gap-2">
                       <Field icon={Barcode} label="Código de Barras" value={selected.codigo_barras} mono />
                       <Field icon={Hash} label="No. Activo" value={selected.no_activo} mono />
+                      <Field icon={Tag} label="Marca" value={selected.marca} />
+                      <Field icon={Tag} label="Modelo" value={selected.modelo} />
                       <Field icon={Tag} label="Serie" value={selected.serie} mono />
                     </div>
                   </div>

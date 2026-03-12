@@ -36,7 +36,7 @@ export default function AdminPage({ defaultTab = "users" }) {
   const [showPassword, setShowPassword] = useState(false);
   const [mafFile, setMafFile] = useState(null);
   const [usersFile, setUsersFile] = useState(null);
-  const [sysSettings, setSysSettings] = useState({ photo_required_ab: true, photo_required_transf: true, pending_photos_ttl_hours: 24 });
+  const [sysSettings, setSysSettings] = useState({ photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24 });
   const [sysSettingsSaving, setSysSettingsSaving] = useState(false);
 
   // ── History state ────────────────────────────────────────────────────────
@@ -340,17 +340,30 @@ export default function AdminPage({ defaultTab = "users" }) {
                   Controla si se solicita foto del formato físico al finalizar una auditoría con movimientos.
                 </p>
               </div>
-              {/* Toggle AB */}
+              {/* Toggle ALTAS */}
               <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
                 <div className="space-y-0.5">
-                  <p className="font-medium text-sm">Foto Formato ALTAS / BAJAS</p>
-                  <p className="text-xs text-muted-foreground">Se solicita cuando hay equipos dados de alta o de baja en la auditoría</p>
+                  <p className="font-medium text-sm">Foto Formato ALTAS</p>
+                  <p className="text-xs text-muted-foreground">Se solicita cuando hay equipos dados de alta (sobrante) en la auditoría</p>
                 </div>
                 <button
-                  onClick={() => handleSaveSysSettings({ ...sysSettings, photo_required_ab: !sysSettings.photo_required_ab })}
+                  onClick={() => handleSaveSysSettings({ ...sysSettings, photo_required_alta: !sysSettings.photo_required_alta })}
                   disabled={sysSettingsSaving}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${sysSettings.photo_required_ab ? "bg-primary" : "bg-muted-foreground/30"}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${sysSettings.photo_required_ab ? "translate-x-6" : "translate-x-1"}`} />
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${sysSettings.photo_required_alta ? "bg-primary" : "bg-muted-foreground/30"}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${sysSettings.photo_required_alta ? "translate-x-6" : "translate-x-1"}`} />
+                </button>
+              </div>
+              {/* Toggle BAJAS */}
+              <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                <div className="space-y-0.5">
+                  <p className="font-medium text-sm">Foto Formato BAJAS</p>
+                  <p className="text-xs text-muted-foreground">Se solicita cuando hay equipos dados de baja (no localizado) en la auditoría</p>
+                </div>
+                <button
+                  onClick={() => handleSaveSysSettings({ ...sysSettings, photo_required_baja: !sysSettings.photo_required_baja })}
+                  disabled={sysSettingsSaving}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${sysSettings.photo_required_baja ? "bg-primary" : "bg-muted-foreground/30"}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${sysSettings.photo_required_baja ? "translate-x-6" : "translate-x-1"}`} />
                 </button>
               </div>
               {/* Toggle Transferencias */}

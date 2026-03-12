@@ -17,7 +17,7 @@ import {
   Download, ChevronLeft, ChevronRight, ClipboardList, ArrowRightLeft, History,
   DollarSign, ArrowUpDown, Search, Eye, Trash2, StickyNote, CheckCircle,
   AlertTriangle, XCircle, TrendingUp, TrendingDown, RefreshCw, Printer, ImageDown,
-  ShieldCheck, ShieldAlert, X, ZoomIn
+  ShieldCheck, ShieldAlert, X, ZoomIn, GitCompare, Sparkles, ChevronDown, ChevronUp
 } from "lucide-react";
 
 
@@ -60,6 +60,10 @@ export default function LogsPage() {
   const [summaryFilter, setSummaryFilter] = useState("not_found");
   const [deleteDialog, setDeleteDialog] = useState(null);
   const [lightbox, setLightbox] = useState(null); // { src, title, filename }
+  const [crossAnalysis, setCrossAnalysis] = useState(null);
+  const [crossLoading, setCrossLoading] = useState(false);
+  const [crossDialog, setCrossDialog] = useState(false);
+  const [crossExpanded, setCrossExpanded] = useState(null);
 
   const classSort = useSortable("scanned_at");
   const movSort = useSortable("created_at");
@@ -849,9 +853,28 @@ ${(a.photo_ab || a.photo_transf) ? `
           )}
           <DialogFooter className="gap-2 sm:gap-0 flex-wrap">
             {isSuperAdmin && selectedAudit && (
-              <Button variant="destructive" size="sm" onClick={() => setDeleteDialog(selectedAudit)} data-testid="dialog-delete-audit" className="gap-2 mr-auto">
-                <Trash2 className="h-4 w-4" /> Eliminar Auditoría
-              </Button>
+              <div className="flex gap-2 mr-auto">
+                <Button variant="destructive" size="sm" onClick={() => setDeleteDialog(selectedAudit)} data-testid="dialog-delete-audit" className="gap-2">
+                  <Trash2 className="h-4 w-4" /> Eliminar Auditoría
+                </Button>
+                {/* Análisis comparativo No Localizado vs Sobrante — solo super admin */}
+                {["completed","pending_photos","incompleto"].includes(selectedAudit?.status) && (
+                  <Button variant="outline" size="sm" className="gap-2 border-purple-500/40 text-purple-700 hover:bg-purple-50"
+                    onClick={async () => {
+                      setCrossDialog(true);
+                      setCrossExpanded(null);
+                      if (crossAnalysis?.audit_id === selectedAudit.id) return; // ya cargado
+                      setCrossLoading(true);
+                      try {
+                        const res = await api.get(`/audits/${selectedAudit.id}/cross-analysis`);
+                        setCrossAnalysis({ ...res.data, audit_id: selectedAudit.id });
+                      } catch { toast.error("Error al ejecutar el análisis"); setCrossDialog(false); }
+                      finally { setCrossLoading(false); }
+                    }}>
+                    <GitCompare className="h-4 w-4" /> Análisis Cruzado
+                  </Button>
+                )}
+              </div>
             )}
             <div className="flex gap-2 flex-wrap justify-end">
               {selectedAudit?.photo_ab && (
@@ -923,6 +946,102 @@ ${(a.photo_ab || a.photo_transf) ? `
         </div>,
         document.body
       )}
+
+      {/* ══ Dialog: Análisis Cruzado No Localizado vs Sobrante ══ */}
+      <Dialog open={crossDialog} onOpenChange={v => { setCrossDialog(v); if (!v) setCrossExpanded(null); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="font-heading uppercase tracking-tight flex items-center gap-2">
+              <GitCompare className="h-5 w-5 text-purple-600" /> Análisis Cruzado — No Localizado vs Sobrante
+            </DialogTitle>
+            <DialogDescription>
+              {crossAnalysis
+                ? `${crossAnalysis.no_localizado_count} equipos no localizados · ${crossAnalysis.sobrante_count} sobrantes · ${crossAnalysis.total} coincidencias encontradas`
+                : "Analizando similitudes en descripción, marca, modelo y valor..."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3 min-h-0">
+            {crossLoading && (
+              <div className="flex flex-col items-center justify-center py-16 space-y-3">
+                <div className="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full" />
+                <p className="text-sm text-muted-foreground">Ejecutando análisis...</p>
+              </div>
+            )}
+            {!crossLoading && crossAnalysis && crossAnalysis.total === 0 && (
+              <div className="text-center py-12 space-y-2">
+                <CheckCircle className="h-12 w-12 text-emerald-400 mx-auto" />
+                <p className="font-medium">Sin coincidencias detectadas</p>
+                <p className="text-sm text-muted-foreground">No se encontraron similitudes entre los equipos no localizados y sobrantes de esta auditoría.</p>
+              </div>
+            )}
+            {!crossLoading && crossAnalysis && crossAnalysis.suggestions?.map((s, i) => {
+              const confColor = s.confidence === "Alta" ? "text-red-600 border-red-500/30 bg-red-500/8" :
+                                s.confidence === "Media" ? "text-amber-600 border-amber-500/30 bg-amber-500/8" :
+                                "text-blue-600 border-blue-500/30 bg-blue-500/8";
+              const isExp = crossExpanded === i;
+              return (
+                <div key={i} className={`rounded-lg border p-4 space-y-3 ${confColor}`}>
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Sparkles className="h-4 w-4 shrink-0" />
+                      <span className="font-semibold text-sm">Coincidencia {s.confidence}</span>
+                      <span className="text-xs font-mono bg-white/50 px-2 py-0.5 rounded-full">Score: {s.score}%</span>
+                      {s.matches.map(m => (
+                        <span key={m} className="text-[11px] px-2 py-0.5 rounded-full border bg-white/60">{m}</span>
+                      ))}
+                    </div>
+                    <button className="opacity-60 hover:opacity-100 transition" onClick={() => setCrossExpanded(isExp ? null : i)}>
+                      {isExp ? <ChevronUp className="h-4 w-4"/> : <ChevronDown className="h-4 w-4"/>}
+                    </button>
+                  </div>
+                  {/* Summary row */}
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="bg-white/50 rounded-lg p-3 space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-red-600">No Localizado</p>
+                      <p className="font-semibold">{s.no_localizado.descripcion || "—"}</p>
+                      <p className="text-xs text-muted-foreground">{s.no_localizado.marca} · {s.no_localizado.modelo}</p>
+                      <p className="font-mono text-xs">{s.no_localizado.codigo_barras}</p>
+                      <p className="text-xs font-medium text-red-700">{new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(s.no_localizado.valor_real||0)}</p>
+                    </div>
+                    <div className="bg-white/50 rounded-lg p-3 space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Sobrante</p>
+                      <p className="font-semibold">{s.sobrante.descripcion || "—"}</p>
+                      <p className="text-xs text-muted-foreground">{s.sobrante.marca} · {s.sobrante.modelo}</p>
+                      <p className="font-mono text-xs">{s.sobrante.codigo_barras || "Sin código"}</p>
+                      {s.sobrante.valor_real > 0 && <p className="text-xs font-medium text-amber-700">{new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(s.sobrante.valor_real)}</p>}
+                    </div>
+                  </div>
+                  {/* Expanded detail */}
+                  {isExp && (
+                    <div className="grid grid-cols-2 gap-3 text-xs bg-white/40 rounded-lg p-3">
+                      <div className="space-y-1">
+                        <p className="font-bold text-muted-foreground uppercase tracking-wider text-[10px]">Detalle No Localizado</p>
+                        <p>No. Activo: <span className="font-mono">{s.no_localizado.no_activo || "—"}</span></p>
+                        <p>Serie: <span className="font-mono">{s.no_localizado.serie || "—"}</span></p>
+                        <p>Código: <span className="font-mono">{s.no_localizado.codigo_barras}</span></p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="font-bold text-muted-foreground uppercase tracking-wider text-[10px]">Detalle Sobrante</p>
+                        <p>Serie: <span className="font-mono">{s.sobrante.serie || "—"}</span></p>
+                        <p>Código: <span className="font-mono">{s.sobrante.codigo_barras || "Sin código"}</span></p>
+                      </div>
+                      <div className="col-span-2 mt-1 p-2 bg-purple-500/10 rounded text-purple-800 text-xs">
+                        <strong>Sugerencia:</strong> Verificar físicamente si el equipo sobrante corresponde al equipo no localizado. Si coincide, proceder con ajuste manual en el inventario.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <DialogFooter className="pt-3 border-t">
+            <Button variant="outline" onClick={() => setCrossDialog(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
