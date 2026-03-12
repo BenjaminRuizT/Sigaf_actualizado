@@ -106,9 +106,11 @@ export default function LogsPage() {
       if (auditFilter !== "all") params.status = auditFilter;
       if (auditPlazaFilter !== "all") params.plaza = auditPlazaFilter;
       if (searchDebounced) params.search = searchDebounced;
+      const statsParams = {};
+      if (auditPlazaFilter !== "all") statsParams.plaza = auditPlazaFilter;
       const [res, statsRes] = await Promise.all([
         api.get("/logs/audits", { params }),
-        api.get("/audits/stats/summary").catch(() => ({ data: null })),
+        api.get("/audits/stats/summary", { params: statsParams }).catch(() => ({ data: null })),
       ]);
       setAuditData(res.data);
       if (statsRes.data) setAuditGlobalStats(statsRes.data);
