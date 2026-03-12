@@ -10,68 +10,54 @@ root.render(
   </React.StrictMode>,
 );
 
-// ── Service Worker registration + version-based update detection ─────────────
-// SW_VERSION must match SW_VERSION constant in public/sw.js
-const EXPECTED_SW_VERSION = '5.0';
-const SW_VERSION_KEY = 'sigaf_sw_version'; // localStorage — survives reloads
+// ── Service Worker: registration + update detection ───────────────────────────
+// How it works:
+//   1. Each new deploy changes sw.js (at minimum the CACHE_NAME changes).
+//   2. The browser detects the byte difference and installs the new SW.
+//   3. The new SW does NOT call skipWaiting() — it waits.
+//   4. reg.waiting becomes truthy → we dispatch 'sw-update-available'.
+//   5. UpdateBanner appears. User clicks "Recargar".
+//   6. We send SKIP_WAITING to the waiting SW.
+//   7. The new SW activates (controllerchange fires) → page reloads automatically.
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
       const reg = await navigator.serviceWorker.register('/sw.js');
 
-      // Poll for updates every 60s
-      setInterval(() => { reg.update(); }, 60_000);
+      const notifyUpdate = () =>
+        window.dispatchEvent(new CustomEvent('sw-update-available', { detail: { reg } }));
 
-      // Ask the active SW for its version
-      const askVersion = () => {
-        const sw = reg.active || navigator.serviceWorker.controller;
-        if (sw) sw.postMessage({ type: 'GET_VERSION' });
-      };
-
-      // Handle version reply from SW
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data?.type === 'SW_VERSION') {
-          const swVersion = event.data.version;
-          const lastKnown = localStorage.getItem(SW_VERSION_KEY);
-          if (lastKnown && lastKnown !== swVersion) {
-            // Different version than what user last saw → show update banner
-            window.dispatchEvent(new CustomEvent('sw-update-available'));
-          }
-          // Always save current version
-          localStorage.setItem(SW_VERSION_KEY, swVersion);
-        }
-      });
-
-      // Method A: new SW is in waiting state
+      // A new SW might already be waiting when the page loads (e.g. the user
+      // had the tab open while the deploy happened and then refreshed).
       if (reg.waiting) {
-        window.dispatchEvent(new CustomEvent('sw-update-available'));
+        notifyUpdate();
       }
+
+      // A new SW starts installing while the page is open.
       reg.addEventListener('updatefound', () => {
-        const nw = reg.installing;
-        if (nw) {
-          nw.addEventListener('statechange', () => {
-            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-              window.dispatchEvent(new CustomEvent('sw-update-available'));
-            }
-          });
-        }
+        const installing = reg.installing;
+        if (!installing) return;
+        installing.addEventListener('statechange', () => {
+          // 'installed' + an existing controller = a new version is waiting.
+          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+            notifyUpdate();
+          }
+        });
       });
 
-      // Method B: controller changed (new SW took over after skipWaiting)
-      // Save the OLD version before reloading so next load can compare
+      // After the user clicks "Recargar", we send SKIP_WAITING.
+      // The new SW activates, controllerchange fires, and we reload.
       let reloading = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (!reloading) {
           reloading = true;
-          // Clear stored version so next load detects the change
-          localStorage.removeItem(SW_VERSION_KEY);
           window.location.reload();
         }
       });
 
-      // Ask version after short delay (SW needs to be ready)
-      setTimeout(askVersion, 800);
+      // Poll for updates every 60 s (catches deploys that happen while the tab is idle).
+      setInterval(() => reg.update(), 60_000);
 
     } catch (err) {
       console.warn('SW registration failed:', err);

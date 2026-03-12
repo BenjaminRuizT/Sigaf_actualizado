@@ -23,19 +23,29 @@ function UpdateBanner() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    // Show banner whenever a new SW version is detected (waiting or already activated)
     const handler = () => setShow(true);
     window.addEventListener('sw-update-available', handler);
-
-    // Also: check if the page was already loaded with a new SW by comparing versions
-    // If SW_ACTIVATED fires after load, it means the user's current session is stale
     return () => window.removeEventListener('sw-update-available', handler);
   }, []);
 
   if (!show) return null;
 
   const handleUpdate = () => {
-    window.location.reload();
+    // Send SKIP_WAITING to the waiting SW — the page will reload via
+    // the controllerchange listener in index.js.
+    if (navigator.serviceWorker?.controller) {
+      // Find the waiting SW via getRegistration
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg?.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        } else {
+          // Fallback: no waiting SW found, just reload
+          window.location.reload();
+        }
+      }).catch(() => window.location.reload());
+    } else {
+      window.location.reload();
+    }
     setShow(false);
   };
 
