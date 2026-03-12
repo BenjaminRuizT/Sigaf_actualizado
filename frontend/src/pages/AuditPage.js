@@ -792,8 +792,8 @@ export default function AuditPage() {
                         <div className="flex-1 min-w-0">
                           <p className="font-mono text-sm font-medium">{scan.codigo_barras}</p>
                           {scan.registered_manually && scan.equipment_data ? (
-                            <p className="text-xs text-emerald-600 font-medium">
-                              ✓ {scan.equipment_data.descripcion} · {scan.equipment_data.marca} {scan.equipment_data.modelo}
+                            <p className="text-xs text-emerald-600 font-medium truncate">
+                              ✓ {scan.equipment_data.descripcion} · {scan.equipment_data.marca}
                             </p>
                           ) : (
                             <p className="text-xs text-muted-foreground truncate">
