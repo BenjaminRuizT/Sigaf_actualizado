@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Users, Monitor, Search, ChevronLeft, ChevronRight, ArrowUpDown, RotateCcw, AlertTriangle, Eye, EyeOff, Download, Upload, FileSpreadsheet, ShieldAlert, Settings, Camera, History, FileX, UserMinus, UserCog, UserPlus, DatabaseZap, Wrench, ChevronDown, ChevronUp, Filter, Lock } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Monitor, Search, ChevronLeft, ChevronRight, ArrowUpDown, RotateCcw, AlertTriangle, Eye, EyeOff, Download, Upload, FileSpreadsheet, ShieldAlert, Settings, Camera, History, FileX, UserMinus, UserCog, UserPlus, DatabaseZap, Wrench, ChevronDown, ChevronUp, Filter, Lock, CheckCircle } from "lucide-react";
 
 
 export default function AdminPage({ defaultTab = "users" }) {
@@ -84,7 +84,7 @@ export default function AdminPage({ defaultTab = "users" }) {
     finally { setHistLoading(false); }
   }, [api, histFilter]);
 
-  useEffect(() => { if (histLoaded) fetchHistory(); }, [histFilter]);
+  useEffect(() => { if (histLoaded) fetchHistory(); }, [histFilter, histLoaded, fetchHistory]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRollback = async (snap) => {
     if (!window.confirm(`¿Revertir esta acción?\n\n"${ACTION_META[snap.action]?.label}" sobre "${snap.target_label}"\n\nEsta operación restaurará el estado anterior.`)) return;
@@ -139,14 +139,36 @@ export default function AdminPage({ defaultTab = "users" }) {
   useEffect(() => { fetchUnlockRequests(); }, [fetchUnlockRequests]);
   useEffect(() => {
     const DEFAULTS = { photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24 };
-    api.get("/admin/system-settings").then(r => setSysSettings({ ...DEFAULTS, ...r.data })).catch(() => {});
+    api.get("/admin/system-settings").then(r => {
+      const raw = r.data || {};
+      setSysSettings({
+        ...DEFAULTS,
+        ...raw,
+        // Force numeric type — backend may have stored it as bool (bool bug) or it may be missing
+        pending_photos_ttl_hours: Number(raw.pending_photos_ttl_hours) > 0
+          ? Number(raw.pending_photos_ttl_hours)
+          : 24,
+      });
+    }).catch(() => {});
   }, [api]);
 
   const handleSaveSysSettings = async (newSettings) => {
     setSysSettingsSaving(true);
     try {
-      const res = await api.put("/admin/system-settings", newSettings);
-      setSysSettings(res.data);
+      const payload = {
+        ...newSettings,
+        pending_photos_ttl_hours: Math.max(1, Math.min(168, Number(newSettings.pending_photos_ttl_hours) || 24)),
+      };
+      const res = await api.put("/admin/system-settings", payload);
+      const DEFAULTS = { photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24 };
+      const raw = res.data || {};
+      setSysSettings({
+        ...DEFAULTS,
+        ...raw,
+        pending_photos_ttl_hours: Number(raw.pending_photos_ttl_hours) > 0
+          ? Number(raw.pending_photos_ttl_hours)
+          : Number(payload.pending_photos_ttl_hours) || 24,
+      });
       toast.success("Configuración guardada");
     } catch { toast.error("Error al guardar configuración"); }
     finally { setSysSettingsSaving(false); }
@@ -535,6 +557,22 @@ export default function AdminPage({ defaultTab = "users" }) {
                       } catch { toast.error("Error en la limpieza"); }
                     }}>
                     <Trash2 className="h-3.5 w-3.5" /> Limpiar ahora
+                  </Button>
+                </div>
+                {/* Fix pending_photos that no longer need photos */}
+                <div className="flex items-center justify-between p-4 rounded-lg border border-amber-500/20 bg-amber-500/5">
+                  <div className="space-y-0.5">
+                    <p className="font-medium text-sm text-amber-700">Corregir auditorías en espera de fotos</p>
+                    <p className="text-xs text-muted-foreground">Completa automáticamente las auditorías <em>pendiente de fotos</em> que ya no requieran foto según la configuración actual.</p>
+                  </div>
+                  <Button size="sm" variant="outline" className="gap-1.5 ml-4 shrink-0 border-amber-500/40 text-amber-700 hover:bg-amber-500/10"
+                    onClick={async () => {
+                      try {
+                        const res = await api.post("/admin/fix-pending-photos");
+                        toast.success(res.data.message);
+                      } catch { toast.error("Error al corregir auditorías"); }
+                    }}>
+                    <CheckCircle className="h-3.5 w-3.5" /> Corregir ahora
                   </Button>
                 </div>
               </div>

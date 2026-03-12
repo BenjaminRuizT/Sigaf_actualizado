@@ -219,15 +219,34 @@ export default function AuditPage() {
             setSigVerify({ valid: sigRes.data.valid, signature: sigRes.data.signature, checked_at: new Date().toLocaleTimeString("es-MX") });
           } catch { /* silencioso — no bloquear carga */ }
         }
-        // Si la auditoría está en pending_photos, reabrir el diálogo de fotos automáticamente
+        // Si la auditoría está en pending_photos, reabrir el diálogo de fotos si aún aplica
         if (res.data.status === "pending_photos") {
-          setPendingFinalize({
-            hasAB: res.data.needs_photo_ab && !res.data.photo_ab,
-            hasTransf: res.data.needs_photo_transf && !res.data.photo_transf,
-          });
-          setPhotoABCapture(null);
-          setPhotoTransfCapture(null);
-          setPhotoDialog(true);
+          // Re-check current system settings to avoid showing photo dialog
+          // for audits that were incorrectly marked pending_photos (pre-fix bug)
+          let photoRequiredAlta = true, photoRequiredBaja = true, photoRequiredTransf = true;
+          try {
+            const sRes = await api.get("/system-settings/public");
+            photoRequiredAlta  = sRes.data.photo_required_alta  !== false;
+            photoRequiredBaja  = sRes.data.photo_required_baja  !== false;
+            photoRequiredTransf = sRes.data.photo_required_transf !== false;
+          } catch { /* use defaults */ }
+          const needsAB    = res.data.needs_photo_ab    && !res.data.photo_ab    && (photoRequiredAlta || photoRequiredBaja);
+          const needsTransf = res.data.needs_photo_transf && !res.data.photo_transf && photoRequiredTransf;
+          if (needsAB || needsTransf) {
+            setPendingFinalize({ hasAB: needsAB, hasTransf: needsTransf });
+            setPhotoABCapture(null);
+            setPhotoTransfCapture(null);
+            setPhotoDialog(true);
+          } else {
+            // Settings changed so photos no longer required — auto-complete this audit
+            try {
+              await api.post(`/audits/${auditId}/finalize`);
+              const [a2, s2, sc2] = await Promise.all([
+                api.get(`/audits/${auditId}`), api.get(`/audits/${auditId}/summary`), api.get(`/audits/${auditId}/scans`),
+              ]);
+              setAudit(a2.data); setSummary(s2.data); setScans(sc2.data);
+            } catch { /* already completed or other status */ }
+          }
         }
       }
     } catch { toast.error(t("common.error")); }
@@ -442,7 +461,13 @@ export default function AuditPage() {
       let msg = "Error al finalizar la auditoría";
       if (typeof detail === "string") msg = detail;
       else if (Array.isArray(detail)) msg = detail.map(d => d.msg || JSON.stringify(d)).join(", ");
-      toast.error(msg);
+      // If auto-cancelled (no scans), navigate back to dashboard
+      if (msg.includes("Auto-cancelada") || msg.includes("cancelada automáticamente")) {
+        toast.info("No se escaneó ningún equipo. La auditoría fue cancelada.", { duration: 6000 });
+        setTimeout(() => navigate("/"), 1200);
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setFinalizing(false);
     }
