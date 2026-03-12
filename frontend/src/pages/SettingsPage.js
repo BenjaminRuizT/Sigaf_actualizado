@@ -41,15 +41,32 @@ export default function SettingsPage() {
   const { user, api } = useAuth();
 
   const [nombre, setNombre] = useState(user?.nombre || "");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showDeploy, setShowDeploy] = useState(false);
 
   const handleSaveProfile = async () => {
     if (!nombre.trim() && !password.trim()) return;
+    // Require current password if changing password
+    if (password.trim() && !currentPassword.trim()) {
+      toast.error("Debes ingresar tu contraseña actual para cambiarla");
+      return;
+    }
     setSaving(true);
     try {
+      // Validate current password first if changing password
+      if (password.trim()) {
+        try {
+          await api.post("/auth/validate-password", { password: currentPassword.trim() });
+        } catch {
+          toast.error("Contraseña actual incorrecta");
+          setSaving(false);
+          return;
+        }
+      }
       const body = {};
       if (nombre.trim() && nombre.trim() !== user?.nombre) body.nombre = nombre.trim();
       if (password.trim()) body.password = password.trim();
@@ -91,6 +108,29 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
+          {/* Current password — required when changing password */}
+          {password.trim() && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <Lock className="h-3.5 w-3.5 text-amber-600" />
+                Contraseña Actual <span className="text-destructive">*</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  type={showCurrentPw ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)}
+                  placeholder="Ingresa tu contraseña actual para confirmar"
+                  className="pr-10 border-amber-500/50 focus:border-amber-500"
+                  data-testid="current-password-input"
+                />
+                <button type="button" onClick={() => setShowCurrentPw(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showCurrentPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-amber-700">Se requiere tu contraseña actual para confirmar el cambio.</p>
+            </div>
+          )}
           <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
             <span>Correo: <strong>{user?.email}</strong></span>
             <span>Perfil: <strong>{user?.perfil}</strong></span>

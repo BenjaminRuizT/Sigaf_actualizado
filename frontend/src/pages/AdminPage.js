@@ -46,6 +46,14 @@ export default function AdminPage({ defaultTab = "users" }) {
   const [importUsersFile, setImportUsersFile] = useState(null);
   const [importUsersLoading, setImportUsersLoading] = useState(false);
   const [importUsersErrors, setImportUsersErrors] = useState([]);
+  const [importUsersFileValid, setImportUsersFileValid] = useState(null); // null=no validado, true=ok, false=error
+  const [importUsersFileMsg, setImportUsersFileMsg] = useState("");
+
+  // Reset data file validation
+  const [mafFileValid, setMafFileValid] = useState(null);
+  const [mafFileMsg, setMafFileMsg] = useState("");
+  const [usersFileValid, setUsersFileValid] = useState(null);
+  const [usersFileMsg, setUsersFileMsg] = useState("");
 
   // ── History state ────────────────────────────────────────────────────────
   const ACTION_META = {
@@ -169,6 +177,93 @@ export default function AdminPage({ defaultTab = "users" }) {
   const handleSaveEquipment = async () => {
     try { await api.put(`/admin/equipment/${editEq}`, eqForm); toast.success(t("common.success")); setEditEq(null); fetchEquipment(); }
     catch (err) { toast.error(err.response?.data?.detail || t("common.error")); }
+  };
+
+  // ── File validation helpers ──────────────────────────────────────────────
+  const USERS_REQUIRED_COLS = ["nombre", "email", "password", "perfil"];
+  const MAF_REQUIRED_COLS   = ["cr plaza", "plaza", "cr tienda", "tienda", "codigo barras", "no activo",
+                                "descripción", "marca", "modelo", "costo"];
+
+  const readXlsxHeaders = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        // Simple header extraction: read first row as CSV-like
+        // Use basic binary parsing to find first row
+        const text = new TextDecoder("utf-8", { fatal: false }).decode(data);
+        // For xlsx files we need a different approach - use ArrayBuffer
+        resolve({ raw: data });
+      } catch (err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+
+  const validateXlsxHeaders = async (file, requiredCols) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          // Parse first row using basic CSV-detection or raw text scan
+          const arr = new Uint8Array(e.target.result);
+          // Check file signature: xlsx = PK (zip), csv = plain text
+          const isXlsx = arr[0] === 0x50 && arr[1] === 0x4B;
+          const isCsv  = !isXlsx;
+          let headers = [];
+          if (isCsv) {
+            const text = new TextDecoder("utf-8", { fatal: false }).decode(arr);
+            const firstLine = text.split(/\r?\n/)[0];
+            headers = firstLine.split(",").map(h => h.trim().toLowerCase().replace(/['"]/g, ""));
+          } else {
+            // For xlsx: scan the raw bytes for the first row cell strings
+            // Simple approach: convert to text and look for common column names
+            const text = new TextDecoder("latin1", { fatal: false }).decode(arr);
+            // xlsx stores sheet data in xl/worksheets/sheet1.xml inside the zip
+            // Basic heuristic: look for <v> or <t> tags — too complex without a lib
+            // Instead flag as "not verifiable" and let backend validate
+            resolve({ valid: true, msg: "Archivo xlsx seleccionado — la estructura se validará al importar.", headers: [] });
+            return;
+          }
+          const missing = requiredCols.filter(r => !headers.some(h => h.includes(r.replace(/ /g, ""))));
+          if (missing.length === 0) {
+            resolve({ valid: true, msg: `✓ Estructura correcta (${headers.length} columnas detectadas)`, headers });
+          } else {
+            resolve({ valid: false, msg: `✗ Columnas faltantes: ${missing.join(", ")}`, headers });
+          }
+        } catch { resolve({ valid: true, msg: "Archivo seleccionado — estructura pendiente de validación.", headers: [] }); }
+      };
+      reader.onerror = () => resolve({ valid: false, msg: "No se pudo leer el archivo." });
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const handleImportUsersFileChange = async (file) => {
+    setImportUsersFile(file);
+    setImportUsersErrors([]);
+    setImportUsersFileValid(null);
+    setImportUsersFileMsg("Validando estructura...");
+    if (!file) return;
+    const result = await validateXlsxHeaders(file, USERS_REQUIRED_COLS);
+    setImportUsersFileValid(result.valid);
+    setImportUsersFileMsg(result.msg);
+  };
+
+  const handleMafFileChange = async (file) => {
+    setMafFile(file);
+    setMafFileValid(null);
+    setMafFileMsg(file ? "Archivo MAF seleccionado — la estructura se validará al procesar." : "");
+    if (file) setMafFileValid(true); // MAF is complex xlsx, backend validates
+  };
+
+  const handleUsersResetFileChange = async (file) => {
+    setUsersFile(file);
+    setUsersFileValid(null);
+    setUsersFileMsg("Validando estructura...");
+    if (!file) return;
+    const result = await validateXlsxHeaders(file, ["perfil", "nombre", "email"]);
+    setUsersFileValid(result.valid);
+    setUsersFileMsg(result.msg);
   };
 
   const handleResetData = async () => {
@@ -624,9 +719,14 @@ export default function AdminPage({ defaultTab = "users" }) {
                 <label className="flex-1 flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background cursor-pointer hover:bg-muted transition-colors">
                   <Upload className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground truncate">{mafFile ? mafFile.name : "Seleccionar archivo MAF.xlsx..."}</span>
-                  <input type="file" accept=".xlsx" className="hidden" onChange={e => setMafFile(e.target.files[0] || null)} data-testid="maf-file-input" />
+                  <input type="file" accept=".xlsx" className="hidden" onChange={e => handleMafFileChange(e.target.files[0] || null)} data-testid="maf-file-input" />
                 </label>
-                {mafFile && <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-xs shrink-0">Cargado</Badge>}
+                {mafFile && (
+                  <div className="flex items-center gap-2 flex-wrap mt-1">
+                    <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-xs">Cargado</Badge>
+                    {mafFileMsg && <span className="text-xs text-muted-foreground">{mafFileMsg}</span>}
+                  </div>
+                )}
               </div>
             </div>
             <div className="space-y-2">
@@ -635,9 +735,15 @@ export default function AdminPage({ defaultTab = "users" }) {
                 <label className="flex-1 flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background cursor-pointer hover:bg-muted transition-colors">
                   <Upload className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground truncate">{usersFile ? usersFile.name : "Seleccionar archivo USUARIOS.xlsx..."}</span>
-                  <input type="file" accept=".xlsx" className="hidden" onChange={e => setUsersFile(e.target.files[0] || null)} data-testid="users-file-input" />
+                  <input type="file" accept=".xlsx" className="hidden" onChange={e => handleUsersResetFileChange(e.target.files[0] || null)} data-testid="users-file-input" />
                 </label>
-                {usersFile && <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-xs shrink-0">Cargado</Badge>}
+                {usersFile && (
+                  <div className="flex flex-col gap-1 mt-1">
+                    <div className={`text-xs font-medium flex items-center gap-1.5 ${usersFileValid === false ? "text-destructive" : "text-emerald-600"}`}>
+                      {usersFileValid === false ? "✗" : "✓"} {usersFileMsg}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -693,8 +799,8 @@ export default function AdminPage({ defaultTab = "users" }) {
               {resetPasswordError && <p className="text-xs text-destructive">{resetPasswordError}</p>}
             </div>
             <div className="flex gap-2 w-full justify-end">
-              <Button variant="outline" onClick={() => { setResetDialog(false); setMafFile(null); setUsersFile(null); setResetPassword(""); setResetPasswordError(""); }}>Cancelar</Button>
-              <Button variant="destructive" onClick={handleResetData} disabled={resetLoading || !mafFile || !usersFile || !resetPassword} data-testid="confirm-reset" className="gap-2">
+              <Button variant="outline" onClick={() => { setResetDialog(false); setMafFile(null); setUsersFile(null); setResetPassword(""); setResetPasswordError(""); setMafFileValid(null); setMafFileMsg(""); setUsersFileValid(null); setUsersFileMsg(""); }}>Cancelar</Button>
+              <Button variant="destructive" onClick={handleResetData} disabled={resetLoading || !mafFile || !usersFile || !resetPassword || usersFileValid === false} data-testid="confirm-reset" className="gap-2">
                 {resetLoading ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : <RotateCcw className="h-4 w-4" />}
                 Reiniciar Datos
               </Button>
@@ -737,9 +843,17 @@ export default function AdminPage({ defaultTab = "users" }) {
               <label className="flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background cursor-pointer hover:bg-muted transition-colors">
                 <Upload className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground truncate">{importUsersFile ? importUsersFile.name : "Seleccionar archivo .xlsx..."}</span>
-                <input type="file" accept=".xlsx,.csv" className="hidden" onChange={e => { setImportUsersFile(e.target.files[0] || null); setImportUsersErrors([]); }} />
+                <input type="file" accept=".xlsx,.csv" className="hidden" onChange={e => handleImportUsersFileChange(e.target.files[0] || null)} />
               </label>
-              {importUsersFile && <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-xs">Archivo seleccionado</Badge>}
+              {importUsersFile && (
+              <div className={`flex items-center gap-2 mt-1 p-2 rounded-lg text-xs font-medium ${
+                importUsersFileValid === null ? "bg-muted text-muted-foreground" :
+                importUsersFileValid ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/30" :
+                "bg-destructive/10 text-destructive border border-destructive/30"
+              }`}>
+                {importUsersFileValid === null ? "⏳" : importUsersFileValid ? "✓" : "✗"} {importUsersFileMsg}
+              </div>
+            )}
             </div>
             {/* Errores de validación */}
             {importUsersErrors.length > 0 && (
@@ -751,7 +865,7 @@ export default function AdminPage({ defaultTab = "users" }) {
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setImportUsersDialog(false)}>Cancelar</Button>
-            <Button onClick={handleImportUsers} disabled={importUsersLoading || !importUsersFile} className="gap-2">
+            <Button onClick={handleImportUsers} disabled={importUsersLoading || !importUsersFile || importUsersFileValid === false} className="gap-2">
               {importUsersLoading ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> : <Upload className="h-4 w-4" />}
               Importar Usuarios
             </Button>

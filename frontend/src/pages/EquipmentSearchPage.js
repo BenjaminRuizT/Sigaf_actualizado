@@ -28,7 +28,8 @@ export default function EquipmentSearchPage() {
     setLoading(true);
     setSelected(null);
     try {
-      const res = await api.get("/equipment/search", { params: { q: trimmed, limit } });
+      // Always request maximum from backend; local pagination controls page size
+      const res = await api.get("/equipment/search", { params: { q: trimmed, limit: 0 } });
       const found = (res.data.results || []).length > 0;
       setResults(res.data.results || []);
       setHasMore(res.data.has_more || false);
@@ -87,12 +88,12 @@ export default function EquipmentSearchPage() {
               value={limit}
               onChange={e => { setLimit(Number(e.target.value)); setEquipPage(1); }}
               className="h-11 px-3 rounded-md border border-input bg-background text-sm font-medium min-w-[80px]"
-              title="Máximo de resultados"
+              title="Registros por página"
             >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
+              <option value={10}>10 por pág.</option>
+              <option value={25}>25 por pág.</option>
+              <option value={50}>50 por pág.</option>
+              <option value={100}>100 por pág.</option>
               <option value={0}>Todos</option>
             </select>
             <Button onClick={() => handleSearch()} disabled={loading} className="h-11 px-6 gap-2">
@@ -130,11 +131,11 @@ export default function EquipmentSearchPage() {
           {/* Lista */}
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground font-medium">
-              {results.length === 0 ? "Sin resultados" : `${results.length} equipo${results.length !== 1 ? "s" : ""} encontrado${results.length !== 1 ? "s" : ""}`}
+              {results.length === 0 ? "Sin resultados" : `${results.length} equipo${results.length !== 1 ? "s" : ""} encontrado${results.length !== 1 ? "s" : ""}${hasMore ? " (mostrando primeros 2,000)" : ""}`}
             </p>
             {hasMore && (
               <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25">
-                <span className="text-xs text-amber-700 font-medium">⚠ Existen más equipos que no se muestran. Aumenta el límite de resultados en el selector o elige <strong>Todos</strong>.</span>
+                <span className="text-xs text-amber-700 font-medium">⚠ Existen más de 2,000 equipos. Refina tu búsqueda para ver todos los resultados.</span>
               </div>
             )}
             {results.length === 0 ? (
