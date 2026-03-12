@@ -849,8 +849,20 @@ async def get_system_settings(user=Depends(get_current_user)):
 async def update_system_settings(settings: dict, user=Depends(get_current_user)):
     if user["perfil"] != "Super Administrador":
         raise HTTPException(403, "Acceso denegado")
-    # Only allow known keys
-    update = {k: bool(settings[k]) for k in _DEFAULT_SETTINGS if k in settings}
+    # Cast each field to its correct type (booleans as bool, ttl_hours as int)
+    INT_FIELDS = {"pending_photos_ttl_hours"}
+    update = {}
+    for k in _DEFAULT_SETTINGS:
+        if k not in settings:
+            continue
+        if k in INT_FIELDS:
+            try:
+                v = int(settings[k])
+                update[k] = max(1, min(168, v))   # clamp to 1–168 h
+            except (TypeError, ValueError):
+                pass
+        else:
+            update[k] = bool(settings[k])
     if not update:
         raise HTTPException(400, "Sin campos válidos")
     await db.system_settings.update_one(
@@ -858,7 +870,9 @@ async def update_system_settings(settings: dict, user=Depends(get_current_user))
     )
     await save_history("UPDATE_SETTINGS", user["email"], user["sub"],
                        None, "Configuración del sistema", None, update)
-    return {k: update.get(k, v) for k, v in _DEFAULT_SETTINGS.items()}
+    # Return current full settings from DB
+    doc = await db.system_settings.find_one({"_id": "global"}) or {}
+    return {k: doc.get(k, v) for k, v in _DEFAULT_SETTINGS.items()}
 
 @api_router.get("/system-settings/public")
 async def get_public_settings(user=Depends(get_current_user)):
