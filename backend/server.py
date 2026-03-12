@@ -1255,11 +1255,16 @@ async def create_audit(input: AuditCreateInput, user=Depends(get_current_user)):
 
 
 @api_router.get("/audits/stats/summary")
-async def audits_stats_summary(user=Depends(get_current_user)):
-    """Stats: total audits done and stores audited."""
-    total_audits = await db.audits.count_documents({"status": {"$in": ["completed", "incompleto"]}})
-    stores_audited = await db.audits.distinct("cr_tienda", {"status": {"$in": ["completed", "incompleto"]}})
-    total_stores = await db.stores.count_documents({})
+async def audits_stats_summary(plaza: Optional[str] = None, user=Depends(get_current_user)):
+    """Stats: total audits done and stores audited. Optionally filtered by plaza."""
+    audit_query: dict = {"status": {"$in": ["completed", "incompleto"]}}
+    store_query: dict = {}
+    if plaza:
+        audit_query["plaza"] = plaza
+        store_query["plaza"] = plaza
+    total_audits = await db.audits.count_documents(audit_query)
+    stores_audited = await db.audits.distinct("cr_tienda", audit_query)
+    total_stores = await db.stores.count_documents(store_query)
     return {
         "total_audits": total_audits,
         "stores_audited": len(stores_audited),
