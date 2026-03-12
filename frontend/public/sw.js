@@ -1,13 +1,19 @@
-const CACHE_NAME = 'sigaf-cache-v5';
-const SW_VERSION = '5.0';
+// SIGAF Service Worker v6
+// IMPORTANT: Change CACHE_NAME on every deploy to trigger the waiting mechanism.
+// The browser compares sw.js byte-by-byte; any change (including this string)
+// causes the new SW to install and enter "waiting" state, which triggers the
+// update banner in the app without needing skipWaiting on install.
+const CACHE_NAME = 'sigaf-v6';
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];
 const CACHEABLE_API_PATHS = ['/api/stores/plazas', '/api/dashboard/stats'];
 
 self.addEventListener('install', (event) => {
+  // Pre-cache static assets but do NOT call skipWaiting here.
+  // Staying in "waiting" lets the app show the update banner and
+  // only activates after the user explicitly clicks "Recargar".
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -19,11 +25,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Respond to version queries from the page
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'GET_VERSION') {
-    event.source?.postMessage({ type: 'SW_VERSION', version: SW_VERSION });
-  }
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
