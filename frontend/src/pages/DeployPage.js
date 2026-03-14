@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Server, Code, Terminal, Globe, Database, Shield, Smartphone, Wifi, WifiOff, FileDown, Loader2 } from "lucide-react";
+import { Server, Code, Terminal, Globe, Database, Shield, Smartphone, WifiOff, FileDown, Loader2 } from "lucide-react";
 
 export default function DeployPage() {
   const { t } = useLanguage();
