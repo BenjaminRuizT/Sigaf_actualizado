@@ -32,7 +32,7 @@ import { PlazaBarChart, DepreciationPieChart, AuditStatusChart } from "@/compone
 
 export default function DashboardPage() {
   const { api, user } = useAuth();
-  const { t } = useLanguage();
+  const { t , fmtDate, fmtMoney} = useLanguage();
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [stores, setStores] = useState([]);
@@ -129,8 +129,7 @@ export default function DashboardPage() {
     if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
     return `$${n.toFixed(0)}`;
   };
-  const fmtMoney = (n) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
-
+  
   const kpis = stats ? [
     { label: t("dashboard.totalStores"), value: fmt(stats.total_stores), icon: Store, color: "text-blue-500" },
     { label: t("dashboard.auditedStores"), value: fmt(stats.audited_stores), icon: CheckCircle, color: "text-emerald-500" },

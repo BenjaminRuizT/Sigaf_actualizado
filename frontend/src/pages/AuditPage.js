@@ -134,7 +134,7 @@ function PhotoCapture({ label, icon, onCapture, captured, testId }) {
 export default function AuditPage() {
   const { auditId } = useParams();
   const { api, user } = useAuth();
-  const { t } = useLanguage();
+  const { t , fmtDate, fmtMoney} = useLanguage();
   const navigate = useNavigate();
   const inputRef = useRef(null);
 
@@ -238,7 +238,7 @@ export default function AuditPage() {
         if (res.data.status === "completed" && res.data.signature) {
           try {
             const sigRes = await api.get(`/audits/${auditId}/verify-signature`);
-            setSigVerify({ valid: sigRes.data.valid, signature: sigRes.data.signature, checked_at: new Date().toLocaleTimeString("es-MX") });
+            setSigVerify({ valid: sigRes.data.valid, signature: sigRes.data.signature, checked_at: new Date().toLocaleTimeString(locale) });
           } catch { /* silencioso — no bloquear carga */ }
         }
         // Si la auditoría está en pending_photos, reabrir el diálogo de fotos si aún aplica
@@ -452,7 +452,7 @@ export default function AuditPage() {
       // Auto-verificar firma al completar
       try {
         const sigRes = await api.get(`/audits/${auditId}/verify-signature`);
-        setSigVerify({ valid: sigRes.data.valid, signature: sigRes.data.signature, checked_at: new Date().toLocaleTimeString("es-MX") });
+        setSigVerify({ valid: sigRes.data.valid, signature: sigRes.data.signature, checked_at: new Date().toLocaleTimeString(locale) });
       } catch { /* silencioso */ }
       const movements = sumRes.data?.movements || [];
       // IMPORTANT: Only MANUAL movements trigger photo requirements.
@@ -536,8 +536,7 @@ export default function AuditPage() {
     }
   };
 
-  const fmtMoney = (n) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
-
+  
   if (loading) return <div className="flex items-center justify-center py-20"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
 
   // Guard: if audit failed to load (e.g. 403 or deleted), show a clear error instead of blank screen

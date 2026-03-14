@@ -35,7 +35,7 @@ const movTypeBadge = (type) => {
 
 export default function LogsPage() {
   const { api, user } = useAuth();
-  const { t } = useLanguage();
+  const { t , fmtDate, fmtMoney, locale} = useLanguage();
   const [tab, setTab] = useState("classifications");
   const [search, setSearch] = useState("");
   const [searchDebounced, setSearchDebounced] = useState("");
@@ -211,9 +211,7 @@ export default function LogsPage() {
     } catch (err) { toast.error(err.response?.data?.detail || t("common.error")); }
   };
 
-  const fmtMoney = (n) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
-  const fmtDate = (d) => d ? new Date(d).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }) : "—";
-
+    
   // Descargar imagen de formato
   const handleDownloadPhoto = (base64Data, filename) => {
     const a = document.createElement("a");
@@ -227,7 +225,7 @@ export default function LogsPage() {
     if (!selectedAudit) return;
     const a = selectedAudit;
     const s = auditSummary?.stats || {};
-    const fmtD = (d) => d ? new Date(d).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }) : "—";
+    const fmtD = (d) => d ? new Date(d).toLocaleString(locale, { dateStyle: "short", timeStyle: "short" }) : "—";
     const fmtM = (n) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
 
     const COLS = `<colgroup>
@@ -409,7 +407,7 @@ ${(a.photo_ab || a.photo_transf) ? `
 <!-- FOOTER -->
 <div class="footer">
   <span>SIGAF — Sistema Integral de Gestión de Activo Fijo</span>
-  <span>Generado: ${new Date().toLocaleString("es-MX")}</span>
+  <span>Generado: ${new Date().toLocaleString(locale)}</span>
 </div>
 
 <script>window.onload = () => { window.print(); }</script>

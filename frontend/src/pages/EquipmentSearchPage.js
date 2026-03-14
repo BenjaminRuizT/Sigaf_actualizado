@@ -8,7 +8,6 @@ import { Search, Package, Barcode, Hash, Tag, MapPin, DollarSign, Calendar, Wren
 import { toast } from "sonner";
 
 const fmtM = (n) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString("es-MX", { year: "numeric", month: "short" }) : "—";
 
 export default function EquipmentSearchPage() {
   const { api } = useAuth();

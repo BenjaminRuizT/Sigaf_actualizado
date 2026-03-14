@@ -18,7 +18,7 @@ import { Plus, Pencil, Trash2, Users, Monitor, RotateCcw, AlertTriangle, Eye, Ey
 
 export default function AdminPage({ defaultTab = "users" }) {
   const { api, user: currentUser } = useAuth();
-  const { t } = useLanguage();
+  const { t , fmtDate, fmtMoney, locale} = useLanguage();
   const [tab, setTab] = useState(defaultTab);
   const [users, setUsers] = useState([]);
   const [userDialog, setUserDialog] = useState(null);
@@ -412,8 +412,7 @@ export default function AdminPage({ defaultTab = "users" }) {
   const openEditUser = (u) => { setUserForm({ nombre: u.nombre, email: u.email, password: "", perfil: u.perfil }); setShowPassword(false); setUserDialog(u.id); };
   const openCreateUser = () => { setUserForm({ nombre: "", email: "", password: "", perfil: "Administrador" }); setShowPassword(false); setUserDialog("create"); };
   const openEditEq = (eq) => { setEqForm({ descripcion: eq.descripcion, marca: eq.marca, modelo: eq.modelo, serie: eq.serie, costo: eq.costo, depreciacion: eq.depreciacion }); setEditEq(eq.id); };
-  const fmtMoney = (n) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
-
+  
   return (
     <div className="space-y-6" data-testid="admin-page">
       <div className="flex items-center justify-between">
@@ -453,7 +452,7 @@ export default function AdminPage({ defaultTab = "users" }) {
                   )}
                   {u.locked_at && (
                     <p className="text-[10px] text-muted-foreground">
-                      Bloqueado: {new Date(u.locked_at).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}
+                      Bloqueado: {new Date(u.locked_at).toLocaleString(locale, { dateStyle: "short", timeStyle: "short" })}
                     </p>
                   )}
                 </div>
@@ -729,8 +728,8 @@ export default function AdminPage({ defaultTab = "users" }) {
                         <p className="text-sm font-medium truncate">{s.nombre || s.email}</p>
                         <p className="text-xs text-muted-foreground truncate">{s.perfil} · {s.ip}</p>
                         <p className="text-xs text-muted-foreground font-mono">
-                          Inicio: {s.created_at ? new Date(s.created_at).toLocaleString("es-MX") : "—"}
-                          {s.last_seen ? ` · Última actividad: ${new Date(s.last_seen).toLocaleString("es-MX")}` : ""}
+                          Inicio: {s.created_at ? new Date(s.created_at).toLocaleString(locale) : "—"}
+                          {s.last_seen ? ` · Última actividad: ${new Date(s.last_seen).toLocaleString(locale)}` : ""}
                         </p>
                         {s.user_agent && (
                           <p className="text-[10px] text-muted-foreground/60 truncate">{s.user_agent.slice(0, 80)}</p>
@@ -801,8 +800,8 @@ export default function AdminPage({ defaultTab = "users" }) {
                         <p className="text-sm font-medium">{a.tienda}</p>
                         <p className="text-xs text-muted-foreground">{a.plaza} · CR: {a.cr_tienda} · Auditor: {a.auditor_name}</p>
                         <p className="text-xs text-muted-foreground font-mono">
-                          Inicio: {a.started_at ? new Date(a.started_at).toLocaleString("es-MX") : "—"}
-                          {a.photos_deadline ? ` · Vencía: ${new Date(a.photos_deadline).toLocaleString("es-MX")}` : ""}
+                          Inicio: {a.started_at ? new Date(a.started_at).toLocaleString(locale) : "—"}
+                          {a.photos_deadline ? ` · Vencía: ${new Date(a.photos_deadline).toLocaleString(locale)}` : ""}
                         </p>
                         <p className="text-[10px] text-muted-foreground">
                           ✓ {a.located_count} localizados · ⊗ {a.not_found_count} no localizados · ⚠ {a.surplus_count} sobrantes
@@ -899,11 +898,11 @@ export default function AdminPage({ defaultTab = "users" }) {
                               {snap.target_label && <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground truncate max-w-[180px]" title={snap.target_label}>{snap.target_label}</span>}
                             </div>
                             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
-                              <span>{new Date(snap.ts).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "medium" })}</span>
+                              <span>{new Date(snap.ts).toLocaleString(locale, { dateStyle: "short", timeStyle: "medium" })}</span>
                               <span className="font-medium text-foreground">{snap.actor_email}</span>
                             </div>
                             {snap.rolled_back && snap.rolled_back_by && (
-                              <p className="text-[11px] text-emerald-600 mt-0.5">Revertida por {snap.rolled_back_by} · {new Date(snap.rolled_back_at).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}</p>
+                              <p className="text-[11px] text-emerald-600 mt-0.5">Revertida por {snap.rolled_back_by} · {new Date(snap.rolled_back_at).toLocaleString(locale, { dateStyle: "short", timeStyle: "short" })}</p>
                             )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
