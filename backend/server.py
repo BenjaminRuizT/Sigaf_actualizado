@@ -402,9 +402,15 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
     except jwt.InvalidTokenError:
         raise HTTPException(401, "Invalid token")
 
-    # Verify account lock status on every authenticated request
+    # Verify user still exists and is not locked
     user_doc = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "locked": 1, "locked_at": 1})
-    if user_doc and user_doc.get("locked"):
+    if user_doc is None:
+        # User was deleted — invalidate the session
+        sid = payload.get("sid")
+        if sid:
+            await db.active_sessions.delete_one({"id": sid})
+        raise HTTPException(401, "User no longer exists")
+    if user_doc.get("locked"):
         locked_at_str = user_doc.get("locked_at") or ""
         elapsed = _seconds_since_iso(locked_at_str) if locked_at_str else _LOGIN_LOCK_SECONDS + 1
         if elapsed >= _LOGIN_LOCK_SECONDS:
@@ -2511,6 +2517,8 @@ async def delete_user(user_id: str, user=Depends(get_current_user)):
     result = await db.users.delete_one({"id": user_id})
     if result.deleted_count == 0:
         raise HTTPException(404, "User not found")
+    # Close all active sessions for the deleted user immediately
+    await close_sessions(user_id)
     await save_history(HistAction.DELETE_USER, user["email"], user["sub"],
                        user_id, (target or {}).get("email"),
                        {k: v for k, v in (target or {}).items()})
@@ -3013,6 +3021,67 @@ async def restore_expired_audit(audit_id: str, user=Depends(get_current_user)):
     await sec_log(SecEvent.AUDIT_RESTORED, actor_email=user["email"], actor_id=user["sub"],
                   target=audit_id, detail={"tienda": audit.get("tienda"), "new_deadline": new_deadline})
     return {"restored": True, "new_deadline": new_deadline}
+
+
+@api_router.post("/auth/heartbeat")
+async def session_heartbeat(user=Depends(get_current_user)):
+    """Called by frontend periodically to keep session alive and update last_seen."""
+    sid = user.get("sid")
+    if sid:
+        await db.active_sessions.update_one(
+            {"id": sid},
+            {"$set": {"last_seen": datetime.now(timezone.utc).isoformat()}}
+        )
+    return {"ok": True}
+
+
+@api_router.get("/notifications")
+async def get_notifications(user=Depends(get_current_user)):
+    """Return pending notifications for the current user: pending photos near TTL, completed audits."""
+    from datetime import timedelta
+    notifications = []
+    now = datetime.now(timezone.utc)
+    
+    # 1. Audits in pending_photos near expiry (within 2 hours)
+    warning_threshold = (now + timedelta(hours=2)).isoformat()
+    near_expiry = await db.audits.find(
+        {"status": "pending_photos", "photos_deadline": {"$lt": warning_threshold, "$gt": now.isoformat()}},
+        {"_id": 0, "id": 1, "tienda": 1, "photos_deadline": 1, "auditor_id": 1}
+    ).to_list(20)
+    for a in near_expiry:
+        # Only notify the auditor who owns it (or super admin)
+        if a.get("auditor_id") == user["sub"] or user["perfil"] == "Super Administrador":
+            deadline = datetime.fromisoformat(a["photos_deadline"].replace("Z",""))
+            mins_left = max(0, int((deadline.replace(tzinfo=timezone.utc) - now).total_seconds() / 60))
+            notifications.append({
+                "type": "pending_photos_expiry",
+                "level": "warning",
+                "title": f"Fotos pendientes: {a['tienda']}",
+                "message": f"La auditoria vence en {mins_left} minutos. Sube las fotos para completarla.",
+                "audit_id": a["id"],
+                "tienda": a["tienda"],
+            })
+    
+    # 2. Recently completed audits (last 30 min) — for admins/superadmin
+    if user["perfil"] in ("Administrador", "Super Administrador"):
+        recent_cutoff = (now - timedelta(minutes=30)).isoformat()
+        recent_completed = await db.audits.find(
+            {"status": {"$in": ["completed", "incompleto"]}, "finished_at": {"$gt": recent_cutoff}},
+            {"_id": 0, "id": 1, "tienda": 1, "plaza": 1, "auditor_name": 1,
+             "located_count": 1, "not_found_count": 1, "finished_at": 1}
+        ).to_list(10)
+        for a in recent_completed:
+            notifications.append({
+                "type": "audit_completed",
+                "level": "info",
+                "title": f"Auditoria completada: {a['tienda']}",
+                "message": f"{a.get('auditor_name','')} — {a.get('located_count',0)} localizados, {a.get('not_found_count',0)} no localizados.",
+                "audit_id": a["id"],
+                "tienda": a["tienda"],
+                "plaza": a.get("plaza",""),
+            })
+    
+    return {"notifications": notifications, "count": len(notifications)}
 
 @app.on_event("startup")
 async def startup():
