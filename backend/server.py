@@ -14,7 +14,7 @@ import openpyxl
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes as crypto_hashes
-from pdf_generator import generate_user_manual, generate_presentation
+from pdf_generator import generate_user_manual, generate_presentation, generate_tech_documentation
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env', override=False)
@@ -2029,6 +2029,33 @@ async def download_presentation(user=Depends(get_current_user)):
     output = generate_presentation(stats, [])
     return StreamingResponse(output, media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=SIGAF_Presentacion.pdf"})
+
+@api_router.get("/download/tech-docs")
+async def download_tech_documentation(user=Depends(get_current_user)):
+    """All profiles: download complete technical documentation PDF."""
+    stats = None
+    try:
+        total_stores = await db.stores.count_documents({})
+        audited_stores = await db.stores.count_documents({"audited": True})
+        total_equipment = await db.equipment.count_documents({})
+        deprecated_eq = await db.equipment.count_documents({"depreciado": True})
+        val_pipe = [{"$group": {"_id": None, "total_cost": {"$sum": "$costo"}, "total_real": {"$sum": "$valor_real"}}}]
+        val = await db.equipment.aggregate(val_pipe).to_list(1)
+        completed_audits = await db.audits.count_documents({"status": {"$in": ["completed"]}})
+        stats = {
+            "total_stores": total_stores, "audited_stores": audited_stores,
+            "total_equipment": total_equipment, "deprecated_equipment": deprecated_eq,
+            "active_equipment": total_equipment - deprecated_eq,
+            "total_cost": val[0]["total_cost"] if val else 0,
+            "total_real_value": val[0]["total_real"] if val else 0,
+            "completed_audits": completed_audits,
+        }
+    except Exception as e:
+        logger.error(f"Error getting stats for tech docs: {e}")
+    output = generate_tech_documentation(stats)
+    return StreamingResponse(output, media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=SIGAF_Documentacion_Tecnica.pdf"})
+
 
 # ==================== EXPORT ====================
 async def get_user_from_token(token: str):
