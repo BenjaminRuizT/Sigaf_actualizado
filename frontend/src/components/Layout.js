@@ -4,19 +4,35 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { LayoutDashboard, ClipboardList, Shield, Settings, LogOut, Menu, Sun, Moon, Globe, Rocket, PieChart, Activity, Package } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Shield, Settings, LogOut, Menu, Sun, Moon, Globe, Rocket, PieChart, Activity, Package, Clock, Bell } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 export default function Layout({ children }) {
-  const { user, logout, closeOtherSessions, api } = useAuth();
+  const { user, logout, closeOtherSessions, api, secondsLeft, timeoutMinutes, showWarning } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { t, language, changeLanguage } = useLanguage();
+  const { t, language, changeLanguage, fmtDate } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [pendingUnlocks, setPendingUnlocks] = useState(0);
   const [otherSessions, setOtherSessions] = useState(0);
   const [closingOthers, setClosingOthers] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotif, setShowNotif] = useState(false);
+
+  // Fetch notifications every 60s
+  useEffect(() => {
+    if (!user) return;
+    const fetchNotifs = async () => {
+      try {
+        const res = await api.get("/notifications");
+        setNotifications(res.data.notifications || []);
+      } catch { /* silencioso */ }
+    };
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 60_000);
+    return () => clearInterval(interval);
+  }, [user, api]);
 
   const isAdmin = ["Administrador", "Super Administrador"].includes(user?.perfil);
   const isSuperAdmin = user?.perfil === "Super Administrador";
@@ -130,6 +146,21 @@ export default function Layout({ children }) {
             </button>
           </div>
         )}
+        {/* Inactivity countdown */}
+        {secondsLeft !== null && (
+          <div className={`mx-2 mb-1 px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 ${
+            secondsLeft <= 60 ? "bg-red-500/15 text-red-600" : "bg-amber-500/10 text-amber-700"
+          }`}>
+            <Clock className="h-3 w-3 shrink-0" />
+            <span>{t("session.closingIn")} {Math.floor(secondsLeft/60)}:{String(secondsLeft%60).padStart(2,"0")}</span>
+          </div>
+        )}
+        {secondsLeft === null && timeoutMinutes && (
+          <div className="mx-2 mb-1 px-3 py-1.5 rounded-lg text-[10px] text-muted-foreground/60 flex items-center gap-1.5">
+            <Clock className="h-3 w-3 shrink-0" />
+            <span>{t("session.inactivityTimeout")}: {timeoutMinutes} min</span>
+          </div>
+        )}
         <button onClick={handleLogout} data-testid="nav-logout"
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
           <LogOut className="h-4 w-4" /> {t("nav.logout")}
@@ -147,6 +178,23 @@ export default function Layout({ children }) {
 
       {/* Main Content */}
       <div className="flex-1 md:ml-60 lg:ml-64">
+        {/* Notification panel */}
+        {showNotif && notifications.length > 0 && (
+          <div className="fixed top-14 right-4 z-50 w-80 bg-card border rounded-xl shadow-xl">
+            <div className="p-3 border-b flex items-center justify-between">
+              <span className="font-semibold text-sm">{t("notifications.title")}</span>
+              <button onClick={() => setShowNotif(false)} className="text-muted-foreground hover:text-foreground text-xs">✕</button>
+            </div>
+            <div className="max-h-72 overflow-y-auto divide-y">
+              {notifications.map((n, i) => (
+                <div key={i} className={`p-3 text-xs ${n.level === "warning" ? "bg-amber-50 dark:bg-amber-950/30" : ""}`}>
+                  <p className="font-semibold">{n.title}</p>
+                  <p className="text-muted-foreground mt-0.5">{n.message}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {/* Mobile Header */}
         <header className="md:hidden sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border px-4 h-14 flex items-center justify-between">
           <Sheet open={open} onOpenChange={setOpen}>
@@ -161,6 +209,14 @@ export default function Layout({ children }) {
           </Sheet>
           <h1 className="font-heading text-lg font-bold uppercase tracking-tight">SIGAF</h1>
           <div className="flex items-center gap-1">
+            {notifications.length > 0 && (
+              <Button variant="ghost" size="icon" onClick={() => setShowNotif(v => !v)} className="relative">
+                <Bell className="h-4 w-4" />
+                <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-bold">
+                  {notifications.length}
+                </span>
+              </Button>
+            )}
             <Button variant="ghost" size="icon" onClick={toggleTheme} data-testid="theme-toggle-mobile">
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
