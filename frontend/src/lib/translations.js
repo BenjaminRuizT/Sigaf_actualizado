@@ -71,7 +71,9 @@ export const translations = {
       close: "Cerrar", noResults: "Sin resultados", page: "Página", of: "de",
       total: "Total", prev: "Anterior", next: "Siguiente", actions: "Acciones",
       yes: "Sí", no: "No", back: "Volver", plaza: "Plaza", cr: "CR"
-    }
+    },
+    notifications: {"title": "Notificaciones", "noNotifications": "Sin notificaciones", "pendingPhotos": "Fotos pendientes", "auditCompleted": "Auditoría completada", "photosExpiring": "Las fotos vencen pronto" },
+    session: {"inactivityTimeout": "Cierre por inactividad", "closingIn": "Cierre en", "continueSession": "Seguir trabajando", "sessionExpired": "Sesión expirada", "multiSession": "Sesiones simultáneas", "activeSessions": "Sesiones activas" }
   },
   en: {
     app: { name: "SIGAF", fullName: "Fixed Asset Management System" },
@@ -145,7 +147,9 @@ export const translations = {
       close: "Close", noResults: "No results", page: "Page", of: "of",
       total: "Total", prev: "Previous", next: "Next", actions: "Actions",
       yes: "Yes", no: "No", back: "Back", plaza: "Plaza", cr: "CR"
-    }
+    },
+    notifications: {"title": "Notifications", "noNotifications": "No notifications", "pendingPhotos": "Pending photos", "auditCompleted": "Audit completed", "photosExpiring": "Photos expiring soon" },
+    session: {"inactivityTimeout": "Inactivity timeout", "closingIn": "Closing in", "continueSession": "Stay logged in", "sessionExpired": "Session expired", "multiSession": "Simultaneous sessions", "activeSessions": "Active sessions" }
   },
   pt: {
     app: { name: "SIGAF", fullName: "Sistema Integrado de Gestão de Ativos Fixos" },
@@ -219,6 +223,8 @@ export const translations = {
       close: "Fechar", noResults: "Sem resultados", page: "Página", of: "de",
       total: "Total", prev: "Anterior", next: "Próximo", actions: "Ações",
       yes: "Sim", no: "Não", back: "Voltar", plaza: "Praça", cr: "CR"
-    }
+    },
+    notifications: {"title": "Notificações", "noNotifications": "Sem notificações", "pendingPhotos": "Fotos pendentes", "auditCompleted": "Auditoria concluída", "photosExpiring": "Fotos expirando em breve" },
+    session: {"inactivityTimeout": "Encerramento por inatividade", "closingIn": "Encerrando em", "continueSession": "Continuar trabalhando", "sessionExpired": "Sessão expirada", "multiSession": "Sessões simultâneas", "activeSessions": "Sessões ativas" }
   }
 };
