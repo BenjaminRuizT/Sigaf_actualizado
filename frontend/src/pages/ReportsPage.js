@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, LineChart, Line } from "recharts";
 import {TrendingDown, DollarSign, Store, AlertTriangle} from "lucide-react";
 
 const COLORS = ["hsl(220, 70%, 50%)", "hsl(354, 70%, 50%)", "hsl(44, 90%, 50%)", "hsl(160, 55%, 42%)", "hsl(280, 55%, 50%)"];
