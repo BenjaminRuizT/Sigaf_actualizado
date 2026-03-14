@@ -4,7 +4,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { LayoutDashboard, ClipboardList, Shield, Settings, LogOut, Menu, Sun, Moon, Globe, Rocket, PieChart, ShieldAlert, Activity, ShieldCheck, Package, History } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Shield, Settings, LogOut, Menu, Sun, Moon, Globe, Rocket, PieChart, Activity, Package } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 export default function Layout({ children }) {
