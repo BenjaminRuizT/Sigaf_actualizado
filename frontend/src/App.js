@@ -15,7 +15,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import DeployPage from "@/pages/DeployPage";
 import ReportsPage from "@/pages/ReportsPage";
 import { useState, useEffect } from "react";
-import { RefreshCw, Sparkles, X } from "lucide-react";
+import { RefreshCw, Sparkles, X, AlertTriangle, Clock } from "lucide-react";
 import "@/App.css";
 
 // ── Update banner — shown when a new Service Worker has been activated ──────
@@ -87,6 +87,58 @@ function AdminRoute({ children }) {
   return children;
 }
 
+// ── Inactivity warning banner ────────────────────────────────────────────────
+function InactivityBanner() {
+  const { showWarning, secondsLeft, continueSession } = useAuth();
+
+  if (!showWarning || secondsLeft === null) return null;
+
+  const mins = Math.floor(secondsLeft / 60);
+  const secs = secondsLeft % 60;
+  const timeStr = mins > 0
+    ? `${mins}:${String(secs).padStart(2, "0")} min`
+    : `${secs} seg`;
+  const isUrgent = secondsLeft <= 60;
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className={`mx-4 w-full max-w-sm rounded-2xl shadow-2xl border-2 p-6 space-y-4
+        ${isUrgent
+          ? "bg-red-50 border-red-400 dark:bg-red-950 dark:border-red-500"
+          : "bg-amber-50 border-amber-400 dark:bg-amber-950 dark:border-amber-500"}`}>
+        <div className="flex items-start gap-3">
+          <AlertTriangle className={`h-6 w-6 shrink-0 mt-0.5 ${isUrgent ? "text-red-500" : "text-amber-500"}`} />
+          <div className="flex-1">
+            <p className={`font-bold text-base ${isUrgent ? "text-red-700 dark:text-red-300" : "text-amber-700 dark:text-amber-300"}`}>
+              Sesión por cerrar
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Tu sesión se cerrará automáticamente por inactividad. ¿Sigues trabajando?
+            </p>
+          </div>
+        </div>
+        {/* Countdown */}
+        <div className={`flex items-center justify-center gap-2 py-3 rounded-xl font-mono text-3xl font-bold
+          ${isUrgent
+            ? "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300"
+            : "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300"}`}>
+          <Clock className="h-6 w-6" />
+          {timeStr}
+        </div>
+        <button
+          onClick={continueSession}
+          className={`w-full py-3 rounded-xl font-semibold text-sm text-white transition active:scale-95
+            ${isUrgent
+              ? "bg-red-500 hover:bg-red-600"
+              : "bg-amber-500 hover:bg-amber-600"}`}
+        >
+          ✓ Seguir trabajando
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -117,6 +169,7 @@ export default function App() {
             <AppRoutes />
             <Toaster richColors position="top-right" />
             <UpdateBanner />
+            <InactivityBanner />
           </AuthProvider>
         </LanguageProvider>
       </ThemeProvider>
