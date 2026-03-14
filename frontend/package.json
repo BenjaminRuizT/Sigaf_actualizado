@@ -58,7 +58,8 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
-    "test": "craco test"
+    "test": "craco test",
+    "prebuild": "node scripts/stamp-sw.js"
   },
   "browserslist": {
     "production": [
