@@ -1,9 +1,9 @@
 // SIGAF Service Worker
-// Build: 2026-03-14T04:42:35.810Z
+// Build: __BUILD_TIMESTAMP__
 // DO NOT EDIT sw.js directly — edit sw.template.js and run `npm run build`.
-// The 2026-03-14T04:42:35.810Z placeholder is replaced by scripts/stamp-sw.js on each build,
+// The __BUILD_TIMESTAMP__ placeholder is replaced by scripts/stamp-sw.js on each build,
 // ensuring the browser detects a new SW on every deploy (byte-diff check).
-const CACHE_NAME = 'sigaf-sw-2026-03-14T04:42:35.810Z';
+const CACHE_NAME = 'sigaf-sw-__BUILD_TIMESTAMP__';
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];
 const CACHEABLE_API_PATHS = ['/api/stores/plazas', '/api/dashboard/stats'];
 
