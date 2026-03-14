@@ -72,7 +72,7 @@ export default function LogsPage() {
 
   const classSort = useSortable("scanned_at");
   const movSort = useSortable("created_at");
-  const auditSort = useSortable("started_at");
+  const auditSort = useSortable("started_at", "desc");
   const isSuperAdmin = user?.perfil === "Super Administrador";
 
   useEffect(() => {
@@ -106,6 +106,8 @@ export default function LogsPage() {
       if (auditFilter !== "all") params.status = auditFilter;
       if (auditPlazaFilter !== "all") params.plaza = auditPlazaFilter;
       if (searchDebounced) params.search = searchDebounced;
+      params.sort_by = auditSort.sortKey;
+      params.sort_dir = auditSort.sortDir;
       const statsParams = {};
       if (auditPlazaFilter !== "all") statsParams.plaza = auditPlazaFilter;
       const [res, statsRes] = await Promise.all([
@@ -115,11 +117,13 @@ export default function LogsPage() {
       setAuditData(res.data);
       if (statsRes.data) setAuditGlobalStats(statsRes.data);
     } catch {}
-  }, [api, auditPage, auditFilter, auditPlazaFilter, searchDebounced]);
+  }, [api, auditPage, auditFilter, auditPlazaFilter, searchDebounced, auditSort.sortKey, auditSort.sortDir]);
 
   useEffect(() => { fetchClassifications(); }, [fetchClassifications]);
   useEffect(() => { fetchMovements(); }, [fetchMovements]);
   useEffect(() => { fetchAudits(); }, [fetchAudits]);
+  // Reset to page 1 when sort changes
+  useEffect(() => { setAuditPage(1); }, [auditSort.sortKey, auditSort.sortDir]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     api.get("/stores/plazas")
       .then(r => {
@@ -690,7 +694,7 @@ ${(a.photo_ab || a.photo_transf) ? `
                     <TableHead className="text-center">{t("common.actions")}</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
-                    {auditSort.sorted(auditData.items).map(item => (
+                    {auditData.items  // sorted server-side.map(item => (
                       <TableRow key={item.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleViewAudit(item)} data-testid={`audit-row-${item.id}`}>
                         <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{fmtDate(item.started_at)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{fmtDate(item.finished_at)}</TableCell>

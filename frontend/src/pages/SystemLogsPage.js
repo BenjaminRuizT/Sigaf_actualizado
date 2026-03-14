@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
-  Activity, ShieldCheck, Wrench, ShieldAlert, ShieldX, RefreshCw, Download, Trash2,
+  Activity, ShieldCheck, Wrench, ChevronDown, ShieldAlert, ShieldX, RefreshCw, Download, Trash2,
   AlertTriangle, CheckCircle, Info, Search, X, Lock, Unlock,
   UserPlus, UserMinus, UserCog, KeyRound, DatabaseZap, FileCheck,
   FileX, LogIn, LogOut, Filter
@@ -58,6 +58,7 @@ const ALL_EVENTS = Object.keys(EVENT_META);
 
 // ════════════════════════════ COMPONENT ════════════════════════════════════
 export default function SystemLogsPage({ defaultTab = "app" }) {
+  const [expandedFix, setExpandedFix] = useState(null);
   const { api } = useAuth();
   const [tab, setTab] = useState(defaultTab);
 
@@ -469,390 +470,987 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
               <div className="flex items-center gap-2">
                 <Wrench className="h-4 w-4 text-primary" />
                 <CardTitle className="text-base">Historial de Fixes — SIGAF v1.0</CardTitle>
-                <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">29 actualizaciones</span>
+                <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">32 actualizaciones</span>
               </div>
             </CardHeader>
             <CardContent className="p-0 max-h-[600px] overflow-y-auto">
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix40</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-primary text-white">Actual</span>
-                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix43" ? null : "fix43")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Auditorías vencidas con vista/restauración, restricción auditoría en progreso (solo mismo auditor/Super Admin), sesiones activas con cierre forzoso, multisesión configurable, tab Fixes en Logs de Sistema</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix43</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary text-white ml-1">Actual</span>
+                      <span className="text-xs text-muted-foreground">2026-03-14</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Ordenamiento server-side en historial de auditorías, imports de AdminPage limpia...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix43" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix43" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Ordenamiento server-side en historial de auditorías, imports de AdminPage limpiados para evitar build fail, tab Fixes con detalles expandibles por fix, DeployPage y PDFs actualizados.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Ordenamiento server-side en historial de auditorías</li>
+                    <li className="text-sm text-foreground/80">• Backend acepta sort_by y sort_dir en /logs/audits</li>
+                    <li className="text-sm text-foreground/80">• Reset de página al cambiar ordenamiento</li>
+                    <li className="text-sm text-foreground/80">• Imports no usados eliminados en AdminPage</li>
+                    <li className="text-sm text-foreground/80">• Tab Fixes con acordeón de detalles expandibles</li>
+                    <li className="text-sm text-foreground/80">• DeployPage y PDFs actualizados con features actuales</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix39</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix42" ? null : "fix42")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Sistema de inactividad: timeout configurable 5-480 min, banner countdown 5 min antes, propagación tiempo real, control en AdminPage</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix42</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-14</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix de imports no usados en AdminPage (ChevronLeft, ChevronRight, ArrowUpDown) q...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix42" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix42" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Fix de imports no usados en AdminPage (ChevronLeft, ChevronRight, ArrowUpDown) que causaban build fail, mafFileValid visible en UI del badge del archivo MAF.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Imports no usados eliminados (build fail resuelto)</li>
+                    <li className="text-sm text-foreground/80">• mafFileValid usado en render del badge MAF</li>
+                    <li className="text-sm text-foreground/80">• expiredDialog eliminado (no-unused-vars resuelto)</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix38</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix41" ? null : "fix41")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">SW definitivo: waiting state correcto, SKIP_WAITING explícito desde App.js, fix modelo duplicado en escaneos</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix41</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-14</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">SW con prebuild script que estampa timestamp único en cada deploy, guard en Audi...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix41" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix41" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">SW con prebuild script que estampa timestamp único en cada deploy, guard en AuditPage para audit=null, cierre correcto de TabsContent en Fixes, auto-carga del tab Historial.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Prebuild script stamp-sw.js: timestamp único por deploy</li>
+                    <li className="text-sm text-foreground/80">• sw.template.js como fuente de verdad del SW</li>
+                    <li className="text-sm text-foreground/80">• Guard !audit en AuditPage (evita pantalla en blanco)</li>
+                    <li className="text-sm text-foreground/80">• Cierre correcto de TabsContent en Logs del Sistema</li>
+                    <li className="text-sm text-foreground/80">• Auto-carga de sesiones y auditorías al abrir Historial</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix37</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix40" ? null : "fix40")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Stats de auditorías filtradas por plaza en tiempo real (total_audits, stores_audited, cobertura %)</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix40</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Auditorías vencidas con vista y restauración, restricción de acceso a auditoría ...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix40" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix40" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Auditorías vencidas con vista y restauración, restricción de acceso a auditoría en progreso por otro usuario, sesiones activas con cierre forzoso, multisesión configurable, tab Fixes en Logs del Sistema.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Vista de auditorías vencidas con botón Restaurar (+24h)</li>
+                    <li className="text-sm text-foreground/80">• Restricción: solo el auditor dueño puede entrar a su auditoría</li>
+                    <li className="text-sm text-foreground/80">• Sesiones activas con cierre forzoso en AdminPage-Historial</li>
+                    <li className="text-sm text-foreground/80">• Multisesión configurable: permitir múltiples sesiones por usuario</li>
+                    <li className="text-sm text-foreground/80">• Tab 'Fixes' en Logs del Sistema con historial completo</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix36</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix39" ? null : "fix39")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Recálculo horas con TTL actual, fix filtro plaza objetos→strings, SW v6 sin skipWaiting, detección updates via waiting state</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix39</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Sistema completo de inactividad: timeout configurable (5-480 min), banner con co...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix39" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix39" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Sistema completo de inactividad: timeout configurable (5-480 min), banner con countdown 5 minutos antes, botón 'Seguir trabajando', propagación en tiempo real a sesiones activas.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Timeout de inactividad configurable en AdminPage</li>
+                    <li className="text-sm text-foreground/80">• Banner modal con countdown en tiempo real</li>
+                    <li className="text-sm text-foreground/80">• Botón 'Seguir trabajando' reinicia el timer</li>
+                    <li className="text-sm text-foreground/80">• Propagación en tiempo real via polling cada 60s</li>
+                    <li className="text-sm text-foreground/80">• Rango: 5 a 480 minutos</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix35</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix38" ? null : "fix38")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Horas restantes desde photos_deadline, layout móvil Consultar Equipo, filtro plaza historial, modelo y serie en escaneos</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix38</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">SW definitivo con waiting state correcto, envío de SKIP_WAITING explícito desde ...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix38" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix38" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">SW definitivo con waiting state correcto, envío de SKIP_WAITING explícito desde App.js al hacer clic en 'Recargar', fix de modelo duplicado en historial de escaneos.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• SW con waiting state correcto (sin skipWaiting automático)</li>
+                    <li className="text-sm text-foreground/80">• App.js envía SKIP_WAITING al SW en waiting</li>
+                    <li className="text-sm text-foreground/80">• Modelo no duplicado en historial de escaneos</li>
+                    <li className="text-sm text-foreground/80">• Recarga automática vía controllerchange</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix34</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix37" ? null : "fix37")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Auto-cancelar auditoría sin escaneos, lógica movimientos robusta, endpoint fix-pending-photos, botón corregir auditorías</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix37</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Estadísticas de auditorías filtradas por plaza en tiempo real: total_audits, sto...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix37" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix37" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Estadísticas de auditorías filtradas por plaza en tiempo real: total_audits, stores_audited y porcentaje de cobertura se actualizan al filtrar.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Stats filtradas por plaza: auditorías realizadas</li>
+                    <li className="text-sm text-foreground/80">• Stats filtradas por plaza: tiendas auditadas</li>
+                    <li className="text-sm text-foreground/80">• Stats filtradas por plaza: % cobertura</li>
+                    <li className="text-sm text-foreground/80">• Backend acepta parámetro plaza en /audits/stats/summary</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix33</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix36" ? null : "fix36")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Banner actualización SW, búsqueda equipo limit=0, contraseña actual requerida para cambiar contraseña, validación estructura archivos Excel</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix36</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Recálculo de horas con TTL actual del sistema, fix del filtro de plaza (objetos→...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix36" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix36" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Recálculo de horas con TTL actual del sistema, fix del filtro de plaza (objetos→strings), SW v6 sin skipWaiting en install, detección de updates via waiting state.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Horas recalculadas con TTL configurado actualmente</li>
+                    <li className="text-sm text-foreground/80">• Filtro plaza: extrae strings de objetos /stores/plazas</li>
+                    <li className="text-sm text-foreground/80">• SW v6: sin skipWaiting en install</li>
+                    <li className="text-sm text-foreground/80">• Detección updates via reg.waiting</li>
+                    <li className="text-sm text-foreground/80">• Separador bullet entre modelo y serie</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix32</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix35" ? null : "fix35")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Fix raíz lógica fotos: filtrar movimientos auto_generated, campos photo_required_alta/baja separados, TTL como int</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix35</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Horas restantes recalculadas desde photos_deadline, layout móvil de Consultar Eq...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix35" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix35" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Horas restantes recalculadas desde photos_deadline, layout móvil de Consultar Equipo corregido, filtro por plaza en historial de auditorías, modelo y serie en historial de escaneos.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Horas restantes calculadas desde photos_deadline real</li>
+                    <li className="text-sm text-foreground/80">• Layout móvil: input full-width, controles en fila separada</li>
+                    <li className="text-sm text-foreground/80">• Filtro por plaza en historial de auditorías (LogsPage)</li>
+                    <li className="text-sm text-foreground/80">• Modelo y serie visibles en historial de escaneos</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix31</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix34" ? null : "fix34")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Fix estado modal tienda (pending_photos), paginación búsqueda equipos 10/25/50/100/Todos, eliminar tab Equipos de AdminPage</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix34</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Auto-cancelar auditoría sin escaneos, lógica de movimientos más robusta, endpoin...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix34" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix34" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Auto-cancelar auditoría sin escaneos, lógica de movimientos más robusta, endpoint fix-pending-photos para completar auditorías que ya no requieren foto.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Auto-cancelación al finalizar sin escaneos</li>
+                    <li className="text-sm text-foreground/80">• Lógica: ALTA siempre manual, BAJA filtra canceladas</li>
+                    <li className="text-sm text-foreground/80">• Endpoint POST /admin/fix-pending-photos</li>
+                    <li className="text-sm text-foreground/80">• Botón 'Corregir ahora' en AdminPage</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix30</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix33" ? null : "fix33")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">8 correcciones: doble X foto, TTL config, fotos solo movimientos manuales, banner SW, contraseña reset, importación masiva usuarios Excel, stats auditorías</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix33</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Banner de actualización SW, búsqueda de equipo carga todos los registros (limit=...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix33" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix33" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Banner de actualización SW, búsqueda de equipo carga todos los registros (limit=0 al backend), contraseña actual requerida para cambiar contraseña, validación de estructura de archivos Excel antes de importar.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Banner actualización SW funcional</li>
+                    <li className="text-sm text-foreground/80">• Búsqueda equipo: limit=0 carga todos al backend</li>
+                    <li className="text-sm text-foreground/80">• Contraseña actual requerida al cambiar contraseña</li>
+                    <li className="text-sm text-foreground/80">• Validación de estructura Excel antes de importar</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix29</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix32" ? null : "fix32")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Endpoint global /cross-analysis/global, rediseño UI análisis cruzado con filtros por plaza y confianza</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix32</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-12</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix raíz de lógica de fotos: filtrar movimientos auto_generated correctamente, c...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix32" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix32" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Fix raíz de lógica de fotos: filtrar movimientos auto_generated correctamente, campos photo_required_alta y photo_required_baja separados, TTL guardado como entero (no booleano).</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Movimientos auto_generated excluidos del cálculo de fotos</li>
+                    <li className="text-sm text-foreground/80">• Campos photo_required_alta y _baja independientes</li>
+                    <li className="text-sm text-foreground/80">• TTL guardado como int (corrige bug de bool→1)</li>
+                    <li className="text-sm text-foreground/80">• Validación robusta de tipos en system-settings</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix27-fix28</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix31" ? null : "fix31")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Tab AdminHistory, estado pending_photos con TTL/auto-limpieza, banner bloqueo countdown, toggles ALTAS/BAJAS, serie obligatoria, catálogo dinámico, análisis cruzado, marca/modelo en búsqueda</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix31</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-12</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix del estado en modal de tienda para mostrar pending_photos correctamente, pag...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix31" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix31" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Fix del estado en modal de tienda para mostrar pending_photos correctamente, paginación de búsqueda de equipos con opciones 10/25/50/100/Todos, eliminación del tab Equipos de AdminPage.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Modal de tienda muestra estado pending_photos correctamente</li>
+                    <li className="text-sm text-foreground/80">• Paginación de búsqueda: 10/25/50/100/Todos por página</li>
+                    <li className="text-sm text-foreground/80">• Tab Equipos eliminado de AdminPage</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix25-fix26</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix30" ? null : "fix30")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Fix botones lightbox, UI conflicto sesión con IP/device/UA, catálogo sobrante con marcas + OTRO manual, control límite búsqueda</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix30</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-12</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">8 correcciones: doble X en diálogo foto, display de horas TTL en config, fotos s...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix30" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix30" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">8 correcciones: doble X en diálogo foto, display de horas TTL en config, fotos solo en movimientos manuales, banner de actualización SW, confirmación de contraseña para reset, importación masiva de usuarios por Excel, estadísticas de auditorías en bitácoras.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Doble X en diálogo de foto eliminado</li>
+                    <li className="text-sm text-foreground/80">• Display de horas TTL corregido en configuración</li>
+                    <li className="text-sm text-foreground/80">• Fotos solo en movimientos manuales (no auto-generados)</li>
+                    <li className="text-sm text-foreground/80">• Banner de actualización SW implementado</li>
+                    <li className="text-sm text-foreground/80">• Contraseña requerida para reiniciar datos</li>
+                    <li className="text-sm text-foreground/80">• Importación masiva de usuarios desde Excel/CSV</li>
+                    <li className="text-sm text-foreground/80">• Tarjetas de estadísticas en bitácoras</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix23-fix24</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix29" ? null : "fix29")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">SystemLogsPage unificada, fix apiRef AuthContext, performance LogsPage con proyecciones y fetches paralelos, índices MongoDB</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix29</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-12</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Endpoint global GET /cross-analysis/global que compara no-localizados vs sobrant...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix29" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix29" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Endpoint global GET /cross-analysis/global que compara no-localizados vs sobrantes de TODAS las auditorías. Rediseño de UI con filtros por plaza y nivel de confianza.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Endpoint global /cross-analysis/global</li>
+                    <li className="text-sm text-foreground/80">• Compara todas las auditorías simultáneamente</li>
+                    <li className="text-sm text-foreground/80">• Filtros por plaza y nivel de confianza (Alta/Media/Baja)</li>
+                    <li className="text-sm text-foreground/80">• Badge 'Tiendas distintas' cuando equipos son de otra tienda</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix21-fix22</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-11 – 2026-03-12</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix27-fix28" ? null : "fix27-fix28")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Sesión única forzada con UI mejorada, ciclo 3 idiomas ES→EN→PT, fix pantalla en blanco AdminPage</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix27-fix28</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-12</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Tab AdminHistory en AdminPage, estado pending_photos con TTL y auto-limpieza, ba...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix27-fix28" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix27-fix28" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Tab AdminHistory en AdminPage, estado pending_photos con TTL y auto-limpieza, banner de bloqueo con countdown, toggles ALTAS/BAJAS separados, serie obligatoria en sobrante, catálogo dinámico desde MAF, análisis cruzado no-localizado vs sobrante, marca/modelo en búsqueda.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Tab AdminHistory en AdminPage</li>
+                    <li className="text-sm text-foreground/80">• Estado pending_photos con TTL configurable</li>
+                    <li className="text-sm text-foreground/80">• Auto-limpieza de auditorías vencidas</li>
+                    <li className="text-sm text-foreground/80">• Banner de bloqueo con countdown en auditoría</li>
+                    <li className="text-sm text-foreground/80">• Toggles separados para foto ALTAS y BAJAS</li>
+                    <li className="text-sm text-foreground/80">• Serie obligatoria en sobrante desconocido</li>
+                    <li className="text-sm text-foreground/80">• Catálogo dinámico cargado desde el MAF</li>
+                    <li className="text-sm text-foreground/80">• Análisis cruzado: no-localizado vs sobrante</li>
+                    <li className="text-sm text-foreground/80">• Marca y modelo en resultados de búsqueda</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix20</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-11</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix25-fix26" ? null : "fix25-fix26")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Fix lightbox Radix, toggles de configuración de fotos, idioma Portugués</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix25-fix26</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-12</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix de botones en lightbox, UI mejorada de conflicto de sesión con IP/device/UA ...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix25-fix26" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix25-fix26" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Fix de botones en lightbox, UI mejorada de conflicto de sesión con IP/device/UA completos, catálogo de sobrante desconocido con marcas filtradas + opción OTRO, control de límite en búsqueda de equipos.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Botones del lightbox corregidos</li>
+                    <li className="text-sm text-foreground/80">• Conflicto de sesión muestra IP, dispositivo y navegador</li>
+                    <li className="text-sm text-foreground/80">• Catálogo de marcas filtrado por tipo de equipo</li>
+                    <li className="text-sm text-foreground/80">• Opción OTRO con campo manual para marcas</li>
+                    <li className="text-sm text-foreground/80">• Control de límite de resultados en búsqueda</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix18-fix19</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-11</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix23-fix24" ? null : "fix23-fix24")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Fix lightbox con createPortal (z-index), scroll en sidebar, enfoque en historial de búsqueda</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix23-fix24</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-12</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">SystemLogsPage unificada (app + seguridad), fix de apiRef en AuthContext, mejora...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix23-fix24" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix23-fix24" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">SystemLogsPage unificada (app + seguridad), fix de apiRef en AuthContext, mejoras de performance en LogsPage con proyecciones MongoDB y fetches paralelos.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• SystemLogsPage unificada con tabs</li>
+                    <li className="text-sm text-foreground/80">• Fix de apiRef en AuthContext (race condition)</li>
+                    <li className="text-sm text-foreground/80">• Proyecciones MongoDB para reducir datos transferidos</li>
+                    <li className="text-sm text-foreground/80">• Fetches paralelos con asyncio.gather</li>
+                    <li className="text-sm text-foreground/80">• Nuevos índices MongoDB para consultas frecuentes</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix17</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-11</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix21-fix22" ? null : "fix21-fix22")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Fotos condicionales por configuración, verificación automática de firma, lightbox de fotos, historial admin con rollback, búsqueda avanzada de equipos</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix21-fix22</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-11 – 2026-03-12</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Sesión única forzada con UI de conflicto mejorada, ciclo de 3 idiomas ES→EN→PT c...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix21-fix22" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix21-fix22" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Sesión única forzada con UI de conflicto mejorada, ciclo de 3 idiomas ES→EN→PT con botón en header, corrección de pantalla en blanco en AdminPage.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Sesión única forzada al iniciar sesión</li>
+                    <li className="text-sm text-foreground/80">• UI de conflicto con detalles del dispositivo activo</li>
+                    <li className="text-sm text-foreground/80">• Ciclo de idiomas ES→EN→PT en un botón</li>
+                    <li className="text-sm text-foreground/80">• Fix pantalla en blanco AdminPage</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix16</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-10</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix20" ? null : "fix20")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Truncado de barcode en escaneo, correcciones visuales menores</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix20</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-11</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix de lightbox con Radix Dialog, toggles de configuración de fotos en admin, so...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix20" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix20" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Fix de lightbox con Radix Dialog, toggles de configuración de fotos en admin, soporte de idioma Portugués (tercer idioma).</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Lightbox compatible con Radix Dialog</li>
+                    <li className="text-sm text-foreground/80">• Toggles de configuración de fotos en AdminPage</li>
+                    <li className="text-sm text-foreground/80">• Soporte de idioma Portugués (ES→EN→PT)</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix15</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-10</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix18-fix19" ? null : "fix18-fix19")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Flujo de desbloqueo regresa al login, notificaciones al solicitar desbloqueo</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix18-fix19</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-11</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix de lightbox usando createPortal para resolver problemas de z-index, scroll e...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix18-fix19" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix18-fix19" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Fix de lightbox usando createPortal para resolver problemas de z-index, scroll en sidebar, enfoque automático en historial de búsqueda.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Lightbox con createPortal (z-index corregido)</li>
+                    <li className="text-sm text-foreground/80">• Scroll en sidebar de navegación</li>
+                    <li className="text-sm text-foreground/80">• Enfoque automático en búsqueda de equipos</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix14</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-10</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix17" ? null : "fix17")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Reporte PDF completo de auditoría con firma digital verificable</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix17</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-11</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fotos condicionales configurables por tipo de movimiento, verificación automátic...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix17" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix17" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Fotos condicionales configurables por tipo de movimiento, verificación automática de firma al completar auditoría, lightbox de fotos, historial de cambios admin con rollback, búsqueda avanzada de equipos con filtros.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Fotos condicionales por tipo (altas/bajas/transferencias)</li>
+                    <li className="text-sm text-foreground/80">• Verificación automática de firma digital al completar</li>
+                    <li className="text-sm text-foreground/80">• Lightbox de fotos con zoom</li>
+                    <li className="text-sm text-foreground/80">• Historial de cambios admin con rollback</li>
+                    <li className="text-sm text-foreground/80">• Búsqueda avanzada con marca, modelo, serie, tienda</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix13</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-10</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix16" ? null : "fix16")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Logs de seguridad, firmas digitales HMAC-SHA256, cifrado de campos sensibles serie/factura con Fernet</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix16</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-10</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Corrección de truncado de código de barras en escaneo, correcciones visuales men...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix16" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix16" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Corrección de truncado de código de barras en escaneo, correcciones visuales menores en la interfaz.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Truncado de código de barras corregido en Zebra TC52</li>
+                    <li className="text-sm text-foreground/80">• Caracteres especiales Unicode eliminados del barcode</li>
+                    <li className="text-sm text-foreground/80">• Correcciones visuales menores</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix11-fix12</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-09 – 2026-03-10</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix15" ? null : "fix15")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Sesión única por usuario, detección conflicto de sesión con IP/dispositivo/UA, cierre forzoso de otras sesiones</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix15</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-10</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">El flujo de desbloqueo de cuenta regresa al login tras solicitarlo, con notifica...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix15" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix15" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">El flujo de desbloqueo de cuenta regresa al login tras solicitarlo, con notificaciones al administrador.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Flujo de desbloqueo regresa al login automáticamente</li>
+                    <li className="text-sm text-foreground/80">• Notificación al administrador al solicitar desbloqueo</li>
+                    <li className="text-sm text-foreground/80">• UI mejorada del proceso de desbloqueo</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix10</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-09</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix14" ? null : "fix14")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Mejoras UX de análisis: rendimiento, filtros avanzados, optimizaciones generales</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix14</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-10</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Reporte PDF completo de auditoría con firma digital verificable, tabla de equipo...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix14" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix14" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Reporte PDF completo de auditoría con firma digital verificable, tabla de equipos no localizados y sobrantes, y resumen de movimientos.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• PDF completo con todos los datos de la auditoría</li>
+                    <li className="text-sm text-foreground/80">• Firma digital incluida y verificable</li>
+                    <li className="text-sm text-foreground/80">• Tabla de equipos no localizados con valores</li>
+                    <li className="text-sm text-foreground/80">• Resumen de movimientos (altas, bajas, transferencias)</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix8-fix9</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-09</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix13" ? null : "fix13")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Columnas Serie/Depreciado en bitácoras, resize diálogo auditoría, PDF por perfil, prioridad badge En Progreso</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix13</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-10</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Logs de auditoría de seguridad, firmas digitales HMAC-SHA256 por auditoría, cifr...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix13" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix13" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Logs de auditoría de seguridad, firmas digitales HMAC-SHA256 por auditoría, cifrado de campos sensibles (serie y factura) con Fernet.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Logs de seguridad con niveles INFO/WARNING/CRITICAL</li>
+                    <li className="text-sm text-foreground/80">• Firmas digitales HMAC-SHA256 por auditoría</li>
+                    <li className="text-sm text-foreground/80">• Cifrado de campos sensibles con Fernet (serie, factura)</li>
+                    <li className="text-sm text-foreground/80">• Verificación automática de integridad</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix7</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-09</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix11-fix12" ? null : "fix11-fix12")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Badge En Progreso dashboard, estado auditoría backend, reescritura completa de pdf_generator.py (Manual + Presentación ejecutiva)</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix11-fix12</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-09 – 2026-03-10</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Implementación de sesión única por usuario con detección de conflicto mostrando ...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix11-fix12" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix11-fix12" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Implementación de sesión única por usuario con detección de conflicto mostrando IP, dispositivo y user-agent. Cierre forzoso de otras sesiones activas.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Sesión única por usuario enforced</li>
+                    <li className="text-sm text-foreground/80">• Diálogo de conflicto de sesión con IP y dispositivo</li>
+                    <li className="text-sm text-foreground/80">• Cierre forzoso de sesiones activas</li>
+                    <li className="text-sm text-foreground/80">• Registro de eventos de sesión en logs de seguridad</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 border-b">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix6</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-09</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix10" ? null : "fix10")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Tabla equipos móvil, campo serie sobrante, overlay finalización, fotos en resumen auditoría, filtros resumen, historial Excel con fotos</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix10</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-09</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Mejoras de UX: rendimiento general, filtros avanzados optimizados y correcciones...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix10" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix10" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Mejoras de UX: rendimiento general, filtros avanzados optimizados y correcciones de interfaz.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Rendimiento de carga mejorado</li>
+                    <li className="text-sm text-foreground/80">• Filtros avanzados optimizados</li>
+                    <li className="text-sm text-foreground/80">• Correcciones de interfaz de usuario</li>
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="flex items-start gap-3 px-4 py-3 ">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <Wrench className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold font-mono text-sm text-primary">fix1-fix5</span>
-                    
-                    <span className="text-xs text-muted-foreground">2026-03-06 – 2026-03-07</span>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix8-fix9" ? null : "fix8-fix9")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-sm mt-0.5 text-foreground/80">Deploy inicial Railway, cámara de escaneo, registro sobrante desconocido, tablas móvil, exportación Excel con imágenes, filtros de movimientos</p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix8-fix9</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-09</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Columnas Serie y Depreciado en bitácoras, resize del diálogo de auditoría, PDF e...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix8-fix9" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix8-fix9" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Columnas Serie y Depreciado en bitácoras, resize del diálogo de auditoría, PDF específico por perfil de usuario, corrección de prioridad del badge En Progreso.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Columnas Serie y Depreciado en bitácoras</li>
+                    <li className="text-sm text-foreground/80">• Resize del diálogo de auditoría</li>
+                    <li className="text-sm text-foreground/80">• PDF diferente según perfil (Admin/Socio/SuperAdmin)</li>
+                    <li className="text-sm text-foreground/80">• Prioridad de badge En Progreso sobre Auditada</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix7" ? null : "fix7")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix7</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-09</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix badge 'En Progreso' en dashboard, corrección de estados de auditoría en back...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix7" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix7" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Fix badge 'En Progreso' en dashboard, corrección de estados de auditoría en backend, reescritura completa de pdf_generator.py con Manual de Usuario y Presentación ejecutiva.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Badge 'En Progreso' en dashboard corregido</li>
+                    <li className="text-sm text-foreground/80">• Estados de auditoría actualizados en backend</li>
+                    <li className="text-sm text-foreground/80">• pdf_generator.py reescrito completamente</li>
+                    <li className="text-sm text-foreground/80">• Manual de Usuario con diseño profesional</li>
+                    <li className="text-sm text-foreground/80">• Presentación ejecutiva para stakeholders</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix6" ? null : "fix6")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix6</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-09</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Mejoras en tabla de equipos móvil, campo serie para sobrante, overlay de finaliz...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix6" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix6" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Mejoras en tabla de equipos móvil, campo serie para sobrante, overlay de finalización, fotos en resumen de auditoría, filtros por tipo y exportación Excel con fotos.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Tabla de equipos móvil optimizada</li>
+                    <li className="text-sm text-foreground/80">• Campo serie obligatorio para sobrante desconocido</li>
+                    <li className="text-sm text-foreground/80">• Overlay de carga al finalizar auditoría</li>
+                    <li className="text-sm text-foreground/80">• Fotos de formatos en resumen de auditoría</li>
+                    <li className="text-sm text-foreground/80">• Exportación Excel del historial con fotos</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix1-fix5" ? null : "fix1-fix5")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix1-fix5</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-06 – 2026-03-07</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Deploy inicial en Railway, implementación de cámara de escaneo, registro de sobr...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix1-fix5" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix1-fix5" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Deploy inicial en Railway, implementación de cámara de escaneo, registro de sobrante desconocido, tablas móvil responsivas, exportación Excel con imágenes incrustadas, filtros de movimientos.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Deploy inicial FastAPI + React en Railway</li>
+                    <li className="text-sm text-foreground/80">• Cámara de escaneo de códigos de barras</li>
+                    <li className="text-sm text-foreground/80">• Registro de sobrante desconocido con campos personalizados</li>
+                    <li className="text-sm text-foreground/80">• Tablas móvil con scroll horizontal</li>
+                    <li className="text-sm text-foreground/80">• Exportación Excel con imágenes incrustadas</li>
+                    <li className="text-sm text-foreground/80">• Filtros de movimientos (transferencias, bajas, altas)</li>
+                    </ul>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+                </TabsContent>
       </Tabs>
     </div>
   );

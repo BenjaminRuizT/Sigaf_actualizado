@@ -9,7 +9,7 @@ export default function DeployPage() {
   const sections = [
     {
       icon: Server,
-      title: "0. URLs de la aplicación en producción (Railway)",
+      title: "0. URLs de la aplicación en producción (Railway) — fix43",
       content: [
         { type: "text", value: "La aplicación está desplegada en Railway.app con los siguientes servicios activos:" },
         { type: "subtitle", value: "Servicios activos" },
@@ -36,9 +36,10 @@ REACT_APP_BACKEND_URL=https://sigafactualizado-production.up.railway.app` },
         { type: "list", items: [
           "1. En Railway, ir al servicio backend → pestaña Deploy → Source → conectado a GitHub o subir archivos",
           "2. Para actualizar server.py: subir el archivo al repositorio o usar Railway CLI: railway up",
-          "3. Para el frontend: reconstruir con yarn build y subir la carpeta build/",
+          "3. Para el frontend: reconstruir con yarn build (el prebuild estampa automáticamente sw.js con timestamp único)",
           "4. Railway redespliega automáticamente al detectar cambios en el repositorio conectado",
-          "5. Ver logs en tiempo real: Railway dashboard → servicio → Logs"
+          "5. Ver logs en tiempo real: Railway dashboard → servicio → Logs",
+          "6. El banner de actualización aparece automáticamente en todos los navegadores activos en la siguiente carga"
         ]},
       ]
     },
@@ -68,6 +69,7 @@ REACT_APP_BACKEND_URL=https://sigafactualizado-production.up.railway.app` },
 │   ├── .env           # Variables de entorno del backend
 │   └── requirements.txt  # Dependencias Python
 ├── frontend/          # React (PWA)
+│   ├── scripts/       # stamp-sw.js (inyecta timestamp en SW)
 │   ├── src/           # Código fuente React
 │   │   ├── App.js     # Componente principal
 │   │   ├── pages/     # Páginas de la aplicación
@@ -361,6 +363,18 @@ services:
 
 volumes:
   mongo_data:` },
+        { type: "subtitle", value: "Características de seguridad implementadas" },
+        { type: "list", items: [
+          "Sesión única por usuario (configurable a multisesión desde AdminPage)",
+          "Cierre automático por inactividad: configurable 5-480 minutos",
+          "Banner de aviso 5 minutos antes del cierre con cuenta regresiva",
+          "Firmas digitales HMAC-SHA256 por auditoría para verificar integridad",
+          "Cifrado de campos sensibles (serie, factura) con Fernet",
+          "Logs de seguridad con niveles INFO/WARNING/CRITICAL",
+          "Control de sesiones activas con cierre forzoso desde AdminPage",
+          "Restricción: solo el auditor dueño puede entrar a su auditoría en progreso",
+          "JWT con session_id validado en cada request autenticado"
+        ]},
         { type: "subtitle", value: "Opción C: Servicios Cloud (Railway, Render, Fly.io)" },
         { type: "list", items: [
           "Railway.app: Conecte su repositorio Git, configure variables de entorno y despliegue automáticamente (soporte HTTPS incluido)",

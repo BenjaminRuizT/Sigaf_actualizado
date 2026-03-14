@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Users, Monitor, Search, ChevronLeft, ChevronRight, ArrowUpDown, RotateCcw, AlertTriangle, Eye, EyeOff, Download, Upload, FileSpreadsheet, ShieldAlert, Settings, Camera, History, FileX, UserMinus, UserCog, UserPlus, DatabaseZap, Wrench, ChevronDown, ChevronUp, Filter, Lock, CheckCircle, LogOut } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Monitor, Search, RotateCcw, AlertTriangle, Eye, EyeOff, Download, Upload, FileSpreadsheet, ShieldAlert, Settings, Camera, History, FileX, UserMinus, UserCog, UserPlus, DatabaseZap, Wrench, ChevronDown, ChevronUp, Filter, Lock, CheckCircle, LogOut } from "lucide-react";
 
 
 export default function AdminPage({ defaultTab = "users" }) {
