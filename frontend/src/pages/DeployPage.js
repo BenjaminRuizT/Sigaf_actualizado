@@ -14,7 +14,7 @@ export default function DeployPage() {
   const handleDownloadTechDoc = async () => {
     setDownloading(true);
     try {
-      const res = await api.get("/download/presentation", { responseType: "blob" });
+      const res = await api.get("/download/tech-docs", { responseType: "blob" });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       const a = document.createElement("a");
       a.href = url;
@@ -432,7 +432,7 @@ volumes:
         </div>
         <Button onClick={handleDownloadTechDoc} disabled={downloading} className="gap-2 shrink-0">
           {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-          Documentación Técnica PDF
+          Documentación
         </Button>
       </div>
 
