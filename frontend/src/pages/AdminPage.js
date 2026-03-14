@@ -38,7 +38,7 @@ export default function AdminPage({ defaultTab = "users" }) {
   const [showPassword, setShowPassword] = useState(false);
   const [mafFile, setMafFile] = useState(null);
   const [usersFile, setUsersFile] = useState(null);
-  const [sysSettings, setSysSettings] = useState({ photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24 });
+  const [sysSettings, setSysSettings] = useState({ photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24, session_timeout_minutes: 15 });
   const [sysSettingsSaving, setSysSettingsSaving] = useState(false);
 
   // Importación masiva de usuarios
@@ -138,16 +138,19 @@ export default function AdminPage({ defaultTab = "users" }) {
   useEffect(() => { fetchPlazas(); }, [fetchPlazas]);
   useEffect(() => { fetchUnlockRequests(); }, [fetchUnlockRequests]);
   useEffect(() => {
-    const DEFAULTS = { photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24 };
+    const DEFAULTS = { photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24, session_timeout_minutes: 15 };
     api.get("/admin/system-settings").then(r => {
       const raw = r.data || {};
       setSysSettings({
         ...DEFAULTS,
         ...raw,
-        // Force numeric type — backend may have stored it as bool (bool bug) or it may be missing
+        // Force numeric types
         pending_photos_ttl_hours: Number(raw.pending_photos_ttl_hours) > 0
           ? Number(raw.pending_photos_ttl_hours)
           : 24,
+        session_timeout_minutes: Number(raw.session_timeout_minutes) >= 5
+          ? Number(raw.session_timeout_minutes)
+          : 15,
       });
     }).catch(() => {});
   }, [api]);
@@ -158,9 +161,10 @@ export default function AdminPage({ defaultTab = "users" }) {
       const payload = {
         ...newSettings,
         pending_photos_ttl_hours: Math.max(1, Math.min(168, Number(newSettings.pending_photos_ttl_hours) || 24)),
+        session_timeout_minutes: Math.max(5, Math.min(480, Number(newSettings.session_timeout_minutes) || 15)),
       };
       const res = await api.put("/admin/system-settings", payload);
-      const DEFAULTS = { photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24 };
+      const DEFAULTS = { photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24, session_timeout_minutes: 15 };
       const raw = res.data || {};
       setSysSettings({
         ...DEFAULTS,
@@ -168,6 +172,9 @@ export default function AdminPage({ defaultTab = "users" }) {
         pending_photos_ttl_hours: Number(raw.pending_photos_ttl_hours) > 0
           ? Number(raw.pending_photos_ttl_hours)
           : Number(payload.pending_photos_ttl_hours) || 24,
+        session_timeout_minutes: Number(raw.session_timeout_minutes) >= 5
+          ? Number(raw.session_timeout_minutes)
+          : Number(payload.session_timeout_minutes) || 15,
       });
       toast.success("Configuración guardada");
     } catch { toast.error("Error al guardar configuración"); }
@@ -575,6 +582,44 @@ export default function AdminPage({ defaultTab = "users" }) {
                     <CheckCircle className="h-3.5 w-3.5" /> Corregir ahora
                   </Button>
                 </div>
+              </div>
+
+              {/* ── Cierre de sesión por inactividad ── */}
+              <div className="border-t pt-4 space-y-3">
+                <div>
+                  <p className="font-heading font-bold uppercase tracking-tight text-base flex items-center gap-2">
+                    <Lock className="h-4 w-4 text-primary" /> Cierre de sesión por inactividad
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Si un usuario no registra actividad durante este tiempo, su sesión se cierra automáticamente. Un banner de aviso aparece 5 minutos antes con cuenta regresiva.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30">
+                  <div className="flex-1 space-y-0.5">
+                    <p className="font-medium text-sm">Minutos de inactividad para cerrar sesión</p>
+                    <p className="text-xs text-muted-foreground">Rango: 5 – 480 minutos (mínimo recomendado: 15)</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={5}
+                      max={480}
+                      value={sysSettings.session_timeout_minutes ?? 15}
+                      onChange={e => setSysSettings(s => ({
+                        ...s,
+                        session_timeout_minutes: Math.max(5, Math.min(480, parseInt(e.target.value) || 15))
+                      }))}
+                      className="w-20 h-9 rounded-md border border-input bg-background px-3 text-sm text-center font-mono"
+                    />
+                    <span className="text-sm text-muted-foreground">min</span>
+                    <Button size="sm" onClick={() => handleSaveSysSettings(sysSettings)} disabled={sysSettingsSaving} className="ml-1">
+                      {sysSettingsSaving ? "..." : "Guardar"}
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  El cambio se aplica en tiempo real a todas las sesiones activas (dentro del minuto siguiente al guardar).
+                </p>
               </div>
             </CardContent>
           </Card>
