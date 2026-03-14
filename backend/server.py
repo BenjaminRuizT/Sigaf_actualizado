@@ -194,6 +194,8 @@ class SecEvent:
     AUDIT_FINALIZED  = "AUDIT_FINALIZED"
     AUDIT_DELETED    = "AUDIT_DELETED"
     AUDIT_CANCELLED  = "AUDIT_CANCELLED"
+    AUDIT_RESTORED   = "AUDIT_RESTORED"
+    SESSION_CLOSED   = "SESSION_CLOSED"
     EQUIPMENT_EDITED = "EQUIPMENT_EDITED"
     DATA_RESET       = "DATA_RESET"
     SIGNATURE_VALID   = "SIGNATURE_VALID"
@@ -218,6 +220,8 @@ _SEC_LEVEL_MAP = {
     SecEvent.AUDIT_FINALIZED:  SecLevel.INFO,
     SecEvent.AUDIT_DELETED:    SecLevel.CRITICAL,
     SecEvent.AUDIT_CANCELLED:  SecLevel.WARNING,
+    SecEvent.AUDIT_RESTORED:   SecLevel.WARNING,
+    SecEvent.SESSION_CLOSED:   SecLevel.WARNING,
     SecEvent.EQUIPMENT_EDITED: SecLevel.WARNING,
     SecEvent.DATA_RESET:       SecLevel.CRITICAL,
     SecEvent.SIGNATURE_VALID:  SecLevel.INFO,
@@ -545,7 +549,11 @@ async def login(input: LoginInput, request: StarletteRequest):
     _req_ip = _req_ip.split(",")[0].strip()  # take first IP if comma-separated proxy chain
     _req_ua = request.headers.get("User-Agent", "")
 
-    if existing_sessions:
+    # Check multi-session setting
+    settings_doc = await db.system_settings.find_one({"_id": "global"}, {"_id": 0}) or {}
+    allow_multi = settings_doc.get("allow_multi_session", False)
+
+    if existing_sessions and not allow_multi:
         # Return 409 Conflict so the frontend can show the session conflict dialog
         safe_sessions = [
             {
@@ -835,6 +843,7 @@ _DEFAULT_SETTINGS = {
     "photo_required_transf": True,        # Pedir foto de formato TRANSFERENCIAS
     "pending_photos_ttl_hours": 24,       # Horas para completar fotos antes de eliminar la auditoría
     "session_timeout_minutes": 15,        # Minutos de inactividad antes de cerrar sesión automáticamente
+    "allow_multi_session": False,         # Permitir múltiples sesiones simultáneas por usuario
 }
 
 @api_router.get("/admin/system-settings")
@@ -1245,6 +1254,16 @@ async def create_audit(input: AuditCreateInput, user=Depends(get_current_user)):
         await db.stores.update_one({"cr_tienda": input.cr_tienda}, {"$set": {
             "audit_status": active["status"], "last_audit_id": active["id"]
         }})
+        # Block other users from entering an in-progress audit (pending_photos always accessible to owner)
+        is_owner = active.get("auditor_id") == user["sub"]
+        is_super  = user["perfil"] == "Super Administrador"
+        if active["status"] == "in_progress" and not is_owner and not is_super:
+            raise HTTPException(403, {
+                "code": "AUDIT_IN_PROGRESS",
+                "auditor_name": active.get("auditor_name", "otro usuario"),
+                "started_at": active.get("started_at"),
+                "tienda": active.get("tienda"),
+            })
         return active
     audit = {
         "id": str(uuid.uuid4()), "cr_tienda": input.cr_tienda, "tienda": store["tienda"],
@@ -2873,6 +2892,73 @@ async def fix_pending_photos_no_longer_needed(user=Depends(get_current_user)):
             fixed += 1
     return {"fixed": fixed, "message": f"Se completaron {fixed} auditorías que ya no requieren fotos"}
 
+
+
+@api_router.get("/admin/active-sessions")
+async def admin_get_active_sessions(user=Depends(get_current_user)):
+    """Super admin: list all active sessions across all users."""
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Acceso denegado")
+    sessions = await db.active_sessions.find({}, {"_id": 0}).sort("last_seen", -1).to_list(1000)
+    # Enrich with user nombres
+    user_ids = list({s["user_id"] for s in sessions})
+    users = await db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "nombre": 1, "email": 1}).to_list(1000)
+    user_map = {u["id"]: u for u in users}
+    result = []
+    for s in sessions:
+        u_data = user_map.get(s["user_id"], {})
+        result.append({**s, "nombre": u_data.get("nombre", ""), "email": u_data.get("email", s.get("email", ""))})
+    return result
+
+@api_router.delete("/admin/active-sessions/{session_id}")
+async def admin_close_session(session_id: str, user=Depends(get_current_user)):
+    """Super admin: forcibly close a specific session."""
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Acceso denegado")
+    result = await db.active_sessions.delete_one({"id": session_id})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Sesión no encontrada")
+    await sec_log(SecEvent.SESSION_CLOSED, actor_email=user["email"], actor_id=user["sub"],
+                  target=session_id, detail={"action": "admin_force_close"})
+    return {"deleted": True, "session_id": session_id}
+
+@api_router.delete("/admin/active-sessions")
+async def admin_close_all_sessions(user_id: str, user=Depends(get_current_user)):
+    """Super admin: close all sessions for a specific user."""
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Acceso denegado")
+    await close_sessions(user_id)
+    return {"deleted": True, "user_id": user_id}
+
+
+@api_router.get("/admin/expired-audits")
+async def list_expired_audits(user=Depends(get_current_user)):
+    """Super admin: list pending_photos audits that have expired."""
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Acceso denegado")
+    now_iso = datetime.now(timezone.utc).isoformat()
+    expired = await db.audits.find(
+        {"status": "pending_photos", "photos_deadline": {"$lt": now_iso}},
+        {"_id": 0, "id": 1, "cr_tienda": 1, "tienda": 1, "plaza": 1,
+         "auditor_name": 1, "started_at": 1, "photos_deadline": 1,
+         "located_count": 1, "not_found_count": 1, "surplus_count": 1}
+    ).to_list(500)
+    return {"expired": expired, "count": len(expired)}
+
+@api_router.post("/admin/expired-audits/{audit_id}/restore")
+async def restore_expired_audit(audit_id: str, user=Depends(get_current_user)):
+    """Super admin: restore an expired pending_photos audit by extending its deadline."""
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Acceso denegado")
+    audit = await db.audits.find_one({"id": audit_id, "status": "pending_photos"}, {"_id": 0})
+    if not audit:
+        raise HTTPException(404, "Auditoría no encontrada o ya no está en espera de fotos")
+    # Extend deadline by 24 hours from now
+    new_deadline = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    await db.audits.update_one({"id": audit_id}, {"$set": {"photos_deadline": new_deadline}})
+    await sec_log(SecEvent.AUDIT_RESTORED, actor_email=user["email"], actor_id=user["sub"],
+                  target=audit_id, detail={"tienda": audit.get("tienda"), "new_deadline": new_deadline})
+    return {"restored": True, "new_deadline": new_deadline}
 
 @app.on_event("startup")
 async def startup():
