@@ -15,9 +15,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { toast } from "sonner";
 import {
   Download, ChevronLeft, ChevronRight, ClipboardList, ArrowRightLeft, History,
-  DollarSign, ArrowUpDown, Search, Eye, Trash2, StickyNote, CheckCircle,
+  DollarSign, Search, Eye, Trash2, StickyNote, CheckCircle,
   AlertTriangle, XCircle, TrendingUp, TrendingDown, RefreshCw, Printer, ImageDown,
-  ShieldCheck, ShieldAlert, X, ZoomIn, GitCompare, Sparkles, ChevronDown, ChevronUp
+  ShieldCheck, X, ZoomIn, GitCompare, Sparkles, ChevronDown, ChevronUp
 } from "lucide-react";
 
 
