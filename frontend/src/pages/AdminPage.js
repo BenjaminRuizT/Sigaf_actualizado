@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Users, Monitor, Search, ChevronLeft, ChevronRight, ArrowUpDown, RotateCcw, AlertTriangle, Eye, EyeOff, Download, Upload, FileSpreadsheet, ShieldAlert, Settings, Camera, History, FileX, UserMinus, UserCog, UserPlus, DatabaseZap, Wrench, ChevronDown, ChevronUp, Filter, Lock, CheckCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Monitor, Search, ChevronLeft, ChevronRight, ArrowUpDown, RotateCcw, AlertTriangle, Eye, EyeOff, Download, Upload, FileSpreadsheet, ShieldAlert, Settings, Camera, History, FileX, UserMinus, UserCog, UserPlus, DatabaseZap, Wrench, ChevronDown, ChevronUp, Filter, Lock, CheckCircle, LogOut } from "lucide-react";
 
 
 export default function AdminPage({ defaultTab = "users" }) {
@@ -38,10 +38,55 @@ export default function AdminPage({ defaultTab = "users" }) {
   const [showPassword, setShowPassword] = useState(false);
   const [mafFile, setMafFile] = useState(null);
   const [usersFile, setUsersFile] = useState(null);
-  const [sysSettings, setSysSettings] = useState({ photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24, session_timeout_minutes: 15 });
+  const [sysSettings, setSysSettings] = useState({ photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24, session_timeout_minutes: 15, allow_multi_session: false });
   const [sysSettingsSaving, setSysSettingsSaving] = useState(false);
 
   // Importación masiva de usuarios
+  // Auditorías vencidas
+  const [expiredAudits, setExpiredAudits] = useState([]);
+  const [expiredLoading, setExpiredLoading] = useState(false);
+  const [expiredDialog, setExpiredDialog] = useState(false);
+  // Sesiones activas
+  const [activeSessions, setActiveSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [closingSession, setClosingSession] = useState(null);
+
+  const fetchExpiredAudits = async () => {
+    setExpiredLoading(true);
+    try {
+      const res = await api.get("/admin/expired-audits");
+      setExpiredAudits(res.data.expired || []);
+    } catch { toast.error("Error al cargar auditorías vencidas"); }
+    finally { setExpiredLoading(false); }
+  };
+
+  const handleRestoreAudit = async (auditId) => {
+    try {
+      await api.post(`/admin/expired-audits/${auditId}/restore`);
+      toast.success("Auditoría restaurada con 24 horas adicionales");
+      fetchExpiredAudits();
+    } catch { toast.error("Error al restaurar auditoría"); }
+  };
+
+  const fetchActiveSessions = async () => {
+    setSessionsLoading(true);
+    try {
+      const res = await api.get("/admin/active-sessions");
+      setActiveSessions(res.data || []);
+    } catch { toast.error("Error al cargar sesiones activas"); }
+    finally { setSessionsLoading(false); }
+  };
+
+  const handleCloseSession = async (sessionId) => {
+    setClosingSession(sessionId);
+    try {
+      await api.delete(`/admin/active-sessions/${sessionId}`);
+      toast.success("Sesión cerrada");
+      fetchActiveSessions();
+    } catch { toast.error("Error al cerrar sesión"); }
+    finally { setClosingSession(null); }
+  };
+
   const [importUsersDialog, setImportUsersDialog] = useState(false);
   const [importUsersFile, setImportUsersFile] = useState(null);
   const [importUsersLoading, setImportUsersLoading] = useState(false);
@@ -138,7 +183,7 @@ export default function AdminPage({ defaultTab = "users" }) {
   useEffect(() => { fetchPlazas(); }, [fetchPlazas]);
   useEffect(() => { fetchUnlockRequests(); }, [fetchUnlockRequests]);
   useEffect(() => {
-    const DEFAULTS = { photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24, session_timeout_minutes: 15 };
+    const DEFAULTS = { photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24, session_timeout_minutes: 15, allow_multi_session: false };
     api.get("/admin/system-settings").then(r => {
       const raw = r.data || {};
       setSysSettings({
@@ -164,7 +209,7 @@ export default function AdminPage({ defaultTab = "users" }) {
         session_timeout_minutes: Math.max(5, Math.min(480, Number(newSettings.session_timeout_minutes) || 15)),
       };
       const res = await api.put("/admin/system-settings", payload);
-      const DEFAULTS = { photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24, session_timeout_minutes: 15 };
+      const DEFAULTS = { photo_required_alta: true, photo_required_baja: true, photo_required_transf: true, pending_photos_ttl_hours: 24, session_timeout_minutes: 15, allow_multi_session: false };
       const raw = res.data || {};
       setSysSettings({
         ...DEFAULTS,
@@ -621,12 +666,165 @@ export default function AdminPage({ defaultTab = "users" }) {
                   El cambio se aplica en tiempo real a todas las sesiones activas (dentro del minuto siguiente al guardar).
                 </p>
               </div>
+
+              {/* ── Multisesión ── */}
+              <div className="border-t pt-4 space-y-3">
+                <div>
+                  <p className="font-heading font-bold uppercase tracking-tight text-base flex items-center gap-2">
+                    <Monitor className="h-4 w-4 text-primary" /> Sesiones simultáneas
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Por defecto cada usuario solo puede tener una sesión activa. Habilitar esta opción permite que el mismo usuario inicie sesión desde múltiples dispositivos simultáneamente.
+                  </p>
+                </div>
+                <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                  <div className="space-y-0.5">
+                    <p className="font-medium text-sm">Permitir múltiples sesiones por usuario</p>
+                    <p className="text-xs text-muted-foreground">Al activar, no se mostrará el diálogo de conflicto de sesión al iniciar sesión desde otro dispositivo</p>
+                  </div>
+                  <button
+                    onClick={() => handleSaveSysSettings({ ...sysSettings, allow_multi_session: !sysSettings.allow_multi_session })}
+                    disabled={sysSettingsSaving}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${sysSettings.allow_multi_session ? "bg-primary" : "bg-muted-foreground/30"}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${sysSettings.allow_multi_session ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* ── Historial de Cambios ── */}
         <TabsContent value="history" className="space-y-4">
+          {/* ── Sesiones Activas ── */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Monitor className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-base">Sesiones Activas</CardTitle>
+                  {activeSessions.length > 0 && (
+                    <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">
+                      {activeSessions.length}
+                    </span>
+                  )}
+                </div>
+                <Button variant="outline" size="sm" onClick={fetchActiveSessions} disabled={sessionsLoading} className="gap-1.5">
+                  <RotateCcw className={`h-3.5 w-3.5 ${sessionsLoading ? "animate-spin" : ""}`} /> Actualizar
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {activeSessions.length === 0 ? (
+                <p className="text-sm text-muted-foreground p-4 text-center">
+                  {sessionsLoading ? "Cargando..." : "Sin sesiones activas o presiona Actualizar"}
+                </p>
+              ) : (
+                <div className="divide-y">
+                  {activeSessions.map(s => (
+                    <div key={s.id} className="flex items-center gap-3 px-4 py-3">
+                      <div className="h-8 w-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                        <UserCog className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{s.nombre || s.email}</p>
+                        <p className="text-xs text-muted-foreground truncate">{s.perfil} · {s.ip}</p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          Inicio: {s.created_at ? new Date(s.created_at).toLocaleString("es-MX") : "—"}
+                          {s.last_seen ? ` · Última actividad: ${new Date(s.last_seen).toLocaleString("es-MX")}` : ""}
+                        </p>
+                        {s.user_agent && (
+                          <p className="text-[10px] text-muted-foreground/60 truncate">{s.user_agent.slice(0, 80)}</p>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCloseSession(s.id)}
+                        disabled={closingSession === s.id}
+                        className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50 shrink-0"
+                      >
+                        <LogOut className="h-3.5 w-3.5" />
+                        {closingSession === s.id ? "..." : "Cerrar"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── Auditorías vencidas ── */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  <CardTitle className="text-base">Auditorías Vencidas (Pendiente Fotos)</CardTitle>
+                  {expiredAudits.length > 0 && (
+                    <span className="text-xs bg-amber-500/10 text-amber-700 font-semibold px-2 py-0.5 rounded-full">
+                      {expiredAudits.length}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={fetchExpiredAudits} disabled={expiredLoading} className="gap-1.5">
+                    <RotateCcw className={`h-3.5 w-3.5 ${expiredLoading ? "animate-spin" : ""}`} /> Ver
+                  </Button>
+                  {expiredAudits.length > 0 && (
+                    <Button variant="destructive" size="sm" className="gap-1.5"
+                      onClick={async () => {
+                        try {
+                          const res = await api.post("/admin/cleanup-expired-audits");
+                          toast.success(res.data.message);
+                          setExpiredAudits([]);
+                        } catch { toast.error("Error en la limpieza"); }
+                      }}>
+                      <Trash2 className="h-3.5 w-3.5" /> Eliminar todas
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {expiredAudits.length === 0 ? (
+                <p className="text-sm text-muted-foreground p-4 text-center">
+                  {expiredLoading ? "Cargando..." : "Sin auditorías vencidas o presiona Ver"}
+                </p>
+              ) : (
+                <div className="divide-y">
+                  {expiredAudits.map(a => (
+                    <div key={a.id} className="flex items-center gap-3 px-4 py-3">
+                      <div className="h-8 w-8 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
+                        <FileX className="h-4 w-4 text-amber-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{a.tienda}</p>
+                        <p className="text-xs text-muted-foreground">{a.plaza} · CR: {a.cr_tienda} · Auditor: {a.auditor_name}</p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          Inicio: {a.started_at ? new Date(a.started_at).toLocaleString("es-MX") : "—"}
+                          {a.photos_deadline ? ` · Vencía: ${new Date(a.photos_deadline).toLocaleString("es-MX")}` : ""}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          ✓ {a.located_count} localizados · ⊗ {a.not_found_count} no localizados · ⚠ {a.surplus_count} sobrantes
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRestoreAudit(a.id)}
+                        className="gap-1.5 border-emerald-400 text-emerald-700 hover:bg-emerald-50 shrink-0"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" /> Restaurar
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── Historial de acciones ── */}
           <div className="flex gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={fetchHistory} className="gap-1.5">
               <RotateCcw className={`h-3.5 w-3.5 ${histLoading ? "animate-spin" : ""}`} /> Actualizar

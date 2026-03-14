@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
-  Activity, ShieldCheck, ShieldAlert, ShieldX, RefreshCw, Download, Trash2,
+  Activity, ShieldCheck, Wrench, ShieldAlert, ShieldX, RefreshCw, Download, Trash2,
   AlertTriangle, CheckCircle, Info, Search, X, Lock, Unlock,
   UserPlus, UserMinus, UserCog, KeyRound, DatabaseZap, FileCheck,
   FileX, LogIn, LogOut, Filter
@@ -200,6 +200,10 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
             {secCritical > 0 && (
               <Badge variant="destructive" className="ml-1 text-[10px] h-4 px-1">{secCritical}</Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="fixes" className="flex items-center gap-2">
+            <Wrench className="h-4 w-4" />
+            Fixes
           </TabsTrigger>
         </TabsList>
 
@@ -455,6 +459,396 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   })}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+        <TabsContent value="fixes" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Wrench className="h-4 w-4 text-primary" />
+                <CardTitle className="text-base">Historial de Fixes — SIGAF v1.0</CardTitle>
+                <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">29 actualizaciones</span>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0 max-h-[600px] overflow-y-auto">
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix40</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-primary text-white">Actual</span>
+                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Auditorías vencidas con vista/restauración, restricción auditoría en progreso (solo mismo auditor/Super Admin), sesiones activas con cierre forzoso, multisesión configurable, tab Fixes en Logs de Sistema</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix39</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Sistema de inactividad: timeout configurable 5-480 min, banner countdown 5 min antes, propagación tiempo real, control en AdminPage</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix38</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">SW definitivo: waiting state correcto, SKIP_WAITING explícito desde App.js, fix modelo duplicado en escaneos</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix37</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Stats de auditorías filtradas por plaza en tiempo real (total_audits, stores_audited, cobertura %)</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix36</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Recálculo horas con TTL actual, fix filtro plaza objetos→strings, SW v6 sin skipWaiting, detección updates via waiting state</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix35</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Horas restantes desde photos_deadline, layout móvil Consultar Equipo, filtro plaza historial, modelo y serie en escaneos</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix34</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Auto-cancelar auditoría sin escaneos, lógica movimientos robusta, endpoint fix-pending-photos, botón corregir auditorías</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix33</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-13</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Banner actualización SW, búsqueda equipo limit=0, contraseña actual requerida para cambiar contraseña, validación estructura archivos Excel</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix32</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Fix raíz lógica fotos: filtrar movimientos auto_generated, campos photo_required_alta/baja separados, TTL como int</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix31</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Fix estado modal tienda (pending_photos), paginación búsqueda equipos 10/25/50/100/Todos, eliminar tab Equipos de AdminPage</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix30</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">8 correcciones: doble X foto, TTL config, fotos solo movimientos manuales, banner SW, contraseña reset, importación masiva usuarios Excel, stats auditorías</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix29</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Endpoint global /cross-analysis/global, rediseño UI análisis cruzado con filtros por plaza y confianza</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix27-fix28</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Tab AdminHistory, estado pending_photos con TTL/auto-limpieza, banner bloqueo countdown, toggles ALTAS/BAJAS, serie obligatoria, catálogo dinámico, análisis cruzado, marca/modelo en búsqueda</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix25-fix26</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Fix botones lightbox, UI conflicto sesión con IP/device/UA, catálogo sobrante con marcas + OTRO manual, control límite búsqueda</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix23-fix24</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-12</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">SystemLogsPage unificada, fix apiRef AuthContext, performance LogsPage con proyecciones y fetches paralelos, índices MongoDB</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix21-fix22</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-11 – 2026-03-12</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Sesión única forzada con UI mejorada, ciclo 3 idiomas ES→EN→PT, fix pantalla en blanco AdminPage</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix20</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-11</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Fix lightbox Radix, toggles de configuración de fotos, idioma Portugués</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix18-fix19</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-11</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Fix lightbox con createPortal (z-index), scroll en sidebar, enfoque en historial de búsqueda</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix17</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-11</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Fotos condicionales por configuración, verificación automática de firma, lightbox de fotos, historial admin con rollback, búsqueda avanzada de equipos</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix16</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-10</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Truncado de barcode en escaneo, correcciones visuales menores</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix15</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-10</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Flujo de desbloqueo regresa al login, notificaciones al solicitar desbloqueo</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix14</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-10</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Reporte PDF completo de auditoría con firma digital verificable</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix13</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-10</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Logs de seguridad, firmas digitales HMAC-SHA256, cifrado de campos sensibles serie/factura con Fernet</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix11-fix12</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-09 – 2026-03-10</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Sesión única por usuario, detección conflicto de sesión con IP/dispositivo/UA, cierre forzoso de otras sesiones</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix10</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-09</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Mejoras UX de análisis: rendimiento, filtros avanzados, optimizaciones generales</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix8-fix9</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-09</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Columnas Serie/Depreciado en bitácoras, resize diálogo auditoría, PDF por perfil, prioridad badge En Progreso</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix7</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-09</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Badge En Progreso dashboard, estado auditoría backend, reescritura completa de pdf_generator.py (Manual + Presentación ejecutiva)</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 border-b">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix6</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-09</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Tabla equipos móvil, campo serie sobrante, overlay finalización, fotos en resumen auditoría, filtros resumen, historial Excel con fotos</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 ">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Wrench className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold font-mono text-sm text-primary">fix1-fix5</span>
+                    
+                    <span className="text-xs text-muted-foreground">2026-03-06 – 2026-03-07</span>
+                  </div>
+                  <p className="text-sm mt-0.5 text-foreground/80">Deploy inicial Railway, cámara de escaneo, registro sobrante desconocido, tablas móvil, exportación Excel con imágenes, filtros de movimientos</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

@@ -82,7 +82,17 @@ export default function DashboardPage() {
       const res = await api.post("/audits", { cr_tienda: selectedStore.cr_tienda });
       setDialogOpen(false);
       navigate(`/audit/${res.data.id}`);
-    } catch (err) { toast.error(err.response?.data?.detail || t("common.error")); }
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      if (err.response?.status === 403 && detail?.code === "AUDIT_IN_PROGRESS") {
+        toast.error(
+          `Auditoría en progreso por ${detail.auditor_name}. Solo ese auditor puede continuar.`,
+          { duration: 7000 }
+        );
+      } else {
+        toast.error(typeof detail === "string" ? detail : t("common.error"));
+      }
+    }
     finally { setAuditLoading(false); }
   };
 
