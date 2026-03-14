@@ -694,7 +694,7 @@ ${(a.photo_ab || a.photo_transf) ? `
                     <TableHead className="text-center">{t("common.actions")}</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
-                    {auditData.items  // sorted server-side.map(item => (
+                    {auditData.items.map(item => (
                       <TableRow key={item.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleViewAudit(item)} data-testid={`audit-row-${item.id}`}>
                         <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{fmtDate(item.started_at)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{fmtDate(item.finished_at)}</TableCell>
