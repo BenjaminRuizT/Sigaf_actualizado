@@ -834,6 +834,7 @@ _DEFAULT_SETTINGS = {
     "photo_required_baja": True,          # Pedir foto de formato BAJAS
     "photo_required_transf": True,        # Pedir foto de formato TRANSFERENCIAS
     "pending_photos_ttl_hours": 24,       # Horas para completar fotos antes de eliminar la auditoría
+    "session_timeout_minutes": 15,        # Minutos de inactividad antes de cerrar sesión automáticamente
 }
 
 @api_router.get("/admin/system-settings")
@@ -850,7 +851,12 @@ async def update_system_settings(settings: dict, user=Depends(get_current_user))
     if user["perfil"] != "Super Administrador":
         raise HTTPException(403, "Acceso denegado")
     # Cast each field to its correct type (booleans as bool, ttl_hours as int)
-    INT_FIELDS = {"pending_photos_ttl_hours"}
+    INT_FIELDS = {"pending_photos_ttl_hours", "session_timeout_minutes"}
+    # Clamp ranges per integer field
+    INT_CLAMPS = {
+        "pending_photos_ttl_hours": (1, 168),
+        "session_timeout_minutes": (5, 480),
+    }
     update = {}
     for k in _DEFAULT_SETTINGS:
         if k not in settings:
@@ -858,7 +864,8 @@ async def update_system_settings(settings: dict, user=Depends(get_current_user))
         if k in INT_FIELDS:
             try:
                 v = int(settings[k])
-                update[k] = max(1, min(168, v))   # clamp to 1–168 h
+                lo, hi = INT_CLAMPS.get(k, (1, 9999))
+                update[k] = max(lo, min(hi, v))
             except (TypeError, ValueError):
                 pass
         else:
