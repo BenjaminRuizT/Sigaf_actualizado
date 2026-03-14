@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSortable } from "@/hooks/useSortable";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,29 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
-import { ArrowUpDown, TrendingDown, DollarSign, Store, AlertTriangle } from "lucide-react";
+import {TrendingDown, DollarSign, Store, AlertTriangle} from "lucide-react";
 
 const COLORS = ["hsl(220, 70%, 50%)", "hsl(354, 70%, 50%)", "hsl(44, 90%, 50%)", "hsl(160, 55%, 42%)", "hsl(280, 55%, 50%)"];
 
-function useSortable(defaultKey, defaultDir = "desc") {
-  const [sortKey, setSortKey] = useState(defaultKey);
-  const [sortDir, setSortDir] = useState(defaultDir);
-  const toggle = (key) => { if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortKey(key); setSortDir("desc"); } };
-  const sorted = (items) => {
-    if (!sortKey) return items;
-    return [...items].sort((a, b) => {
-      const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0;
-      if (typeof av === "number") return sortDir === "asc" ? av - bv : bv - av;
-      return sortDir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
-    });
-  };
-  const SortHeader = ({ col, children }) => (
-    <button onClick={() => toggle(col)} className="flex items-center gap-1 hover:text-foreground transition-colors">
-      {children} <ArrowUpDown className={`h-3 w-3 ${sortKey === col ? "opacity-80" : "opacity-30"}`} />
-    </button>
-  );
-  return { sorted, SortHeader };
-}
 
 export default function ReportsPage() {
   const { api } = useAuth();

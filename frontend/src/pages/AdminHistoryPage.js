@@ -6,8 +6,19 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  History, RefreshCw, RotateCcw, Filter, Trash2, UserMinus, UserCog,
-  UserPlus, DatabaseZap, FileX, Wrench, ChevronDown, ChevronUp, ShieldAlert
+  History,
+  RefreshCw,
+  RotateCcw,
+  Filter,
+  UserMinus,
+  UserCog,
+  UserPlus,
+  DatabaseZap,
+  FileX,
+  Wrench,
+  ChevronDown,
+  ChevronUp,
+  ShieldAlert
 } from "lucide-react";
 
 const ACTION_META = {

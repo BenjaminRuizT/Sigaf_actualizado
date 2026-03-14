@@ -13,7 +13,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Store, Monitor, CheckCircle, AlertTriangle, Search, Play, Eye, ChevronLeft, ChevronRight, TrendingDown, DollarSign, BarChart3, Activity, ArrowUpDown, FileText } from "lucide-react";
+import {
+  Store,
+  Monitor,
+  CheckCircle,
+  Search,
+  Play,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  TrendingDown,
+  DollarSign,
+  BarChart3,
+  FileText
+} from "lucide-react";
 import { PlazaBarChart, DepreciationPieChart, AuditStatusChart } from "@/components/DashboardCharts";
 
 

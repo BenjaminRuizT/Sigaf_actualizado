@@ -7,10 +7,27 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  ShieldCheck, ShieldAlert, ShieldX, RefreshCw, Download, Trash2,
-  Search, X, AlertTriangle, CheckCircle, Info, Lock, Unlock,
-  UserPlus, UserMinus, UserCog, KeyRound, DatabaseZap, FileCheck,
-  FileX, LogIn, LogOut, Filter
+  ShieldCheck,
+  ShieldAlert,
+  ShieldX,
+  RefreshCw,
+  Download,
+  Trash2,
+  Search,
+  X,
+  Info,
+  Lock,
+  Unlock,
+  UserPlus,
+  UserMinus,
+  UserCog,
+  KeyRound,
+  DatabaseZap,
+  FileCheck,
+  FileX,
+  LogIn,
+  LogOut,
+  Filter
 } from "lucide-react";
 
 const EVENT_META = {

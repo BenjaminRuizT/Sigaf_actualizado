@@ -17,10 +17,31 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
-  Scan, CheckCircle, AlertTriangle, XCircle, ArrowRightLeft, Trash2, ArrowLeft,
-  FileCheck, Package, HelpCircle, StickyNote, ArrowUpDown, X, WifiOff, RefreshCw,
-  CloudOff, Cloud, Camera, PlusCircle, Ban, TrendingDown, TrendingUp, ShieldCheck, ShieldX,
-  Lock, Clock
+  Scan,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  ArrowRightLeft,
+  Trash2,
+  ArrowLeft,
+  FileCheck,
+  Package,
+  HelpCircle,
+  StickyNote,
+  X,
+  WifiOff,
+  RefreshCw,
+  CloudOff,
+  Cloud,
+  Camera,
+  PlusCircle,
+  Ban,
+  TrendingDown,
+  TrendingUp,
+  ShieldCheck,
+  ShieldX,
+  Lock,
+  Clock
 } from "lucide-react";
 
 const classColors = {

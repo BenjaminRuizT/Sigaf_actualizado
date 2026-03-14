@@ -10,7 +10,28 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Sun, Moon, Globe, Palette, User, Eye, EyeOff, Save, Info, CheckCircle, Camera, QrCode, Download, BarChart3, Shield, CloudOff, BookOpen, Server, Database, Rocket, Lock, RefreshCw, Wrench } from "lucide-react";
+import {
+  Sun,
+  Moon,
+  Globe,
+  Palette,
+  User,
+  Eye,
+  EyeOff,
+  Save,
+  Info,
+  Camera,
+  QrCode,
+  Download,
+  BarChart3,
+  Shield,
+  CloudOff,
+  BookOpen,
+  Server,
+  Lock,
+  RefreshCw,
+  Wrench
+} from "lucide-react";
 
 const APP_VERSION = "3.0.0";
 const APP_BUILD_DATE = "Marzo 2026";

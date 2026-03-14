@@ -1,10 +1,31 @@
+import { useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Server, Code, Terminal, Globe, Database, Shield, Smartphone, Wifi, WifiOff } from "lucide-react";
+import { Server, Code, Terminal, Globe, Database, Shield, Smartphone, Wifi, WifiOff, FileDown, Loader2 } from "lucide-react";
 
 export default function DeployPage() {
   const { t } = useLanguage();
+  const { api } = useAuth();
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadTechDoc = async () => {
+    setDownloading(true);
+    try {
+      const res = await api.get("/download/presentation", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "SIGAF_Documentacion_Tecnica.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch { }
+    finally { setDownloading(false); }
+  };
 
   const sections = [
     {
@@ -404,9 +425,15 @@ volumes:
 
   return (
     <div className="space-y-6 max-w-4xl" data-testid="deploy-page">
-      <div>
-        <h1 className="font-heading text-3xl md:text-4xl font-bold uppercase tracking-tight">Guía de Despliegue</h1>
-        <p className="text-muted-foreground text-sm mt-1">Instrucciones para administrar el proyecto, configurar la PWA y ponerlo en línea</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="font-heading text-3xl md:text-4xl font-bold uppercase tracking-tight">Guía de Despliegue</h1>
+          <p className="text-muted-foreground text-sm mt-1">Instrucciones para administrar el proyecto, configurar la PWA y ponerlo en línea</p>
+        </div>
+        <Button onClick={handleDownloadTechDoc} disabled={downloading} className="gap-2 shrink-0">
+          {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+          Documentación Técnica PDF
+        </Button>
       </div>
 
       <ScrollArea className="h-[calc(100vh-180px)]">
