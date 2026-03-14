@@ -720,10 +720,38 @@ def generate_user_manual(stats, plazas_data, user_perfil="Super Administrador"):
         ["Opcion","Valores","Descripcion"],
         [
             ["Tema","Claro / Oscuro","Cambia el esquema de colores"],
-            ["Idioma","Espanol / Ingles","Traduce todos los textos del sistema"],
+            ["Idioma","Espanol / Ingles / Portugues","Traduce todos los textos del sistema (3 idiomas)"],
             ["Paleta","Profesional / OXXO","Azul marino (Profesional) o Rojo/Amarillo corporativo"],
-        ],[28,40,122]
+        ],[28,50,112]
     )
+
+    if is_super:
+        pdf.subsection("Configuracion avanzada (Solo Super Administrador)")
+        pdf.table(
+            ["Parametro","Rango","Descripcion"],
+            [
+                ["Foto formato ALTAS","Si / No","Solicitar foto del formato AF al registrar altas"],
+                ["Foto formato BAJAS","Si / No","Solicitar foto del formato AF al registrar bajas"],
+                ["Foto TRANSFERENCIAS","Si / No","Solicitar foto del formato AF en transferencias"],
+                ["TTL fotos pendientes","1 - 168 horas","Tiempo para subir fotos antes de eliminar auditoria"],
+                ["Timeout inactividad","5 - 480 minutos","Minutos sin actividad para cierre automatico de sesion"],
+                ["Multiples sesiones","Si / No","Permitir que un usuario inicie sesion en varios dispositivos"],
+            ],[45,28,117]
+        )
+        pdf.note_box("Cierre automatico por inactividad",
+            "Cuando un usuario no registra actividad (teclado, mouse, touch) durante el tiempo configurado, aparece un banner de aviso con cuenta regresiva de 5 minutos. Si no confirma, la sesion se cierra automaticamente.",
+            AMBER, (255, 248, 230))
+
+    if is_super or is_admin:
+        pdf.subsection("Historial y administracion (Panel de Administracion)")
+        pdf.table(
+            ["Seccion","Descripcion"],
+            [
+                ["Sesiones activas","Ver y cerrar forzosamente sesiones activas de cualquier usuario"],
+                ["Auditorias vencidas","Ver auditorias pendientes de foto que vencieron; restaurar plazo (+24h) o eliminar"],
+                ["Historial de acciones","Registro de cambios con opcion de reversion (rollback)"],
+            ],[45,145]
+        )
 
     # ── FAQ adaptado al perfil ──
     faq_num = "9" if is_super else ("8" if is_admin else "7")
@@ -962,12 +990,20 @@ def generate_presentation(stats, plazas_data):
             ["Registro de Sobrante Desconocido con Serie","Completado","Produccion"],
             ["Evidencia fotografica de formatos AF","Completado","Produccion"],
             ["Exportacion Excel (AB + Transferencias + Fotos)","Completado","Produccion"],
-            ["Bitacoras filtrables con Serie y Depreciado","Completado","Produccion"],
-            ["Resumen interactivo de auditoria","Completado","Produccion"],
-            ["Reporte PDF ejecutivo por auditoria","Completado","Produccion"],
-            ["Manual de Usuario PDF dinamico","Completado","Produccion"],
-            ["Badge 'En Progreso' en tarjetas de tienda","Completado","Produccion"],
+            ["Bitacoras con filtro por plaza y ordenamiento","Completado","Produccion"],
+            ["Analisis cruzado global No Localizado vs Sobrante","Completado","Produccion"],
+            ["Reporte PDF ejecutivo por auditoria con firma","Completado","Produccion"],
+            ["Logs de seguridad + firmas digitales HMAC-SHA256","Completado","Produccion"],
+            ["Sesion unica + control de sesiones activas","Completado","Produccion"],
+            ["Cierre de sesion por inactividad configurable","Completado","Produccion"],
+            ["Restriccion: auditoria solo por auditor dueno","Completado","Produccion"],
+            ["Multisesion configurable por Super Admin","Completado","Produccion"],
+            ["Importacion masiva de usuarios desde Excel","Completado","Produccion"],
+            ["Banner de actualizacion de PWA automatico","Completado","Produccion"],
+            ["Manual de Usuario PDF dinamico por perfil","Completado","Produccion"],
+            ["Historial de fixes en Logs del Sistema","Completado","Produccion"],
             ["Dispositivos Zebra TC52 configurados","En proceso","Actualizacion OS pendiente"],
+            ["Integracion ERP/SAP para sincronizacion MAF","Pendiente","Backlog"],
         ],[90,32,68]
     )
 
@@ -1003,6 +1039,7 @@ def generate_presentation(stats, plazas_data):
         "Dashboard gerencial con comparativas historicas entre ciclos de auditoria",
         "Notificaciones automaticas por correo al completar auditorias",
         "App nativa Android optimizada para Zebra TC52",
+        "Modulo de reportes avanzados con graficas por plaza y periodo",
     ]:
         pdf.bullet(s)
 

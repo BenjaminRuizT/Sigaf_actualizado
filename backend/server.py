@@ -1929,7 +1929,9 @@ async def get_movement_logs(type: Optional[str] = None, search: Optional[str] = 
             "alta_total_value": round(av[0]["t"], 2) if av else 0}
 
 @api_router.get("/logs/audits")
-async def get_audit_logs(status: Optional[str] = None, search: Optional[str] = None, plaza: Optional[str] = None, page: int = 1, limit: int = 50, user=Depends(get_current_user)):
+async def get_audit_logs(status: Optional[str] = None, search: Optional[str] = None, plaza: Optional[str] = None,
+                         sort_by: str = "started_at", sort_dir: str = "desc",
+                         page: int = 1, limit: int = 50, user=Depends(get_current_user)):
     query = {}
     if status:
         query["status"] = status
@@ -1942,13 +1944,15 @@ async def get_audit_logs(status: Optional[str] = None, search: Optional[str] = N
             {"plaza": {"$regex": search, "$options": "i"}},
         ]
     skip = (page - 1) * limit
-    # Projection: exclude heavy base64 photo fields and raw scans — not needed for the list view
-    _AUDIT_LIST_PROJECTION = {
-        "_id": 0, "photo_ab": 0, "photo_transf": 0,
-    }
+    # Allowed sort fields — whitelist to prevent injection
+    ALLOWED_SORT = {"started_at", "finished_at", "cr_tienda", "tienda", "plaza",
+                    "auditor_name", "status", "located_count", "not_found_count"}
+    sort_field = sort_by if sort_by in ALLOWED_SORT else "started_at"
+    sort_direction = -1 if sort_dir == "desc" else 1
+    _AUDIT_LIST_PROJECTION = {"_id": 0, "photo_ab": 0, "photo_transf": 0}
     total, items = await asyncio.gather(
         db.audits.count_documents(query),
-        db.audits.find(query, _AUDIT_LIST_PROJECTION).sort("started_at", -1).skip(skip).limit(limit).to_list(limit)
+        db.audits.find(query, _AUDIT_LIST_PROJECTION).sort(sort_field, sort_direction).skip(skip).limit(limit).to_list(limit)
     )
     return {"items": items, "total": total, "page": page, "pages": max(1, (total + limit - 1) // limit)}
 
