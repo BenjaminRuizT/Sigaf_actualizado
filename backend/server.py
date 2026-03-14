@@ -1022,8 +1022,22 @@ def _build_cross_suggestions(no_loc, sobrante, audits_map=None):
                         "valor_real": sb_valor,
                     }
                 })
+    # ── Deduplicate: each no_localizado and each sobrante can appear in at most ONE pair ──────
+    # Sort by score descending first so the highest-confidence match wins
     suggestions.sort(key=lambda x: x["score"], reverse=True)
-    return suggestions
+    used_no_loc = set()
+    used_sobrante = set()
+    deduped = []
+    for s in suggestions:
+        nl_id = s["no_localizado"]["scan_id"]
+        sb_id = s["sobrante"]["scan_id"]
+        # Skip if either item was already matched in a higher-score suggestion
+        if nl_id in used_no_loc or sb_id in used_sobrante:
+            continue
+        used_no_loc.add(nl_id)
+        used_sobrante.add(sb_id)
+        deduped.append(s)
+    return deduped
 
 
 @api_router.get("/cross-analysis/global")
@@ -2186,7 +2200,16 @@ async def export_to_excel(export_type: str, token: Optional[str] = None, authori
         if plaza and plaza != "all":
             query["plaza"] = plaza
 
-        items = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(100000)
+        items_raw = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(100000)
+        # Deduplicate: keep only the most recent movement per (equipment_id, type, audit_id).
+        # Duplicates can occur when finalize is called multiple times (e.g. pending_photos flow).
+        seen_keys = set()
+        items = []
+        for m in items_raw:
+            dup_key = (m.get("equipment_id", ""), m.get("type", ""), m.get("audit_id", ""))
+            if dup_key not in seen_keys:
+                seen_keys.add(dup_key)
+                items.append(m)
 
         # Lookup plazas for to_cr_tienda (needed for transferencias)
         store_plaza_cache = {}
@@ -2671,10 +2694,10 @@ async def download_template(template_type: str, user=Depends(get_current_user)):
                     "9", "2021", "108771", "9400", "9306", "40", "0", "IMPRESORA", "EPSON", "FX890II", "X3YF049071"])
     elif template_type == "usuarios":
         ws.title = "USUARIOS"
-        ws.append(["Perfil", "Nombre", "Email", "Contraseña"])
-        ws.append(["Super Administrador", "Juan Pérez", "juan.perez@empresa.com", "MiContraseña*1"])
-        ws.append(["Administrador", "María López", "maria.lopez@empresa.com", "MiContraseña*1"])
-        ws.append(["Socio Tecnologico", "Carlos Ruiz", "carlos.ruiz@proveedor.com", "MiContraseña*1"])
+        ws.append(["nombre", "email", "password", "perfil"])
+        ws.append(["Juan Pérez", "juan.perez@empresa.com", "MiContraseña*1", "Administrador"])
+        ws.append(["María López", "maria.lopez@empresa.com", "MiContraseña*1", "Administrador"])
+        ws.append(["Carlos Ruiz", "carlos.ruiz@proveedor.com", "MiContraseña*1", "Socio Tecnologico"])
     else:
         raise HTTPException(400, "Invalid template type")
     output = io.BytesIO()
@@ -3002,30 +3025,64 @@ async def shutdown_db_client():
     client.close()
 @api_router.post("/admin/import-users")
 async def import_users_bulk(file: UploadFile = File(...), user=Depends(get_current_user)):
-    """Super Admin: bulk import users from Excel file."""
+    """Super Admin: bulk import users from Excel (.xlsx) or CSV file."""
     if user["perfil"] != "Super Administrador":
         raise HTTPException(403, "Acceso denegado")
     content = await file.read()
-    import io
-    try:
-        import openpyxl
-        wb = openpyxl.load_workbook(io.BytesIO(content))
-        ws = wb.active
-    except Exception:
-        raise HTTPException(400, "No se pudo leer el archivo Excel. Verifica que sea un archivo .xlsx válido.")
+    import io, csv as csv_mod
+
+    # ── Normalize header: map Spanish/mixed column names to internal keys ──────
+    COL_ALIASES = {
+        "nombre": "nombre", "name": "nombre",
+        "email": "email", "correo": "email",
+        "password": "password", "contraseña": "password", "contrasena": "password", "clave": "password",
+        "perfil": "perfil", "profile": "perfil", "rol": "perfil", "role": "perfil",
+    }
+    def normalize_header(h: str) -> str:
+        key = h.strip().lower().replace("á","a").replace("é","e").replace("í","i").replace("ó","o").replace("ú","u").replace("ñ","n")
+        return COL_ALIASES.get(key, key)
+
+    # ── Detect file type and parse rows ──────────────────────────────────────
+    filename_lower = (file.filename or "").lower()
+    rows_raw = []  # list of dicts with normalized keys
+
+    if filename_lower.endswith(".csv") or b"," in content[:200] and b"PK" not in content[:4]:
+        # CSV — try UTF-8 then latin-1
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = content.decode("latin-1")
+        reader = csv_mod.DictReader(io.StringIO(text))
+        if not reader.fieldnames:
+            raise HTTPException(400, "El archivo CSV está vacío o mal formado.")
+        norm_fields = {f: normalize_header(f) for f in reader.fieldnames}
+        for row in reader:
+            rows_raw.append({norm_fields[k]: (v or "").strip() for k, v in row.items()})
+    else:
+        # XLSX
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(io.BytesIO(content))
+            ws = wb.active
+        except Exception:
+            raise HTTPException(400, "No se pudo leer el archivo. Use .xlsx o .csv con la estructura requerida.")
+        raw_headers = [str(ws.cell(1, c).value or "").strip() for c in range(1, ws.max_column + 1)]
+        headers = [normalize_header(h) for h in raw_headers]
+        for row_idx in range(2, ws.max_rows + 1):
+            row = {headers[c]: str(ws.cell(row_idx, c + 1).value or "").strip() for c in range(len(headers))}
+            rows_raw.append(row)
 
     REQUIRED_COLS = {"nombre", "email", "password", "perfil"}
-    # Read header row
-    headers = [str(ws.cell(1, c).value or "").strip().lower() for c in range(1, ws.max_column + 1)]
-    missing = REQUIRED_COLS - set(headers)
-    if missing:
-        raise HTTPException(400, f"Columnas faltantes en el archivo: {', '.join(sorted(missing))}. Columnas requeridas: nombre, email, password, perfil")
+    if rows_raw:
+        present = set(rows_raw[0].keys())
+        missing = REQUIRED_COLS - present
+        if missing:
+            raise HTTPException(400, f"Columnas faltantes: {', '.join(sorted(missing))}. Requeridas: nombre, email, password, perfil")
 
     VALID_PERFILES = {"Administrador", "Socio Tecnologico", "Super Administrador"}
     errors = []
     users_to_create = []
-    for row_idx in range(2, ws.max_rows + 1):
-        row = {headers[c]: str(ws.cell(row_idx, c + 1).value or "").strip() for c in range(len(headers))}
+    for row_idx, row in enumerate(rows_raw, start=2):
         nombre = row.get("nombre", "")
         email  = row.get("email", "")
         pwd    = row.get("password", "")
