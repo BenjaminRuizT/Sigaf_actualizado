@@ -519,6 +519,27 @@ export default function AuditPage() {
 
   if (loading) return <div className="flex items-center justify-center py-20"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
 
+  // Guard: if audit failed to load (e.g. 403 or deleted), show a clear error instead of blank screen
+  if (!audit) return (
+    <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+      <div className="h-14 w-14 rounded-full bg-destructive/10 flex items-center justify-center">
+        <AlertTriangle className="h-7 w-7 text-destructive" />
+      </div>
+      <div className="space-y-1">
+        <p className="font-semibold text-lg">No se pudo cargar la auditoría</p>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Es posible que esta auditoría pertenezca a otro auditor, haya sido cancelada o no exista.
+        </p>
+      </div>
+      <button
+        onClick={() => navigate("/")}
+        className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition"
+      >
+        ← Volver al panel
+      </button>
+    </div>
+  );
+
   const isActive = audit?.status === "in_progress";
   const scannedBarcodes = new Set(scans.filter(s => s.scanned_by !== "system").map(s => s.codigo_barras));
   const locatedCount = audit?.located_count || 0;

@@ -462,6 +462,7 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
             </CardContent>
           </Card>
 
+        </TabsContent>
         <TabsContent value="fixes" className="space-y-4 mt-4">
           <Card>
             <CardHeader className="pb-2">

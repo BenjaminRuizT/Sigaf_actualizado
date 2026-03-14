@@ -45,7 +45,6 @@ export default function AdminPage({ defaultTab = "users" }) {
   // Auditorías vencidas
   const [expiredAudits, setExpiredAudits] = useState([]);
   const [expiredLoading, setExpiredLoading] = useState(false);
-  const [expiredDialog, setExpiredDialog] = useState(false);
   // Sesiones activas
   const [activeSessions, setActiveSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
@@ -476,7 +475,7 @@ export default function AdminPage({ defaultTab = "users" }) {
         <TabsList className="grid w-full grid-cols-3" data-testid="admin-tabs">
           <TabsTrigger value="users" data-testid="admin-tab-users" className="gap-2"><Users className="h-4 w-4" /> {t("admin.users")}</TabsTrigger>
           <TabsTrigger value="settings" className="gap-2"><Settings className="h-4 w-4" /> Configuración</TabsTrigger>
-          <TabsTrigger value="history" className="gap-2" onClick={() => { if (!histLoaded) fetchHistory(); }}>
+          <TabsTrigger value="history" className="gap-2" onClick={() => { if (!histLoaded) fetchHistory(); fetchActiveSessions(); fetchExpiredAudits(); }}>
             <History className="h-4 w-4" /> Historial
           </TabsTrigger>
         </TabsList>
@@ -1004,7 +1003,9 @@ export default function AdminPage({ defaultTab = "users" }) {
                 </label>
                 {mafFile && (
                   <div className="flex items-center gap-2 flex-wrap mt-1">
-                    <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-xs">Cargado</Badge>
+                    <Badge variant="outline" className={`text-xs ${mafFileValid === false ? "bg-destructive/10 text-destructive border-destructive/30" : "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"}`}>
+                      {mafFileValid === false ? "Error" : "Cargado"}
+                    </Badge>
                     {mafFileMsg && <span className="text-xs text-muted-foreground">{mafFileMsg}</span>}
                   </div>
                 )}
