@@ -95,7 +95,7 @@ export function AuthProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, resetInactivityTimer]);
 
-  // ── Poll system settings every 60 s for real-time timeout config updates ──
+  // ── Poll system settings every 60 s + heartbeat every 2 min ──────────────
   useEffect(() => {
     if (!user || !apiRef.current) return;
     const poll = async () => {
@@ -104,13 +104,18 @@ export function AuthProvider({ children }) {
         const newMin = Number(res.data?.session_timeout_minutes);
         if (newMin >= 5 && newMin !== timeoutMinRef.current) {
           setTimeoutMinutes(newMin);
-          resetInactivityTimer(); // Restart with new timeout
+          resetInactivityTimer();
         }
       } catch { /* silencioso */ }
     };
-    poll(); // immediate check
-    const interval = setInterval(poll, 60_000);
-    return () => clearInterval(interval);
+    const heartbeat = async () => {
+      try { await apiRef.current.post("/auth/heartbeat"); } catch { /* silencioso */ }
+    };
+    poll();
+    heartbeat();
+    const settingsInterval = setInterval(poll, 60_000);
+    const heartbeatInterval = setInterval(heartbeat, 120_000); // every 2 min
+    return () => { clearInterval(settingsInterval); clearInterval(heartbeatInterval); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
