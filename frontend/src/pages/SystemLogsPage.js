@@ -470,10 +470,79 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
               <div className="flex items-center gap-2">
                 <Wrench className="h-4 w-4 text-primary" />
                 <CardTitle className="text-base">Historial de Fixes — SIGAF v1.0</CardTitle>
-                <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">32 actualizaciones</span>
+                <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">34 actualizaciones</span>
               </div>
             </CardHeader>
             <CardContent className="p-0 max-h-[600px] overflow-y-auto">
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix48" ? null : "fix48")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix48</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary text-white ml-1">Actual</span>
+                      <span className="text-xs text-muted-foreground">2026-03-14</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Sesiones fantasma, notificaciones push, multi-idioma completo con locale dinamic...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix48" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix48" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Sesiones fantasma, notificaciones push, multi-idioma completo con locale dinamico, heartbeat, countdown inactividad en sidebar.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• delete_user ahora cierra sesiones del usuario eliminado</li>
+                    <li className="text-sm text-foreground/80">• get_current_user rechaza tokens de usuarios eliminados (401)</li>
+                    <li className="text-sm text-foreground/80">• Endpoint POST /auth/heartbeat actualiza last_seen cada 2 min</li>
+                    <li className="text-sm text-foreground/80">• Endpoint GET /notifications: alertas fotos pendientes y auditorias completadas</li>
+                    <li className="text-sm text-foreground/80">• Campana de notificaciones en header con badge numerico</li>
+                    <li className="text-sm text-foreground/80">• Countdown de inactividad visible en sidebar</li>
+                    <li className="text-sm text-foreground/80">• LanguageContext: helpers fmtDate, fmtMoney con locale dinamico es-MX/en-US/pt-BR</li>
+                    <li className="text-sm text-foreground/80">• Nuevas claves de traduccion: session.*, notifications.* en ES/EN/PT</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-b last:border-0">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix49" ? null : "fix49")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix49</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary text-white ml-1">Actual</span>
+                      <span className="text-xs text-muted-foreground">2026-03-14</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix raiz cierre de sesion por inactividad: refs para evitar stale closures, time...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix49" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix49" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Fix raiz cierre de sesion por inactividad: refs para evitar stale closures, timer en 2 fases, historial actualizado.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• BUG RAIZ: showWarning en closure del useEffect siempre era false</li>
+                    <li className="text-sm text-foreground/80">• Solucion: showWarningRef (useRef) sincronizado — sin stale closures</li>
+                    <li className="text-sm text-foreground/80">• isLoggedInRef para evitar timers fantasma post-logout</li>
+                    <li className="text-sm text-foreground/80">• Timer en 2 fases: setTimeout(warningDelay) luego setInterval(countdown)</li>
+                    <li className="text-sm text-foreground/80">• onActivity usa showWarningRef.current en lugar del estado React</li>
+                    <li className="text-sm text-foreground/80">• Poll de settings con delay inicial para garantizar apiRef disponible</li>
+                    <li className="text-sm text-foreground/80">• Historial de fixes y manuales actualizados</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
               <div className="border-b last:border-0">
                 <button
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
@@ -485,7 +554,7 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix43</span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary text-white ml-1">Actual</span>
+                      
                       <span className="text-xs text-muted-foreground">2026-03-14</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">Ordenamiento server-side en historial de auditorías, imports de AdminPage limpia...</p>
