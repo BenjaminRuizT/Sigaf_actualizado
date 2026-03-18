@@ -4,10 +4,8 @@ import axios from "axios";
 const AuthContext = createContext();
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// Default inactivity timeout in minutes (overridden by system settings)
 const DEFAULT_TIMEOUT_MINUTES = 15;
-// Show warning banner when this many seconds remain before auto-logout
-const WARNING_THRESHOLD_SECONDS = 5 * 60; // 5 minutes
+const WARNING_THRESHOLD_SECONDS = 5 * 60; // show banner 5 min before logout
 
 export function AuthProvider({ children }) {
   const [token, setToken]   = useState(localStorage.getItem("sigaf_token"));
@@ -18,106 +16,131 @@ export function AuthProvider({ children }) {
 
   // ── Inactivity timer state ──────────────────────────────────────────────
   const [timeoutMinutes, setTimeoutMinutes] = useState(DEFAULT_TIMEOUT_MINUTES);
-  const [secondsLeft, setSecondsLeft]       = useState(null);  // null = timer not running
+  const [secondsLeft, setSecondsLeft]       = useState(null);
   const [showWarning, setShowWarning]       = useState(false);
 
-  const timerRef        = useRef(null);   // setInterval handle for countdown display
-  const inactivityRef   = useRef(null);   // setTimeout handle for actual logout
-  const lastActivityRef = useRef(Date.now());
-  const timeoutMinRef   = useRef(timeoutMinutes); // mutable ref, always current
+  // Use REFS for timer handles and mutable values — avoids stale closure bugs
+  const timerRef        = useRef(null);      // setInterval for countdown
+  const inactivityRef   = useRef(null);      // setTimeout for warning trigger
+  const timeoutMinRef   = useRef(DEFAULT_TIMEOUT_MINUTES);
+  const showWarningRef  = useRef(false);     // REF-backed showWarning — no stale closures
+  const isLoggedInRef   = useRef(false);     // whether user is currently logged in
 
-  // Keep ref in sync with state
+  // Keep refs in sync with state
   useEffect(() => { timeoutMinRef.current = timeoutMinutes; }, [timeoutMinutes]);
+  useEffect(() => { showWarningRef.current = showWarning; },   [showWarning]);
+  useEffect(() => { isLoggedInRef.current = !!user; },         [user]);
 
-  // ── Reset the inactivity clock ─────────────────────────────────────────
+  // ── Core: clear all inactivity timers ─────────────────────────────────
+  const clearAllTimers = useCallback(() => {
+    if (inactivityRef.current) { clearTimeout(inactivityRef.current);  inactivityRef.current = null; }
+    if (timerRef.current)      { clearInterval(timerRef.current);       timerRef.current = null; }
+  }, []);
+
+  // ── Core: start/restart the inactivity clock ───────────────────────────
   const resetInactivityTimer = useCallback(() => {
-    lastActivityRef.current = Date.now();
+    if (!isLoggedInRef.current) return;
+
+    clearAllTimers();
     setShowWarning(false);
+    setSecondsLeft(null);
+    showWarningRef.current = false;
 
-    // Clear existing timers
-    if (inactivityRef.current) clearTimeout(inactivityRef.current);
-    if (timerRef.current)       clearInterval(timerRef.current);
+    const totalMs   = timeoutMinRef.current * 60 * 1000;
+    const warnMs    = WARNING_THRESHOLD_SECONDS * 1000;
+    const warnDelay = Math.max(0, totalMs - warnMs);
 
-    const totalMs = timeoutMinRef.current * 60 * 1000;
-    const warnMs  = WARNING_THRESHOLD_SECONDS * 1000;
-
-    // Schedule the warning banner
-    const warningDelay = Math.max(0, totalMs - warnMs);
+    // Phase 1: wait until 5 minutes before timeout, then show warning
     inactivityRef.current = setTimeout(() => {
-      // Start the visible countdown
+      if (!isLoggedInRef.current) return;
+
       let remaining = WARNING_THRESHOLD_SECONDS;
       setSecondsLeft(remaining);
       setShowWarning(true);
+      showWarningRef.current = true;
 
+      // Phase 2: count down every second
       timerRef.current = setInterval(() => {
         remaining -= 1;
         setSecondsLeft(remaining);
+
         if (remaining <= 0) {
-          clearInterval(timerRef.current);
+          clearAllTimers();
           setShowWarning(false);
           setSecondsLeft(null);
-          // Auto-logout
+          showWarningRef.current = false;
+          // Execute logout
           if (logoutRef.current) logoutRef.current();
         }
       }, 1000);
-    }, warningDelay);
-  }, []); // no deps — uses refs only
+    }, warnDelay);
+  }, [clearAllTimers]);
 
-  // ── Activity event listeners (only when logged in) ─────────────────────
+  // ── Activity listeners: only reset timer when warning is NOT showing ───
   useEffect(() => {
     if (!user) {
-      // Clear timers when logged out
-      if (inactivityRef.current) clearTimeout(inactivityRef.current);
-      if (timerRef.current)       clearInterval(timerRef.current);
+      clearAllTimers();
       setShowWarning(false);
       setSecondsLeft(null);
+      showWarningRef.current = false;
       return;
     }
 
     const EVENTS = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"];
-    let throttleTimer = null;
+    let throttle = null;
 
     const onActivity = () => {
-      if (throttleTimer) return;
-      throttleTimer = setTimeout(() => { throttleTimer = null; }, 500);
-      if (showWarning) return; // Don't reset if warning is already showing — let user decide
+      // Always use the REF to check current value — no stale closures
+      if (showWarningRef.current) return;
+      if (throttle) return;
+      throttle = setTimeout(() => { throttle = null; }, 500);
       resetInactivityTimer();
     };
 
-    EVENTS.forEach(e => window.addEventListener(e, onActivity, { passive: true }));
-    resetInactivityTimer(); // Start timer when user logs in
+    EVENTS.forEach(ev => window.addEventListener(ev, onActivity, { passive: true }));
+    resetInactivityTimer(); // kick off on login
 
     return () => {
-      EVENTS.forEach(e => window.removeEventListener(e, onActivity));
-      if (inactivityRef.current) clearTimeout(inactivityRef.current);
-      if (timerRef.current)       clearInterval(timerRef.current);
+      EVENTS.forEach(ev => window.removeEventListener(ev, onActivity));
+      clearAllTimers();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, resetInactivityTimer]);
+  }, [user, resetInactivityTimer, clearAllTimers]);
 
-  // ── Poll system settings every 60 s + heartbeat every 2 min ──────────────
+  // ── Poll settings from server every 60s + heartbeat every 2 min ───────
   useEffect(() => {
-    if (!user || !apiRef.current) return;
+    if (!user) return;
+
+    // Wait for apiRef to be populated (useMemo runs synchronously, so it's ready)
     const poll = async () => {
+      if (!apiRef.current) return;
       try {
         const res = await apiRef.current.get("/system-settings/public");
         const newMin = Number(res.data?.session_timeout_minutes);
         if (newMin >= 5 && newMin !== timeoutMinRef.current) {
           setTimeoutMinutes(newMin);
-          resetInactivityTimer();
+          timeoutMinRef.current = newMin;
+          // Only restart if not currently showing warning
+          if (!showWarningRef.current) resetInactivityTimer();
         }
-      } catch { /* silencioso */ }
+      } catch { /* silent */ }
     };
+
     const heartbeat = async () => {
-      try { await apiRef.current.post("/auth/heartbeat"); } catch { /* silencioso */ }
+      if (!apiRef.current) return;
+      try { await apiRef.current.post("/auth/heartbeat"); } catch { /* silent */ }
     };
-    poll();
-    heartbeat();
+
+    // Initial load with small delay to ensure apiRef is set
+    const initTimer = setTimeout(() => { poll(); heartbeat(); }, 200);
     const settingsInterval = setInterval(poll, 60_000);
-    const heartbeatInterval = setInterval(heartbeat, 120_000); // every 2 min
-    return () => { clearInterval(settingsInterval); clearInterval(heartbeatInterval); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+    const heartbeatInterval = setInterval(heartbeat, 120_000);
+
+    return () => {
+      clearTimeout(initTimer);
+      clearInterval(settingsInterval);
+      clearInterval(heartbeatInterval);
+    };
+  }, [user, resetInactivityTimer]);
 
   // ── Auth flow ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -155,7 +178,7 @@ export function AuthProvider({ children }) {
     try {
       const t = localStorage.getItem("sigaf_token");
       if (t) await axios.post(`${API}/auth/logout`, {}, { headers: { Authorization: `Bearer ${t}` } });
-    } catch { /* silencioso */ }
+    } catch { /* silent */ }
     localStorage.removeItem("sigaf_token");
     setToken(null);
     setUser(null);
@@ -169,25 +192,21 @@ export function AuthProvider({ children }) {
 
   const api = useMemo(() => {
     const instance = axios.create({ baseURL: API });
-
     instance.interceptors.request.use(config => {
       const t = localStorage.getItem("sigaf_token");
       if (t) config.headers.Authorization = `Bearer ${t}`;
       return config;
     });
-
     instance.interceptors.response.use(
       response => response,
       error => {
-        const status = error?.response?.status;
-        if (status === 401) {
+        if (error?.response?.status === 401) {
           localStorage.removeItem("sigaf_token");
           if (logoutRef.current) logoutRef.current();
         }
         return Promise.reject(error);
       }
     );
-
     apiRef.current = instance;
     return instance;
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,7 +215,6 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       token, user, loading, login, loginForce, logout, closeOtherSessions, api,
-      // Inactivity timer
       showWarning, secondsLeft, timeoutMinutes,
       continueSession: resetInactivityTimer,
     }}>
