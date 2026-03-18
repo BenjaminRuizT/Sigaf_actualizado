@@ -353,7 +353,7 @@ def generate_user_manual(stats, plazas_data, user_perfil="Super Administrador"):
     elif perfil == "Administrador":
         cover_subtitle = "Guia para Administrador"
 
-    pdf.cover("Manual de Usuario", cover_subtitle, f"Perfil: {perfil}  |  v2.0 - Marzo 2026")
+    pdf.cover("Manual de Usuario", cover_subtitle, f"Perfil: {perfil}  |  v1.10 - Marzo 2026")
 
     # Tabla de contenido adaptada al perfil
     pdf.add_page()
@@ -806,7 +806,7 @@ def generate_presentation(stats, plazas_data):
     pdf = SigafPDF("SIGAF - Presentacion Ejecutiva")
     pdf.alias_nb_pages()
 
-    pdf.cover("SIGAF", "Sistema Integral de Gestion de Activo Fijo", "Presentacion Ejecutiva - Marzo 2026")
+    pdf.cover("SIGAF", "Sistema Integral de Gestion de Activo Fijo", "Presentacion Ejecutiva v1.10 - Marzo 2026")
 
     # ── 1. Problemática ──
     pdf.add_page()
@@ -1003,6 +1003,9 @@ def generate_presentation(stats, plazas_data):
             ["Manual de Usuario PDF dinamico por perfil","Completado","Produccion"],
             ["Historial de fixes en Logs del Sistema","Completado","Produccion"],
             ["Dispositivos Zebra TC52 configurados","En proceso","Actualizacion OS pendiente"],
+            ["Cierre de sesion por inactividad configurable","Completado","Produccion"],
+            ["Notificaciones push: fotos pendientes y auditorias completadas","Completado","Produccion"],
+            ["Multi-idioma completo: fechas y moneda con locale dinamico","Completado","Produccion"],
             ["Integracion ERP/SAP para sincronizacion MAF","Pendiente","Backlog"],
         ],[90,32,68]
     )
@@ -1074,8 +1077,8 @@ def generate_tech_documentation(stats=None):
 
     pdf.cover(
         "Documentacion Tecnica",
-        "SIGAF v1.0 — Sistema Integral de Gestion de Activo Fijo",
-        "Marzo 2026  |  OXXO - Direccion de Sistemas  |  Confidencial"
+        "SIGAF v1.10 — Sistema Integral de Gestion de Activo Fijo",
+        "Marzo 2026  |  OXXO - Direccion de Sistemas  |  v1.10  |  Confidencial"
     )
 
     # ─────────────────────────────────────────────────────────────
@@ -1831,6 +1834,8 @@ def generate_tech_documentation(stats=None):
         ("v1.8.0", "2026-03-13", "Admin y restricciones", "Restriccion auditoria por auditor, multisesion configurable, auditorias vencidas con restauracion, tab Fixes."),
         ("v1.9.0", "2026-03-14", "Ordenamiento y CSV", "Sort server-side en bitacoras, importacion CSV con normalizacion de headers, dedup en exportacion, dedup analisis cruzado."),
         ("v1.10.0", "2026-03-14", "Documentacion", "Documentacion tecnica completa PDF, DeployPage actualizada, limpieza de imports en todos los archivos."),
+        ("v1.11.0", "2026-03-14", "Sesiones y notif.", "Sesiones fantasma corregidas al eliminar usuario, notificaciones push, heartbeat, countdown inactividad en sidebar, locale dinamico para fechas/moneda."),
+        ("v1.12.0", "2026-03-14", "Fix inactividad", "Fix raiz cierre por inactividad: showWarningRef evita stale closures, timer en 2 fases separadas, isLoggedInRef para timers post-logout."),
     ]
     pdf.table(
         ["Version", "Fecha", "Titulo", "Cambios principales"],
@@ -1847,7 +1852,7 @@ def generate_tech_documentation(stats=None):
         pdf.set_y(y + 7)
         pdf.set_font("Helvetica", "B", 14)
         pdf.set_text_color(*WHITE)
-        pdf.cell(210, 8, safe("SIGAF — Documentacion Tecnica v1.10"), align="C", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(210, 8, safe("SIGAF — Documentacion Tecnica v1.12"), align="C", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Helvetica", "", 9.5)
         pdf.set_text_color(180, 200, 240)
         pdf.cell(210, 7, safe("OXXO - Direccion de Sistemas  |  Confidencial"), align="C", new_x="LMARGIN", new_y="NEXT")
