@@ -1228,6 +1228,24 @@ async def get_stores(plaza: Optional[str] = None, search: Optional[str] = None, 
     skip = (page - 1) * limit
     total = await db.stores.count_documents(query)
     stores = await db.stores.find(query, {"_id": 0}).sort("tienda", 1).skip(skip).limit(limit).to_list(limit)
+    # Enrich stores with reopen_deadline from most recent completed audit
+    completed_crs = [s["cr_tienda"] for s in stores if s.get("audit_status") in ("completed", "incompleto")]
+    if completed_crs:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        recent_audits = await db.audits.find(
+            {"cr_tienda": {"$in": completed_crs},
+             "reopen_deadline": {"$gt": now_iso}},
+            {"_id": 0, "cr_tienda": 1, "id": 1, "reopen_deadline": 1}
+        ).sort("finished_at", -1).to_list(500)
+        # Keep only the most recent per store
+        reopen_map = {}
+        for a in recent_audits:
+            if a["cr_tienda"] not in reopen_map:
+                reopen_map[a["cr_tienda"]] = {"reopen_deadline": a["reopen_deadline"], "last_audit_id": a["id"]}
+        for s in stores:
+            if s["cr_tienda"] in reopen_map:
+                s["reopen_deadline"] = reopen_map[s["cr_tienda"]]["reopen_deadline"]
+                s["last_audit_id"] = reopen_map[s["cr_tienda"]]["last_audit_id"]
     return {"stores": stores, "total": total, "page": page, "pages": max(1, (total + limit - 1) // limit)}
 
 @api_router.get("/stores/plazas")
@@ -1325,11 +1343,12 @@ async def get_audit(audit_id: str, user=Depends(get_current_user)):
     return audit
 
 async def _cancel_pending_baja(equipment_id: str, audit_id: str, cancelled_by: str, now_iso: str) -> Optional[dict]:
-    """Cancel any pending BAJA movement for this equipment and return the cancelled movement."""
+    """Cancel any pending BAJA movement for this equipment and update the origin audit's stats."""
     pending_baja = await db.movements.find_one(
         {"equipment_id": equipment_id, "type": "baja", "status": "pending"}, {"_id": 0}
     )
     if pending_baja:
+        origin_audit_id = pending_baja.get("audit_id")
         await db.movements.update_one(
             {"id": pending_baja["id"]},
             {"$set": {
@@ -1338,6 +1357,38 @@ async def _cancel_pending_baja(equipment_id: str, audit_id: str, cancelled_by: s
                 "cancel_reason": f"Equipo localizado en auditoria {audit_id} — BAJA revertida automaticamente"
             }}
         )
+        # ── Fix origin audit: update the no_localizado scan and recalculate counters ──
+        if origin_audit_id and origin_audit_id != audit_id:
+            # Mark the no_localizado scan as resolved
+            await db.audit_scans.update_one(
+                {"audit_id": origin_audit_id, "equipment_id": equipment_id,
+                 "classification": "no_localizado"},
+                {"$set": {
+                    "classification": "no_localizado_resuelto",
+                    "resolved_at": now_iso,
+                    "resolved_by_audit": audit_id,
+                    "resolved_by": cancelled_by,
+                }}
+            )
+            # Recalculate not_found_count and not_found_value for the origin audit
+            remaining_nf = await db.audit_scans.count_documents(
+                {"audit_id": origin_audit_id, "classification": "no_localizado"}
+            )
+            remaining_docs = await db.audit_scans.find(
+                {"audit_id": origin_audit_id, "classification": "no_localizado"},
+                {"_id": 0, "equipment_data": 1}
+            ).to_list(10000)
+            remaining_value = sum(
+                float(s.get("equipment_data", {}).get("valor_real") or 0)
+                for s in remaining_docs
+            )
+            await db.audits.update_one(
+                {"id": origin_audit_id},
+                {"$set": {
+                    "not_found_count": remaining_nf,
+                    "not_found_value": round(remaining_value, 2),
+                }}
+            )
         return pending_baja
     return None
 
@@ -1544,6 +1595,7 @@ async def finalize_audit(audit_id: str, input: Optional[FinalizeWithPhotosInput]
 
     update_data = {
         "status": final_status, "finished_at": now_iso,
+            "reopen_deadline": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat(),
         "not_found_count": not_found_count, "not_found_value": round(not_found_value, 2),
         "needs_photo_ab": needs_photo_ab, "needs_photo_transf": needs_photo_transf,
     }
@@ -1792,6 +1844,41 @@ class MovementInputExtended(BaseModel):
     from_cr_tienda: Optional[str] = None
     to_cr_tienda: Optional[str] = None
     extra_data: Optional[dict] = None
+
+
+@api_router.post("/audits/{audit_id}/reopen")
+async def reopen_audit(audit_id: str, user=Depends(get_current_user)):
+    """Allow the original auditor to reopen a completed audit within 15 minutes."""
+    audit = await db.audits.find_one({"id": audit_id}, {"_id": 0})
+    if not audit:
+        raise HTTPException(404, "Audit not found")
+    if audit["status"] not in ("completed", "incompleto"):
+        raise HTTPException(400, "Solo se pueden reabrir auditorias completadas")
+    if audit.get("auditor_id") != user["sub"] and user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Solo el auditor original puede reabrir esta auditoria")
+    deadline_str = audit.get("reopen_deadline")
+    if not deadline_str:
+        raise HTTPException(400, "Esta auditoria no tiene ventana de reapertura disponible")
+    try:
+        deadline = datetime.fromisoformat(deadline_str.replace("Z", "+00:00"))
+    except Exception:
+        raise HTTPException(400, "Fecha de reapertura invalida")
+    if datetime.now(timezone.utc) > deadline:
+        raise HTTPException(400, "El tiempo para reabrir esta auditoria ha expirado (15 minutos)")
+    await db.audits.update_one({"id": audit_id}, {"$set": {
+        "status": "in_progress", "finished_at": None,
+        "reopen_deadline": None, "hmac_signature": None,
+        "reopened_at": datetime.now(timezone.utc).isoformat(),
+        "reopened_by": user["nombre"],
+    }})
+    await db.stores.update_one({"cr_tienda": audit["cr_tienda"]}, {"$set": {
+        "audited": False, "audit_status": "in_progress", "last_audit_id": audit_id,
+    }})
+    await db.movements.delete_many({"audit_id": audit_id, "auto_generated": True})
+    await db.audit_scans.delete_many({"audit_id": audit_id, "scanned_by": "system"})
+    await sec_log(SecEvent.AUDIT_CANCELLED, actor_email=user["email"], actor_id=user["sub"],
+                  target=audit_id, detail={"action": "reopen", "tienda": audit.get("tienda")})
+    return {"ok": True, "message": "Auditoria reabierta exitosamente"}
 
 @api_router.post("/audits/{audit_id}/photos")
 async def upload_audit_photos(audit_id: str, photo_ab: Optional[UploadFile] = File(None), photo_transf: Optional[UploadFile] = File(None), user=Depends(get_current_user)):
@@ -3033,6 +3120,207 @@ async def session_heartbeat(user=Depends(get_current_user)):
             {"$set": {"last_seen": datetime.now(timezone.utc).isoformat()}}
         )
     return {"ok": True}
+
+
+@api_router.get("/admin/audit-inconsistencies")
+async def get_audit_inconsistencies(user=Depends(get_current_user)):
+    """Find audits with equipment marked as no_localizado but whose baja was later cancelled (resolved elsewhere)."""
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Solo Super Administrador")
+    
+    # Find all cancelled baja movements (resolved by a later transfer)
+    cancelled_bajas = await db.movements.find(
+        {"type": "baja", "status": "cancelled", "auto_generated": True},
+        {"_id": 0, "equipment_id": 1, "audit_id": 1, "equipment_data": 1,
+         "from_cr_tienda": 1, "from_tienda": 1, "cancelled_at": 1, "cancel_reason": 1}
+    ).to_list(10000)
+    
+    inconsistencies = []
+    for baja in cancelled_bajas:
+        eq_id = baja.get("equipment_id")
+        origin_audit_id = baja.get("audit_id")
+        if not eq_id or not origin_audit_id:
+            continue
+        
+        # Check if the no_localizado scan still exists (not yet marked as resolved)
+        nf_scan = await db.audit_scans.find_one(
+            {"audit_id": origin_audit_id, "equipment_id": eq_id,
+             "classification": "no_localizado"},
+            {"_id": 0, "id": 1, "codigo_barras": 1}
+        )
+        if not nf_scan:
+            continue  # Already resolved or not found
+        
+        # Get origin audit details
+        origin_audit = await db.audits.find_one(
+            {"id": origin_audit_id},
+            {"_id": 0, "tienda": 1, "plaza": 1, "cr_tienda": 1, "finished_at": 1,
+             "not_found_count": 1, "not_found_value": 1}
+        )
+        if not origin_audit:
+            continue
+        
+        # Find the transfer movement that resolved this
+        transfer = await db.movements.find_one(
+            {"equipment_id": eq_id, "type": "transfer"},
+            {"_id": 0, "audit_id": 1, "to_cr_tienda": 1, "to_tienda": 1,
+             "created_at": 1, "created_by": 1}
+        )
+        
+        eq_data = baja.get("equipment_data") or {}
+        inconsistencies.append({
+            "equipment_id": eq_id,
+            "codigo_barras": nf_scan.get("codigo_barras", eq_data.get("codigo_barras", "")),
+            "descripcion": eq_data.get("descripcion", ""),
+            "marca": eq_data.get("marca", ""),
+            "modelo": eq_data.get("modelo", ""),
+            "valor_real": eq_data.get("valor_real", 0),
+            "origin_audit_id": origin_audit_id,
+            "origin_tienda": origin_audit.get("tienda", ""),
+            "origin_plaza": origin_audit.get("plaza", ""),
+            "origin_cr": origin_audit.get("cr_tienda", ""),
+            "origin_finished_at": origin_audit.get("finished_at", ""),
+            "current_not_found_count": origin_audit.get("not_found_count", 0),
+            "current_not_found_value": origin_audit.get("not_found_value", 0),
+            "resolved_by_audit": transfer.get("audit_id") if transfer else None,
+            "resolved_to_tienda": transfer.get("to_tienda") if transfer else None,
+            "resolved_at": transfer.get("created_at") if transfer else baja.get("cancelled_at"),
+            "scan_id": nf_scan.get("id"),
+        })
+    
+    return {
+        "inconsistencies": inconsistencies,
+        "total": len(inconsistencies)
+    }
+
+
+@api_router.post("/admin/fix-audit-inconsistency")
+async def fix_single_inconsistency(
+    equipment_id: str,
+    origin_audit_id: str,
+    resolved_by_audit: Optional[str] = None,
+    user=Depends(get_current_user)
+):
+    """Fix a single audit inconsistency: mark the no_localizado scan as resolved and recalculate counters."""
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Solo Super Administrador")
+    
+    now_iso = datetime.now(timezone.utc).isoformat()
+    
+    # Mark the scan as resolved
+    await db.audit_scans.update_one(
+        {"audit_id": origin_audit_id, "equipment_id": equipment_id,
+         "classification": "no_localizado"},
+        {"$set": {
+            "classification": "no_localizado_resuelto",
+            "resolved_at": now_iso,
+            "resolved_by_audit": resolved_by_audit or "manual",
+            "resolved_by": user["nombre"],
+        }}
+    )
+    
+    # Recalculate counters
+    remaining_nf = await db.audit_scans.count_documents(
+        {"audit_id": origin_audit_id, "classification": "no_localizado"}
+    )
+    remaining_docs = await db.audit_scans.find(
+        {"audit_id": origin_audit_id, "classification": "no_localizado"},
+        {"_id": 0, "equipment_data": 1}
+    ).to_list(10000)
+    remaining_value = sum(
+        float(s.get("equipment_data", {}).get("valor_real") or 0)
+        for s in remaining_docs
+    )
+    
+    await db.audits.update_one(
+        {"id": origin_audit_id},
+        {"$set": {
+            "not_found_count": remaining_nf,
+            "not_found_value": round(remaining_value, 2),
+        }}
+    )
+    
+    return {
+        "ok": True,
+        "equipment_id": equipment_id,
+        "origin_audit_id": origin_audit_id,
+        "remaining_not_found": remaining_nf,
+        "remaining_value": round(remaining_value, 2),
+    }
+
+
+@api_router.post("/admin/fix-all-audit-inconsistencies")
+async def fix_all_inconsistencies(user=Depends(get_current_user)):
+    """Fix all audit inconsistencies in bulk: resolve all no_localizado scans whose baja was cancelled."""
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Solo Super Administrador")
+    
+    now_iso = datetime.now(timezone.utc).isoformat()
+    
+    # Find all cancelled auto-generated bajas
+    cancelled_bajas = await db.movements.find(
+        {"type": "baja", "status": "cancelled", "auto_generated": True},
+        {"_id": 0, "equipment_id": 1, "audit_id": 1}
+    ).to_list(10000)
+    
+    fixed = 0
+    audits_to_recalc = set()
+    
+    for baja in cancelled_bajas:
+        eq_id = baja.get("equipment_id")
+        origin_audit_id = baja.get("audit_id")
+        if not eq_id or not origin_audit_id:
+            continue
+        
+        result = await db.audit_scans.update_one(
+            {"audit_id": origin_audit_id, "equipment_id": eq_id,
+             "classification": "no_localizado"},
+            {"$set": {
+                "classification": "no_localizado_resuelto",
+                "resolved_at": now_iso,
+                "resolved_by": user["nombre"],
+                "resolved_by_audit": "bulk_fix",
+            }}
+        )
+        if result.modified_count > 0:
+            fixed += 1
+            audits_to_recalc.add(origin_audit_id)
+    
+    # Recalculate counters for all affected audits
+    for audit_id in audits_to_recalc:
+        remaining_nf = await db.audit_scans.count_documents(
+            {"audit_id": audit_id, "classification": "no_localizado"}
+        )
+        remaining_docs = await db.audit_scans.find(
+            {"audit_id": audit_id, "classification": "no_localizado"},
+            {"_id": 0, "equipment_data": 1}
+        ).to_list(10000)
+        remaining_value = sum(
+            float(s.get("equipment_data", {}).get("valor_real") or 0)
+            for s in remaining_docs
+        )
+        await db.audits.update_one(
+            {"id": audit_id},
+            {"$set": {
+                "not_found_count": remaining_nf,
+                "not_found_value": round(remaining_value, 2),
+            }}
+        )
+    
+    await sec_log(
+        SecEvent.AUDIT_CANCELLED,  # reuse closest event type
+        actor_email=user["email"], actor_id=user["sub"],
+        target="bulk_fix",
+        detail={"action": "fix_inconsistencies", "fixed": fixed,
+                "audits_recalculated": len(audits_to_recalc)}
+    )
+    
+    return {
+        "ok": True,
+        "fixed_scans": fixed,
+        "audits_recalculated": len(audits_to_recalc),
+        "audit_ids": list(audits_to_recalc)
+    }
 
 
 @api_router.get("/notifications")
