@@ -3323,6 +3323,55 @@ async def fix_all_inconsistencies(user=Depends(get_current_user)):
     }
 
 
+@api_router.get("/admin/duplicate-audits")
+async def get_duplicate_audits(user=Depends(get_current_user)):
+    """
+    Detect stores that have 2 or more audits registered.
+    Returns groups of audits per store for Super Admin review.
+    """
+    if user["perfil"] != "Super Administrador":
+        raise HTTPException(403, "Solo Super Administrador")
+
+    # Pull all audits with relevant fields
+    all_audits = await db.audits.find(
+        {},
+        {
+            "_id": 0, "id": 1, "cr_tienda": 1, "tienda": 1, "plaza": 1,
+            "auditor_id": 1, "auditor_name": 1, "status": 1,
+            "started_at": 1, "finished_at": 1,
+            "located_count": 1, "not_found_count": 1,
+        }
+    ).sort("started_at", 1).to_list(10000)
+
+    # Group by cr_tienda
+    from collections import defaultdict
+    groups_map = defaultdict(list)
+    for audit in all_audits:
+        cr = audit.get("cr_tienda") or "SIN_CR"
+        groups_map[cr].append(audit)
+
+    # Keep only stores with 2+ audits
+    duplicate_groups = []
+    for cr, audits in groups_map.items():
+        if len(audits) >= 2:
+            duplicate_groups.append({
+                "cr_tienda": cr,
+                "tienda": audits[0].get("tienda", ""),
+                "plaza": audits[0].get("plaza", ""),
+                "audits": audits,
+            })
+
+    # Sort by tienda name
+    duplicate_groups.sort(key=lambda g: (g.get("plaza") or "", g.get("tienda") or ""))
+
+    return {
+        "ok": True,
+        "total_stores": len(duplicate_groups),
+        "total_audits": sum(len(g["audits"]) for g in duplicate_groups),
+        "groups": duplicate_groups,
+    }
+
+
 @api_router.get("/notifications")
 async def get_notifications(user=Depends(get_current_user)):
     """Return pending notifications for the current user: pending photos near TTL, completed audits."""
