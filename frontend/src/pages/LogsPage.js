@@ -68,6 +68,10 @@ export default function LogsPage() {
   const [crossDialog, setCrossDialog] = useState(false);
   const [crossExpanded, setCrossExpanded] = useState(null);
   const [crossPlazaFilter, setCrossPlazaFilter] = useState("all");
+  const [dupDialog, setDupDialog] = useState(false);
+  const [dupLoading, setDupLoading] = useState(false);
+  const [dupData, setDupData] = useState([]);
+  const [dupDeleting, setDupDeleting] = useState(null);
   const [crossConfFilter, setCrossConfFilter] = useState("all");
 
   const classSort = useSortable("scanned_at");
@@ -210,6 +214,37 @@ export default function LogsPage() {
       fetchAudits();
     } catch (err) { toast.error(err.response?.data?.detail || t("common.error")); }
   };
+
+  const handleFetchDuplicates = async () => {
+    setDupLoading(true);
+    setDupData([]);
+    try {
+      const res = await api.get("/admin/duplicate-audits");
+      setDupData(res.data.groups || []);
+      if ((res.data.groups || []).length === 0) {
+        toast.success("No se encontraron auditorías duplicadas");
+      } else {
+        toast.warning(`Se encontraron ${res.data.groups.length} tienda(s) con auditorías duplicadas`);
+      }
+    } catch { toast.error("Error al buscar auditorías duplicadas"); }
+    finally { setDupLoading(false); }
+  };
+
+  const handleDeleteDuplicate = async (auditId) => {
+    setDupDeleting(auditId);
+    try {
+      await api.delete(`/audits/${auditId}`);
+      toast.success("Auditoría eliminada");
+      setDupData(prev =>
+        prev.map(g => ({ ...g, audits: g.audits.filter(a => a.id !== auditId) }))
+            .filter(g => g.audits.length > 1)
+      );
+      fetchAudits();
+    } catch (err) { toast.error(err.response?.data?.detail || "Error al eliminar"); }
+    finally { setDupDeleting(null); }
+  };
+
+
 
     
   // Descargar imagen de formato
@@ -669,6 +704,16 @@ ${(a.photo_ab || a.photo_transf) ? `
                   <GitCompare className="h-4 w-4" /> Análisis Cruzado Global
                 </Button>
               )}
+              {isSuperAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-orange-500/40 text-orange-700 hover:bg-orange-500/10"
+                  onClick={() => { setDupDialog(true); handleFetchDuplicates(); }}
+                >
+                  <AlertTriangle className="h-4 w-4" /> Ver Duplicadas
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={handleExportAudits} disabled={exporting} data-testid="export-audits" className="gap-2">
                 {exporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {t("logs.exportExcel")}
               </Button>
@@ -956,6 +1001,104 @@ ${(a.photo_ab || a.photo_transf) ? `
               )}
               <Button variant="outline" onClick={() => { setSelectedAudit(null); setAuditSummary(null); }}>{t("common.close")}</Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ══ Dialog: Auditorías Duplicadas ══ */}
+      <Dialog open={dupDialog} onOpenChange={v => { setDupDialog(v); if (!v) setDupData([]); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="font-heading uppercase tracking-tight flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              Auditorías Duplicadas por Tienda
+            </DialogTitle>
+            <DialogDescription>
+              Tiendas que tienen 2 o más auditorías registradas. Selecciona cuál eliminar conservando la correcta.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            {dupLoading && (
+              <div className="flex items-center justify-center py-12 gap-3 text-muted-foreground">
+                <RefreshCw className="h-5 w-5 animate-spin" />
+                <span className="text-sm">Buscando auditorías duplicadas…</span>
+              </div>
+            )}
+            {!dupLoading && dupData.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
+                <CheckCircle className="h-8 w-8 text-emerald-500" />
+                <p className="text-sm font-medium text-emerald-600">No se encontraron auditorías duplicadas</p>
+              </div>
+            )}
+            {!dupLoading && dupData.map((group, gi) => (
+              <div key={gi} className="border rounded-lg overflow-hidden">
+                <div className="bg-orange-500/10 px-4 py-2 flex items-center justify-between border-b">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold">{group.cr_tienda}</span>
+                    <span className="text-sm font-semibold">{group.tienda}</span>
+                    {group.plaza && <span className="text-xs text-muted-foreground">· {group.plaza}</span>}
+                  </div>
+                  <span className="text-xs bg-orange-500/20 text-orange-700 font-semibold px-2 py-0.5 rounded-full">
+                    {group.audits.length} auditorías
+                  </span>
+                </div>
+                <div className="divide-y">
+                  {group.audits.map((audit) => (
+                    <div key={audit.id} className="px-4 py-3 flex items-center gap-3">
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className={`text-[10px] ${
+                            audit.status === "completed" ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" :
+                            audit.status === "pending_photos" ? "bg-amber-500/15 text-amber-700 border-amber-500/40" :
+                            audit.status === "cancelada" ? "bg-gray-500/10 text-gray-500 border-gray-400/30" :
+                            "bg-blue-500/15 text-blue-600 border-blue-500/30"}`}>
+                            {audit.status === "completed" ? "Completada" :
+                             audit.status === "pending_photos" ? "⏳ Pend. Fotos" :
+                             audit.status === "cancelada" ? "Cancelada" : "En Proceso"}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            Inicio: {audit.started_at ? new Date(audit.started_at).toLocaleString(locale) : "—"}
+                          </span>
+                          {audit.finished_at && (
+                            <span className="text-xs text-muted-foreground">
+                              Fin: {new Date(audit.finished_at).toLocaleString(locale)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          Auditor: <span className="font-medium">{audit.auditor_name || "—"}</span>
+                          {" · "}Localizados: <span className="text-emerald-600 font-medium">{audit.located_count ?? 0}</span>
+                          {" · "}No loc.: <span className="text-red-500 font-medium">{audit.not_found_count ?? 0}</span>
+                          {" · "}ID: <span className="font-mono">{audit.id.slice(-8)}</span>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="shrink-0 gap-1.5 h-7 text-xs"
+                        disabled={dupDeleting === audit.id}
+                        onClick={() => handleDeleteDuplicate(audit.id)}
+                      >
+                        {dupDeleting === audit.id
+                          ? <RefreshCw className="h-3 w-3 animate-spin" />
+                          : <Trash2 className="h-3 w-3" />}
+                        Eliminar
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter className="pt-2 border-t">
+            <Button variant="outline" onClick={() => { setDupDialog(false); setDupData([]); }}>
+              Cerrar
+            </Button>
+            <Button variant="outline" onClick={handleFetchDuplicates} disabled={dupLoading} className="gap-2">
+              <RefreshCw className={`h-3.5 w-3.5 ${dupLoading ? "animate-spin" : ""}`} /> Actualizar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
