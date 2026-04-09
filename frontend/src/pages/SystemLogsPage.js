@@ -475,43 +475,131 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
             </CardHeader>
             <CardContent className="p-0 max-h-[600px] overflow-y-auto">
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
-                  onClick={() => setExpandedFix(expandedFix === "fix48" ? null : "fix48")}
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix53" ? null : "fix53")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <Wrench className="h-4 w-4 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold font-mono text-sm text-primary">fix48</span>
+                      <span className="font-bold font-mono text-sm text-primary">fix53</span>
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary text-white ml-1">Actual</span>
-                      <span className="text-xs text-muted-foreground">2026-03-14</span>
+                      <span className="text-xs text-muted-foreground">2026-04-09 — Fix raíz de inconsistencias: transferencia no actualizaba auditoría origen</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Sesiones fantasma, notificaciones push, multi-idioma completo con locale dinamic...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Al escanear un equipo No Localizado en otra tienda, el sistema ahora a...</p>
                   </div>
-                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix48" ? "rotate-180" : ""}`} />
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix53" ? "rotate-180" : ""}`} />
                 </button>
-                {expandedFix === "fix48" && (
+                {expandedFix === "fix53" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Sesiones fantasma, notificaciones push, multi-idioma completo con locale dinamico, heartbeat, countdown inactividad en sidebar.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Al escanear un equipo No Localizado en otra tienda, el sistema ahora actualiza correctamente la auditoría origen. Nuevo panel de reconciliación retroactiva en Configuración.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• delete_user ahora cierra sesiones del usuario eliminado</li>
-                    <li className="text-sm text-foreground/80">• get_current_user rechaza tokens de usuarios eliminados (401)</li>
-                    <li className="text-sm text-foreground/80">• Endpoint POST /auth/heartbeat actualiza last_seen cada 2 min</li>
-                    <li className="text-sm text-foreground/80">• Endpoint GET /notifications: alertas fotos pendientes y auditorias completadas</li>
-                    <li className="text-sm text-foreground/80">• Campana de notificaciones en header con badge numerico</li>
-                    <li className="text-sm text-foreground/80">• Countdown de inactividad visible en sidebar</li>
-                    <li className="text-sm text-foreground/80">• LanguageContext: helpers fmtDate, fmtMoney con locale dinamico es-MX/en-US/pt-BR</li>
-                    <li className="text-sm text-foreground/80">• Nuevas claves de traduccion: session.*, notifications.* en ES/EN/PT</li>
+                    <li className="text-sm text-foreground/80">• BUG RAÍZ: _cancel_pending_baja cancelaba el movimiento de baja pero NO actualizaba el scan no_localizado ni los contadores de la auditoría origen</li>
+                    <li className="text-sm text-foreground/80">• Fix: al cancelar una baja, se marca el scan como no_localizado_resuelto y se recalculan not_found_count y not_found_value en la auditoría origen</li>
+                    <li className="text-sm text-foreground/80">• Nuevo endpoint GET /admin/audit-inconsistencies: detecta todos los equipos con esta inconsistencia histórica</li>
+                    <li className="text-sm text-foreground/80">• Nuevo endpoint POST /admin/fix-all-audit-inconsistencies: corrección masiva retroactiva</li>
+                    <li className="text-sm text-foreground/80">• Nuevo endpoint POST /admin/fix-audit-inconsistency: corrección individual por equipo</li>
+                    <li className="text-sm text-foreground/80">• Panel en Configuración (solo Super Admin): muestra lista de equipos inconsistentes con opción de corregir uno a uno o todos a la vez</li>
+                    <li className="text-sm text-foreground/80">• El panel muestra: código de barras, descripción, tienda origen del No Localizado y tienda donde fue encontrado (transferencia)</li>
                     </ul>
                   </div>
                 )}
               </div>
 
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix52" ? null : "fix52")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix52</span>
+                      
+                      <span className="text-xs text-muted-foreground">2026-03-19 — Historial de fixes completo y reordenado</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Todos los fixes desde fix6 hasta fix52 documentados en orden cronológi...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix52" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix52" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Todos los fixes desde fix6 hasta fix52 documentados en orden cronológico inverso.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• 33 fixes documentados desde fix6 hasta fix52</li>
+                    <li className="text-sm text-foreground/80">• Orden cronológico inverso: el fix más reciente aparece primero</li>
+                    <li className="text-sm text-foreground/80">• Descripción detallada con cambios específicos en cada fix</li>
+                    <li className="text-sm text-foreground/80">• Badge 'Actual' en fix52 (el más reciente)</li>
+                    <li className="text-sm text-foreground/80">• Contador: 34 actualizaciones totales</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-b last:border-0">
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix51" ? null : "fix51")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix51</span>
+                      <span className="text-xs text-muted-foreground">2026-03-19 — Análisis cruzado por valor, combobox sobrante, reapertura</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Filtro por valor en análisis cruzado. Combobox filtrable. Reapertura c...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix51" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix51" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Filtro por valor en análisis cruzado. Combobox filtrable. Reapertura con countdown 15 min.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Análisis cruzado: selector 'Ordenar por valor' (Mayor/Menor primero)</li>
+                    <li className="text-sm text-foreground/80">• Sobrante desconocido: Descripción y Marca con combobox de búsqueda filtrable</li>
+                    <li className="text-sm text-foreground/80">• Todos los campos de sobrante desconocido en MAYÚSCULAS automáticas</li>
+                    <li className="text-sm text-foreground/80">• POST /audits/{id}/reopen: ventana de 15 min para reabrir y seguir escaneando</li>
+                    <li className="text-sm text-foreground/80">• Dashboard: badge countdown en tarjetas de tiendas recientemente auditadas</li>
+                    <li className="text-sm text-foreground/80">• Dashboard: botón 'Reabrir (MM:SS)' con tiempo restante en modal</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-b last:border-0">
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix50" ? null : "fix50")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix50</span>
+                      <span className="text-xs text-muted-foreground">2026-03-14 — Inactividad resistente a tab oculto (wall-clock)</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Enfoque wall-clock con Date.now(). Inmune al throttling del browser.</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix50" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix50" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Enfoque wall-clock con Date.now(). Inmune al throttling del browser.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Ticker único calcula elapsed = Date.now() - lastActivityRef.current</li>
+                    <li className="text-sm text-foreground/80">• Inmune a throttling del browser cuando el tab está oculto</li>
+                    <li className="text-sm text-foreground/80">• visibilitychange: logout inmediato al regresar si el tiempo ya venció</li>
+                    <li className="text-sm text-foreground/80">• Logout garantizado aunque el usuario nunca vea la pantalla de aviso</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-b last:border-0">
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix49" ? null : "fix49")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -520,32 +608,173 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix49</span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary text-white ml-1">Actual</span>
-                      <span className="text-xs text-muted-foreground">2026-03-14</span>
+                      <span className="text-xs text-muted-foreground">2026-03-14 — Fix raíz inactividad: stale closures</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix raiz cierre de sesion por inactividad: refs para evitar stale closures, time...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">showWarningRef reemplaza showWarning en closures. Timer en 2 fases.</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix49" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix49" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Fix raiz cierre de sesion por inactividad: refs para evitar stale closures, timer en 2 fases, historial actualizado.</p>
+                    <p className="text-sm text-muted-foreground mb-2">showWarningRef reemplaza showWarning en closures. Timer en 2 fases.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• BUG RAIZ: showWarning en closure del useEffect siempre era false</li>
-                    <li className="text-sm text-foreground/80">• Solucion: showWarningRef (useRef) sincronizado — sin stale closures</li>
-                    <li className="text-sm text-foreground/80">• isLoggedInRef para evitar timers fantasma post-logout</li>
-                    <li className="text-sm text-foreground/80">• Timer en 2 fases: setTimeout(warningDelay) luego setInterval(countdown)</li>
-                    <li className="text-sm text-foreground/80">• onActivity usa showWarningRef.current en lugar del estado React</li>
-                    <li className="text-sm text-foreground/80">• Poll de settings con delay inicial para garantizar apiRef disponible</li>
-                    <li className="text-sm text-foreground/80">• Historial de fixes y manuales actualizados</li>
+                    <li className="text-sm text-foreground/80">• BUG: showWarning en closure siempre false → timer se reiniciaba con cualquier movimiento</li>
+                    <li className="text-sm text-foreground/80">• Solución: showWarningRef (useRef) sincronizado con estado real</li>
+                    <li className="text-sm text-foreground/80">• isLoggedInRef evita timers fantasma post-logout</li>
+                    <li className="text-sm text-foreground/80">• Timer en 2 fases: setTimeout(warningDelay) → setInterval(countdown)</li>
                     </ul>
                   </div>
                 )}
               </div>
 
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix48" ? null : "fix48")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix48</span>
+                      <span className="text-xs text-muted-foreground">2026-03-14 — Sesiones fantasma, notificaciones push, locale dinámico</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Sesiones de usuarios eliminados corregidas. Notificaciones push. Local...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix48" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix48" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Sesiones de usuarios eliminados corregidas. Notificaciones push. Locale dinámico.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• delete_user cierra sesiones del usuario eliminado inmediatamente</li>
+                    <li className="text-sm text-foreground/80">• get_current_user rechaza tokens de usuarios eliminados (HTTP 401)</li>
+                    <li className="text-sm text-foreground/80">• POST /auth/heartbeat: actualiza last_seen cada 2 minutos</li>
+                    <li className="text-sm text-foreground/80">• GET /notifications: alertas de fotos pendientes y auditorías completadas</li>
+                    <li className="text-sm text-foreground/80">• Campana de notificaciones con badge numérico en header</li>
+                    <li className="text-sm text-foreground/80">• Countdown de inactividad visible en sidebar</li>
+                    <li className="text-sm text-foreground/80">• fmtDate, fmtMoney con locale dinámico: es-MX / en-US / pt-BR</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-b last:border-0">
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix47" ? null : "fix47")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix47</span>
+                      <span className="text-xs text-muted-foreground">2026-03-14 — Paquete SIGAF_fix47_COMPLETE (17 archivos)</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Paquete completo con todos los fixes fix40-fix46. Fix del .map() roto ...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix47" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix47" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Paquete completo con todos los fixes fix40-fix46. Fix del .map() roto en LogsPage.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• 17 archivos verificados con cero imports no usados</li>
+                    <li className="text-sm text-foreground/80">• Fix: comentario inline rompía el .map() en LogsPage línea 697</li>
+                    <li className="text-sm text-foreground/80">• Fix: package.json sin eslintConfig conflictiva</li>
+                    <li className="text-sm text-foreground/80">• AdminPage definitivamente con CardHeader y CardTitle</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-b last:border-0">
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix46" ? null : "fix46")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix46</span>
+                      <span className="text-xs text-muted-foreground">2026-03-14 — Endpoint /download/tech-docs</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Nuevo endpoint para documentación técnica PDF. Botón 'Documentación' e...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix46" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix46" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Nuevo endpoint para documentación técnica PDF. Botón 'Documentación' en DeployPage.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Endpoint GET /download/tech-docs para todos los perfiles</li>
+                    <li className="text-sm text-foreground/80">• generate_tech_documentation() con stats actuales del sistema</li>
+                    <li className="text-sm text-foreground/80">• Botón 'Documentación' en DeployPage genera y descarga el PDF</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-b last:border-0">
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix45" ? null : "fix45")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix45</span>
+                      <span className="text-xs text-muted-foreground">2026-03-14 — Limpieza global — cero imports no usados</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Scan exhaustivo de todos los archivos. Cero unused imports en toda la ...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix45" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix45" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">Scan exhaustivo de todos los archivos. Cero unused imports en toda la base de código.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• Scan automático de pages/ y components/ completo</li>
+                    <li className="text-sm text-foreground/80">• Layout.js: ShieldAlert, ShieldCheck, History eliminados</li>
+                    <li className="text-sm text-foreground/80">• DashboardPage.js: CardHeader, CardTitle sin usar eliminados</li>
+                    <li className="text-sm text-foreground/80">• ReportsPage.js: PieChart, Pie de recharts eliminados</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-b last:border-0">
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                  onClick={() => setExpandedFix(expandedFix === "fix44" ? null : "fix44")}
+                >
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold font-mono text-sm text-primary">fix44</span>
+                      <span className="text-xs text-muted-foreground">2026-03-14 — Fix definitivo AdminPage pantalla en blanco</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">CardHeader/CardTitle eliminados por error causaban crash silencioso en...</p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix44" ? "rotate-180" : ""}`} />
+                </button>
+                {expandedFix === "fix44" && (
+                  <div className="px-4 pb-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-2">CardHeader/CardTitle eliminados por error causaban crash silencioso en runtime.</p>
+                    <ul className="space-y-1">
+                    <li className="text-sm text-foreground/80">• CAUSA RAÍZ: componentes JSX sin importar = crash silencioso en render</li>
+                    <li className="text-sm text-foreground/80">• Restauración de CardHeader y CardTitle en AdminPage</li>
+                    <li className="text-sm text-foreground/80">• Limpieza en Layout.js, DashboardPage.js, ReportsPage.js</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-b last:border-0">
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix43" ? null : "fix43")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -554,30 +783,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix43</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-14</span>
+                      <span className="text-xs text-muted-foreground">2026-03-13 — Sort bitácoras + CSV import + dedup análisis cruzado</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Ordenamiento server-side en historial de auditorías, imports de AdminPage limpia...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Ordenamiento real en bitácoras. Importación CSV. Dedup en exportacione...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix43" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix43" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Ordenamiento server-side en historial de auditorías, imports de AdminPage limpiados para evitar build fail, tab Fixes con detalles expandibles por fix, DeployPage y PDFs actualizados.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Ordenamiento real en bitácoras. Importación CSV. Dedup en exportaciones.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Ordenamiento server-side en historial de auditorías</li>
-                    <li className="text-sm text-foreground/80">• Backend acepta sort_by y sort_dir en /logs/audits</li>
-                    <li className="text-sm text-foreground/80">• Reset de página al cambiar ordenamiento</li>
-                    <li className="text-sm text-foreground/80">• Imports no usados eliminados en AdminPage</li>
-                    <li className="text-sm text-foreground/80">• Tab Fixes con acordeón de detalles expandibles</li>
-                    <li className="text-sm text-foreground/80">• DeployPage y PDFs actualizados con features actuales</li>
+                    <li className="text-sm text-foreground/80">• Sort server-side en Bitácoras con whitelist de campos</li>
+                    <li className="text-sm text-foreground/80">• CSV import con detección automática y normalización</li>
+                    <li className="text-sm text-foreground/80">• Dedup en exportaciones de movimientos</li>
+                    <li className="text-sm text-foreground/80">• Análisis cruzado: dedup con prioridad al mejor score de coincidencia</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix42" ? null : "fix42")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -586,27 +812,26 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix42</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-14</span>
+                      <span className="text-xs text-muted-foreground">2026-03-13 — Paquete SIGAF_FINAL — limpieza de código</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix de imports no usados en AdminPage (ChevronLeft, ChevronRight, ArrowUpDown) q...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Paquete completo de 17 archivos. Limpieza exhaustiva de imports y códi...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix42" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix42" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Fix de imports no usados en AdminPage (ChevronLeft, ChevronRight, ArrowUpDown) que causaban build fail, mafFileValid visible en UI del badge del archivo MAF.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Paquete completo de 17 archivos. Limpieza exhaustiva de imports y código muerto.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Imports no usados eliminados (build fail resuelto)</li>
-                    <li className="text-sm text-foreground/80">• mafFileValid usado en render del badge MAF</li>
-                    <li className="text-sm text-foreground/80">• expiredDialog eliminado (no-unused-vars resuelto)</li>
+                    <li className="text-sm text-foreground/80">• Análisis automatizado de imports en todos los archivos .js</li>
+                    <li className="text-sm text-foreground/80">• Eliminación de ArrowUpDown, ShieldAlert, AlertTriangle, Activity, Database, Rocket</li>
+                    <li className="text-sm text-foreground/80">• Paquete SIGAF_FINAL con los 17 archivos verificados y cero imports no usados</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix41" ? null : "fix41")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -615,29 +840,26 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix41</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-14</span>
+                      <span className="text-xs text-muted-foreground">2026-03-13 — Prebuild stamp-sw.js y guards de auditoría</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">SW con prebuild script que estampa timestamp único en cada deploy, guard en Audi...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Prebuild automático en cada build. Guard !audit. Fix de TabsContent.</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix41" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix41" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">SW con prebuild script que estampa timestamp único en cada deploy, guard en AuditPage para audit=null, cierre correcto de TabsContent en Fixes, auto-carga del tab Historial.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Prebuild automático en cada build. Guard !audit. Fix de TabsContent.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Prebuild script stamp-sw.js: timestamp único por deploy</li>
-                    <li className="text-sm text-foreground/80">• sw.template.js como fuente de verdad del SW</li>
-                    <li className="text-sm text-foreground/80">• Guard !audit en AuditPage (evita pantalla en blanco)</li>
-                    <li className="text-sm text-foreground/80">• Cierre correcto de TabsContent en Logs del Sistema</li>
-                    <li className="text-sm text-foreground/80">• Auto-carga de sesiones y auditorías al abrir Historial</li>
+                    <li className="text-sm text-foreground/80">• Prebuild: node scripts/stamp-sw.js en cada yarn build automáticamente</li>
+                    <li className="text-sm text-foreground/80">• Guard !audit en AuditPage evita crashes al inicializar</li>
+                    <li className="text-sm text-foreground/80">• Timestamp único garantiza detección de nuevo SW en cada deploy</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix40" ? null : "fix40")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -646,29 +868,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix40</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                      <span className="text-xs text-muted-foreground">2026-03-13 — Sesiones activas, auditorías vencidas y multisesión</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Auditorías vencidas con vista y restauración, restricción de acceso a auditoría ...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Panel de sesiones activas con cierre forzoso. Auditorías vencidas. Mul...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix40" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix40" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Auditorías vencidas con vista y restauración, restricción de acceso a auditoría en progreso por otro usuario, sesiones activas con cierre forzoso, multisesión configurable, tab Fixes en Logs del Sistema.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Panel de sesiones activas con cierre forzoso. Auditorías vencidas. Multisesión configurable.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Vista de auditorías vencidas con botón Restaurar (+24h)</li>
-                    <li className="text-sm text-foreground/80">• Restricción: solo el auditor dueño puede entrar a su auditoría</li>
-                    <li className="text-sm text-foreground/80">• Sesiones activas con cierre forzoso en AdminPage-Historial</li>
-                    <li className="text-sm text-foreground/80">• Multisesión configurable: permitir múltiples sesiones por usuario</li>
-                    <li className="text-sm text-foreground/80">• Tab 'Fixes' en Logs del Sistema con historial completo</li>
+                    <li className="text-sm text-foreground/80">• Sesiones activas: ver y cerrar forzosamente desde AdminPage</li>
+                    <li className="text-sm text-foreground/80">• Auditorías vencidas (pending_photos): restaurar +24h o eliminar</li>
+                    <li className="text-sm text-foreground/80">• Restricción: solo el auditor dueño puede continuar su auditoría</li>
+                    <li className="text-sm text-foreground/80">• Multisesión configurable por Super Admin (allow_multi_session)</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix39" ? null : "fix39")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -677,29 +897,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix39</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                      <span className="text-xs text-muted-foreground">2026-03-13 — Timeout de inactividad configurable</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Sistema completo de inactividad: timeout configurable (5-480 min), banner con co...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Cierre de sesión por inactividad. Timer 5-480 min. Banner de aviso 5 m...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix39" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix39" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Sistema completo de inactividad: timeout configurable (5-480 min), banner con countdown 5 minutos antes, botón 'Seguir trabajando', propagación en tiempo real a sesiones activas.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Cierre de sesión por inactividad. Timer 5-480 min. Banner de aviso 5 min antes.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Timeout de inactividad configurable en AdminPage</li>
-                    <li className="text-sm text-foreground/80">• Banner modal con countdown en tiempo real</li>
-                    <li className="text-sm text-foreground/80">• Botón 'Seguir trabajando' reinicia el timer</li>
-                    <li className="text-sm text-foreground/80">• Propagación en tiempo real via polling cada 60s</li>
-                    <li className="text-sm text-foreground/80">• Rango: 5 a 480 minutos</li>
+                    <li className="text-sm text-foreground/80">• Timeout configurable: 5-480 minutos desde AdminPage</li>
+                    <li className="text-sm text-foreground/80">• Banner de aviso con cuenta regresiva 5 min antes del cierre</li>
+                    <li className="text-sm text-foreground/80">• Botón 'Seguir trabajando' para extender la sesión</li>
+                    <li className="text-sm text-foreground/80">• Parámetro session_timeout_minutes en system_settings</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix38" ? null : "fix38")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -708,28 +926,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix38</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                      <span className="text-xs text-muted-foreground">2026-03-12 — Documentación técnica PDF completa (10 secciones)</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">SW definitivo con waiting state correcto, envío de SKIP_WAITING explícito desde ...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">generate_tech_documentation() con 10 secciones y 40+ páginas profesion...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix38" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix38" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">SW definitivo con waiting state correcto, envío de SKIP_WAITING explícito desde App.js al hacer clic en 'Recargar', fix de modelo duplicado en historial de escaneos.</p>
+                    <p className="text-sm text-muted-foreground mb-2">generate_tech_documentation() con 10 secciones y 40+ páginas profesionales.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• SW con waiting state correcto (sin skipWaiting automático)</li>
-                    <li className="text-sm text-foreground/80">• App.js envía SKIP_WAITING al SW en waiting</li>
-                    <li className="text-sm text-foreground/80">• Modelo no duplicado en historial de escaneos</li>
-                    <li className="text-sm text-foreground/80">• Recarga automática vía controllerchange</li>
+                    <li className="text-sm text-foreground/80">• 10 secciones: Requisitos, Casos de Uso, Arquitectura, BD, API, Wireframes, Pruebas, Deploy, Manual, Changelog</li>
+                    <li className="text-sm text-foreground/80">• 15 RF y 7 RNF en tablas con ID</li>
+                    <li className="text-sm text-foreground/80">• 42 endpoints documentados con método HTTP codificado por color</li>
+                    <li className="text-sm text-foreground/80">• Esquema de 12 colecciones MongoDB con todos sus campos</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix37" ? null : "fix37")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -738,28 +955,26 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix37</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                      <span className="text-xs text-muted-foreground">2026-03-12 — DeployPage con seguridad y botón documentación</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Estadísticas de auditorías filtradas por plaza en tiempo real: total_audits, sto...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Sección de seguridad en DeployPage. Botón de documentación técnica PDF...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix37" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix37" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Estadísticas de auditorías filtradas por plaza en tiempo real: total_audits, stores_audited y porcentaje de cobertura se actualizan al filtrar.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Sección de seguridad en DeployPage. Botón de documentación técnica PDF.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Stats filtradas por plaza: auditorías realizadas</li>
-                    <li className="text-sm text-foreground/80">• Stats filtradas por plaza: tiendas auditadas</li>
-                    <li className="text-sm text-foreground/80">• Stats filtradas por plaza: % cobertura</li>
-                    <li className="text-sm text-foreground/80">• Backend acepta parámetro plaza en /audits/stats/summary</li>
+                    <li className="text-sm text-foreground/80">• Sección 'Características de seguridad implementadas' con 9 mecanismos</li>
+                    <li className="text-sm text-foreground/80">• Actualización de instrucciones de deploy con stamp-sw.js</li>
+                    <li className="text-sm text-foreground/80">• Botón 'Documentación' que genera PDF técnico completo</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix36" ? null : "fix36")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -768,29 +983,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix36</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                      <span className="text-xs text-muted-foreground">2026-03-12 — CSV import y deduplicación en exportaciones</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Recálculo de horas con TTL actual del sistema, fix del filtro de plaza (objetos→...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Importación CSV con normalización. Dedup en exportaciones y análisis c...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix36" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix36" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Recálculo de horas con TTL actual del sistema, fix del filtro de plaza (objetos→strings), SW v6 sin skipWaiting en install, detección de updates via waiting state.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Importación CSV con normalización. Dedup en exportaciones y análisis cruzado.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Horas recalculadas con TTL configurado actualmente</li>
-                    <li className="text-sm text-foreground/80">• Filtro plaza: extrae strings de objetos /stores/plazas</li>
-                    <li className="text-sm text-foreground/80">• SW v6: sin skipWaiting en install</li>
-                    <li className="text-sm text-foreground/80">• Detección updates via reg.waiting</li>
-                    <li className="text-sm text-foreground/80">• Separador bullet entre modelo y serie</li>
+                    <li className="text-sm text-foreground/80">• Importación masiva acepta .xlsx y .csv con detección automática</li>
+                    <li className="text-sm text-foreground/80">• Normalización de headers: Contraseña→password, Correo→email</li>
+                    <li className="text-sm text-foreground/80">• Deduplicación en exportaciones por (equipment_id, type, audit_id)</li>
+                    <li className="text-sm text-foreground/80">• Deduplicación en análisis cruzado: prioridad al mejor score</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix35" ? null : "fix35")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -799,28 +1012,26 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix35</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                      <span className="text-xs text-muted-foreground">2026-03-12 — LogsPage sort server-side</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Horas restantes recalculadas desde photos_deadline, layout móvil de Consultar Eq...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Ordenamiento en servidor con sort_by + sort_dir. Considera todos los r...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix35" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix35" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Horas restantes recalculadas desde photos_deadline, layout móvil de Consultar Equipo corregido, filtro por plaza en historial de auditorías, modelo y serie en historial de escaneos.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Ordenamiento en servidor con sort_by + sort_dir. Considera todos los registros.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Horas restantes calculadas desde photos_deadline real</li>
-                    <li className="text-sm text-foreground/80">• Layout móvil: input full-width, controles en fila separada</li>
-                    <li className="text-sm text-foreground/80">• Filtro por plaza en historial de auditorías (LogsPage)</li>
-                    <li className="text-sm text-foreground/80">• Modelo y serie visibles en historial de escaneos</li>
+                    <li className="text-sm text-foreground/80">• Endpoint /logs/audits acepta sort_by y sort_dir con whitelist</li>
+                    <li className="text-sm text-foreground/80">• Ordenamiento en MongoDB antes de paginación: considera TODOS los registros</li>
+                    <li className="text-sm text-foreground/80">• Frontend resetea a página 1 al cambiar orden</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix34" ? null : "fix34")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -829,28 +1040,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix34</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                      <span className="text-xs text-muted-foreground">2026-03-12 — CardHeader/CardTitle restaurados en AdminPage</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Auto-cancelar auditoría sin escaneos, lógica de movimientos más robusta, endpoin...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix raíz de la pantalla en blanco del módulo de Administración.</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix34" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix34" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Auto-cancelar auditoría sin escaneos, lógica de movimientos más robusta, endpoint fix-pending-photos para completar auditorías que ya no requieren foto.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Fix raíz de la pantalla en blanco del módulo de Administración.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Auto-cancelación al finalizar sin escaneos</li>
-                    <li className="text-sm text-foreground/80">• Lógica: ALTA siempre manual, BAJA filtra canceladas</li>
-                    <li className="text-sm text-foreground/80">• Endpoint POST /admin/fix-pending-photos</li>
-                    <li className="text-sm text-foreground/80">• Botón 'Corregir ahora' en AdminPage</li>
+                    <li className="text-sm text-foreground/80">• CAUSA RAÍZ: CardHeader y CardTitle eliminados por error</li>
+                    <li className="text-sm text-foreground/80">• Componentes JSX sin importar = crash silencioso en runtime</li>
+                    <li className="text-sm text-foreground/80">• El build pasaba pero React no podía renderizar los componentes</li>
+                    <li className="text-sm text-foreground/80">• Fix definitivo de la pantalla en blanco en Administración</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix33" ? null : "fix33")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -859,28 +1069,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix33</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-13</span>
+                      <span className="text-xs text-muted-foreground">2026-03-12 — Limpieza exhaustiva de imports no usados</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Banner de actualización SW, búsqueda de equipo carga todos los registros (limit=...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Eliminación de todos los imports no usados. Causa raíz de build fails ...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix33" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix33" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Banner de actualización SW, búsqueda de equipo carga todos los registros (limit=0 al backend), contraseña actual requerida para cambiar contraseña, validación de estructura de archivos Excel antes de importar.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Eliminación de todos los imports no usados. Causa raíz de build fails con CI=true.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Banner actualización SW funcional</li>
-                    <li className="text-sm text-foreground/80">• Búsqueda equipo: limit=0 carga todos al backend</li>
-                    <li className="text-sm text-foreground/80">• Contraseña actual requerida al cambiar contraseña</li>
-                    <li className="text-sm text-foreground/80">• Validación de estructura Excel antes de importar</li>
+                    <li className="text-sm text-foreground/80">• Eliminación de imports no usados en todos los archivos .js</li>
+                    <li className="text-sm text-foreground/80">• CI=true convierte no-unused-vars en error fatal que aborta yarn build</li>
+                    <li className="text-sm text-foreground/80">• Scripts de análisis automático de imports</li>
+                    <li className="text-sm text-foreground/80">• Railway servía bundle viejo cuando el build fallaba silenciosamente</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix32" ? null : "fix32")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -889,28 +1098,26 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix32</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-12</span>
+                      <span className="text-xs text-muted-foreground">2026-03-11 — Guard !audit en AuditPage</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix raíz de lógica de fotos: filtrar movimientos auto_generated correctamente, c...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Guard de seguridad en AuditPage para evitar errores con audit null.</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix32" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix32" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Fix raíz de lógica de fotos: filtrar movimientos auto_generated correctamente, campos photo_required_alta y photo_required_baja separados, TTL guardado como entero (no booleano).</p>
+                    <p className="text-sm text-muted-foreground mb-2">Guard de seguridad en AuditPage para evitar errores con audit null.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Movimientos auto_generated excluidos del cálculo de fotos</li>
-                    <li className="text-sm text-foreground/80">• Campos photo_required_alta y _baja independientes</li>
-                    <li className="text-sm text-foreground/80">• TTL guardado como int (corrige bug de bool→1)</li>
-                    <li className="text-sm text-foreground/80">• Validación robusta de tipos en system-settings</li>
+                    <li className="text-sm text-foreground/80">• Guard if (!audit) return null en AuditPage</li>
+                    <li className="text-sm text-foreground/80">• Fix de TabsContent en componentes de auditoría</li>
+                    <li className="text-sm text-foreground/80">• Correcciones de errores de renderizado</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix31" ? null : "fix31")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -919,27 +1126,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix31</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-12</span>
+                      <span className="text-xs text-muted-foreground">2026-03-11 — stamp-sw.js prebuild</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix del estado en modal de tienda para mostrar pending_photos correctamente, pag...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Script stamp-sw.js inyecta timestamp único en cada build.</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix31" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix31" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Fix del estado en modal de tienda para mostrar pending_photos correctamente, paginación de búsqueda de equipos con opciones 10/25/50/100/Todos, eliminación del tab Equipos de AdminPage.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Script stamp-sw.js inyecta timestamp único en cada build.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Modal de tienda muestra estado pending_photos correctamente</li>
-                    <li className="text-sm text-foreground/80">• Paginación de búsqueda: 10/25/50/100/Todos por página</li>
-                    <li className="text-sm text-foreground/80">• Tab Equipos eliminado de AdminPage</li>
+                    <li className="text-sm text-foreground/80">• Script scripts/stamp-sw.js ejecutado como prebuild</li>
+                    <li className="text-sm text-foreground/80">• sw.template.js como plantilla base del Service Worker</li>
+                    <li className="text-sm text-foreground/80">• CACHE_NAME con timestamp único por build</li>
+                    <li className="text-sm text-foreground/80">• Garantía de banner de actualización en cada nuevo deploy</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix30" ? null : "fix30")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -948,31 +1155,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix30</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-12</span>
+                      <span className="text-xs text-muted-foreground">2026-03-11 — Service Worker con waiting state correcto</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">8 correcciones: doble X en diálogo foto, display de horas TTL en config, fotos s...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">SW sin skipWaiting en install. Banner de actualización controlado por ...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix30" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix30" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">8 correcciones: doble X en diálogo foto, display de horas TTL en config, fotos solo en movimientos manuales, banner de actualización SW, confirmación de contraseña para reset, importación masiva de usuarios por Excel, estadísticas de auditorías en bitácoras.</p>
+                    <p className="text-sm text-muted-foreground mb-2">SW sin skipWaiting en install. Banner de actualización controlado por el usuario.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Doble X en diálogo de foto eliminado</li>
-                    <li className="text-sm text-foreground/80">• Display de horas TTL corregido en configuración</li>
-                    <li className="text-sm text-foreground/80">• Fotos solo en movimientos manuales (no auto-generados)</li>
-                    <li className="text-sm text-foreground/80">• Banner de actualización SW implementado</li>
-                    <li className="text-sm text-foreground/80">• Contraseña requerida para reiniciar datos</li>
-                    <li className="text-sm text-foreground/80">• Importación masiva de usuarios desde Excel/CSV</li>
-                    <li className="text-sm text-foreground/80">• Tarjetas de estadísticas en bitácoras</li>
+                    <li className="text-sm text-foreground/80">• SW v5: install sin skipWaiting (permite estado waiting)</li>
+                    <li className="text-sm text-foreground/80">• SKIP_WAITING activa la actualización solo al confirmar</li>
+                    <li className="text-sm text-foreground/80">• Banner de actualización disponible en la UI</li>
+                    <li className="text-sm text-foreground/80">• controllerchange recarga automáticamente tras activar nuevo SW</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix29" ? null : "fix29")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -981,155 +1184,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix29</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-12</span>
+                      <span className="text-xs text-muted-foreground">2026-03-11 — Búsqueda limit=0 y validación de contraseña</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Endpoint global GET /cross-analysis/global que compara no-localizados vs sobrant...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Búsqueda de equipos con limit=0. Validación de contraseña actual antes...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix29" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix29" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Endpoint global GET /cross-analysis/global que compara no-localizados vs sobrantes de TODAS las auditorías. Rediseño de UI con filtros por plaza y nivel de confianza.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Búsqueda de equipos con limit=0. Validación de contraseña actual antes de cambiarla.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Endpoint global /cross-analysis/global</li>
-                    <li className="text-sm text-foreground/80">• Compara todas las auditorías simultáneamente</li>
-                    <li className="text-sm text-foreground/80">• Filtros por plaza y nivel de confianza (Alta/Media/Baja)</li>
-                    <li className="text-sm text-foreground/80">• Badge 'Tiendas distintas' cuando equipos son de otra tienda</li>
+                    <li className="text-sm text-foreground/80">• Búsqueda de equipos: limit=0 devuelve todos los registros</li>
+                    <li className="text-sm text-foreground/80">• Validación de contraseña actual requerida antes de cambiar</li>
+                    <li className="text-sm text-foreground/80">• Fix de paginación en búsqueda</li>
+                    <li className="text-sm text-foreground/80">• Correcciones en exportación de movimientos</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
-                  onClick={() => setExpandedFix(expandedFix === "fix27-fix28" ? null : "fix27-fix28")}
-                >
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <Wrench className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold font-mono text-sm text-primary">fix27-fix28</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-12</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Tab AdminHistory en AdminPage, estado pending_photos con TTL y auto-limpieza, ba...</p>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix27-fix28" ? "rotate-180" : ""}`} />
-                </button>
-                {expandedFix === "fix27-fix28" && (
-                  <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Tab AdminHistory en AdminPage, estado pending_photos con TTL y auto-limpieza, banner de bloqueo con countdown, toggles ALTAS/BAJAS separados, serie obligatoria en sobrante, catálogo dinámico desde MAF, análisis cruzado no-localizado vs sobrante, marca/modelo en búsqueda.</p>
-                    <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Tab AdminHistory en AdminPage</li>
-                    <li className="text-sm text-foreground/80">• Estado pending_photos con TTL configurable</li>
-                    <li className="text-sm text-foreground/80">• Auto-limpieza de auditorías vencidas</li>
-                    <li className="text-sm text-foreground/80">• Banner de bloqueo con countdown en auditoría</li>
-                    <li className="text-sm text-foreground/80">• Toggles separados para foto ALTAS y BAJAS</li>
-                    <li className="text-sm text-foreground/80">• Serie obligatoria en sobrante desconocido</li>
-                    <li className="text-sm text-foreground/80">• Catálogo dinámico cargado desde el MAF</li>
-                    <li className="text-sm text-foreground/80">• Análisis cruzado: no-localizado vs sobrante</li>
-                    <li className="text-sm text-foreground/80">• Marca y modelo en resultados de búsqueda</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-              <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
-                  onClick={() => setExpandedFix(expandedFix === "fix25-fix26" ? null : "fix25-fix26")}
-                >
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <Wrench className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold font-mono text-sm text-primary">fix25-fix26</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-12</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix de botones en lightbox, UI mejorada de conflicto de sesión con IP/device/UA ...</p>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix25-fix26" ? "rotate-180" : ""}`} />
-                </button>
-                {expandedFix === "fix25-fix26" && (
-                  <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Fix de botones en lightbox, UI mejorada de conflicto de sesión con IP/device/UA completos, catálogo de sobrante desconocido con marcas filtradas + opción OTRO, control de límite en búsqueda de equipos.</p>
-                    <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Botones del lightbox corregidos</li>
-                    <li className="text-sm text-foreground/80">• Conflicto de sesión muestra IP, dispositivo y navegador</li>
-                    <li className="text-sm text-foreground/80">• Catálogo de marcas filtrado por tipo de equipo</li>
-                    <li className="text-sm text-foreground/80">• Opción OTRO con campo manual para marcas</li>
-                    <li className="text-sm text-foreground/80">• Control de límite de resultados en búsqueda</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-              <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
-                  onClick={() => setExpandedFix(expandedFix === "fix23-fix24" ? null : "fix23-fix24")}
-                >
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <Wrench className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold font-mono text-sm text-primary">fix23-fix24</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-12</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">SystemLogsPage unificada (app + seguridad), fix de apiRef en AuthContext, mejora...</p>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix23-fix24" ? "rotate-180" : ""}`} />
-                </button>
-                {expandedFix === "fix23-fix24" && (
-                  <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">SystemLogsPage unificada (app + seguridad), fix de apiRef en AuthContext, mejoras de performance en LogsPage con proyecciones MongoDB y fetches paralelos.</p>
-                    <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• SystemLogsPage unificada con tabs</li>
-                    <li className="text-sm text-foreground/80">• Fix de apiRef en AuthContext (race condition)</li>
-                    <li className="text-sm text-foreground/80">• Proyecciones MongoDB para reducir datos transferidos</li>
-                    <li className="text-sm text-foreground/80">• Fetches paralelos con asyncio.gather</li>
-                    <li className="text-sm text-foreground/80">• Nuevos índices MongoDB para consultas frecuentes</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-              <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
-                  onClick={() => setExpandedFix(expandedFix === "fix21-fix22" ? null : "fix21-fix22")}
-                >
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <Wrench className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold font-mono text-sm text-primary">fix21-fix22</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-11 – 2026-03-12</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Sesión única forzada con UI de conflicto mejorada, ciclo de 3 idiomas ES→EN→PT c...</p>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix21-fix22" ? "rotate-180" : ""}`} />
-                </button>
-                {expandedFix === "fix21-fix22" && (
-                  <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Sesión única forzada con UI de conflicto mejorada, ciclo de 3 idiomas ES→EN→PT con botón en header, corrección de pantalla en blanco en AdminPage.</p>
-                    <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Sesión única forzada al iniciar sesión</li>
-                    <li className="text-sm text-foreground/80">• UI de conflicto con detalles del dispositivo activo</li>
-                    <li className="text-sm text-foreground/80">• Ciclo de idiomas ES→EN→PT en un botón</li>
-                    <li className="text-sm text-foreground/80">• Fix pantalla en blanco AdminPage</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-              <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix20" ? null : "fix20")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -1138,56 +1213,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix20</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-11</span>
+                      <span className="text-xs text-muted-foreground">2026-03-10 — Análisis cruzado global y exportaciones mejoradas</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix de lightbox con Radix Dialog, toggles de configuración de fotos en admin, so...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Endpoint global entre todas las auditorías. Importación masiva de usua...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix20" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix20" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Fix de lightbox con Radix Dialog, toggles de configuración de fotos en admin, soporte de idioma Portugués (tercer idioma).</p>
+                    <p className="text-sm text-muted-foreground mb-2">Endpoint global entre todas las auditorías. Importación masiva de usuarios.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Lightbox compatible con Radix Dialog</li>
-                    <li className="text-sm text-foreground/80">• Toggles de configuración de fotos en AdminPage</li>
-                    <li className="text-sm text-foreground/80">• Soporte de idioma Portugués (ES→EN→PT)</li>
+                    <li className="text-sm text-foreground/80">• Endpoint GET /cross-analysis/global para Super Administrador</li>
+                    <li className="text-sm text-foreground/80">• Exportación AB y Transferencias con formato corporativo AF</li>
+                    <li className="text-sm text-foreground/80">• Importación masiva de usuarios desde Excel (.xlsx)</li>
+                    <li className="text-sm text-foreground/80">• Fix de lógica de fotos (auto_generated=True para bajas de sistema)</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
-                  onClick={() => setExpandedFix(expandedFix === "fix18-fix19" ? null : "fix18-fix19")}
-                >
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <Wrench className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold font-mono text-sm text-primary">fix18-fix19</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-11</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix de lightbox usando createPortal para resolver problemas de z-index, scroll e...</p>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix18-fix19" ? "rotate-180" : ""}`} />
-                </button>
-                {expandedFix === "fix18-fix19" && (
-                  <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Fix de lightbox usando createPortal para resolver problemas de z-index, scroll en sidebar, enfoque automático en historial de búsqueda.</p>
-                    <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Lightbox con createPortal (z-index corregido)</li>
-                    <li className="text-sm text-foreground/80">• Scroll en sidebar de navegación</li>
-                    <li className="text-sm text-foreground/80">• Enfoque automático en búsqueda de equipos</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-              <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix17" ? null : "fix17")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -1196,29 +1242,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix17</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-11</span>
+                      <span className="text-xs text-muted-foreground">2026-03-10 — Análisis cruzado y pending_photos TTL</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fotos condicionales configurables por tipo de movimiento, verificación automátic...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Análisis cruzado No Localizado vs Sobrante. pending_photos con TTL con...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix17" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix17" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Fotos condicionales configurables por tipo de movimiento, verificación automática de firma al completar auditoría, lightbox de fotos, historial de cambios admin con rollback, búsqueda avanzada de equipos con filtros.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Análisis cruzado No Localizado vs Sobrante. pending_photos con TTL configurable.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Fotos condicionales por tipo (altas/bajas/transferencias)</li>
-                    <li className="text-sm text-foreground/80">• Verificación automática de firma digital al completar</li>
-                    <li className="text-sm text-foreground/80">• Lightbox de fotos con zoom</li>
-                    <li className="text-sm text-foreground/80">• Historial de cambios admin con rollback</li>
-                    <li className="text-sm text-foreground/80">• Búsqueda avanzada con marca, modelo, serie, tienda</li>
+                    <li className="text-sm text-foreground/80">• Análisis cruzado: detectar equipos desplazados entre tiendas</li>
+                    <li className="text-sm text-foreground/80">• Estado pending_photos con TTL configurable 1-168 horas</li>
+                    <li className="text-sm text-foreground/80">• Background task cada hora que limpia auditorías vencidas</li>
+                    <li className="text-sm text-foreground/80">• Campos needs_photo_ab y needs_photo_transf en auditorías</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix16" ? null : "fix16")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -1227,27 +1271,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix16</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-10</span>
+                      <span className="text-xs text-muted-foreground">2026-03-10 — SystemLogsPage unificada</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Corrección de truncado de código de barras en escaneo, correcciones visuales men...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Panel de logs unificado con 4 tabs: App, Seguridad, Historial Admin, F...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix16" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix16" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Corrección de truncado de código de barras en escaneo, correcciones visuales menores en la interfaz.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Panel de logs unificado con 4 tabs: App, Seguridad, Historial Admin, Fixes.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Truncado de código de barras corregido en Zebra TC52</li>
-                    <li className="text-sm text-foreground/80">• Caracteres especiales Unicode eliminados del barcode</li>
-                    <li className="text-sm text-foreground/80">• Correcciones visuales menores</li>
+                    <li className="text-sm text-foreground/80">• SystemLogsPage unificada con 4 tabs</li>
+                    <li className="text-sm text-foreground/80">• Eliminación de AppLogsPage.js y SecurityLogsPage.js obsoletos</li>
+                    <li className="text-sm text-foreground/80">• Paginación y búsqueda en todas las secciones de logs</li>
+                    <li className="text-sm text-foreground/80">• Tab de Fixes con acordeón expandible</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix15" ? null : "fix15")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -1256,27 +1300,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix15</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-10</span>
+                      <span className="text-xs text-muted-foreground">2026-03-09 — Multi-idioma ES/EN/PT</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">El flujo de desbloqueo de cuenta regresa al login tras solicitarlo, con notifica...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Soporte completo para 3 idiomas. Paleta OXXO. Persistencia de preferen...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix15" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix15" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">El flujo de desbloqueo de cuenta regresa al login tras solicitarlo, con notificaciones al administrador.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Soporte completo para 3 idiomas. Paleta OXXO. Persistencia de preferencias.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Flujo de desbloqueo regresa al login automáticamente</li>
-                    <li className="text-sm text-foreground/80">• Notificación al administrador al solicitar desbloqueo</li>
-                    <li className="text-sm text-foreground/80">• UI mejorada del proceso de desbloqueo</li>
+                    <li className="text-sm text-foreground/80">• Sistema de internacionalización con 3 idiomas: ES/EN/PT</li>
+                    <li className="text-sm text-foreground/80">• Paleta de colores OXXO (rojo/amarillo) además de Profesional (azul marino)</li>
+                    <li className="text-sm text-foreground/80">• Selector de idioma y tema en sidebar</li>
+                    <li className="text-sm text-foreground/80">• Persistencia de preferencias en localStorage</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix14" ? null : "fix14")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -1285,28 +1329,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix14</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-10</span>
+                      <span className="text-xs text-muted-foreground">2026-03-09 — Fotos condicionales y lightbox</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Reporte PDF completo de auditoría con firma digital verificable, tabla de equipo...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fotos AF configurables por tipo. Lightbox. Historial admin con rollbac...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix14" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix14" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Reporte PDF completo de auditoría con firma digital verificable, tabla de equipos no localizados y sobrantes, y resumen de movimientos.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Fotos AF configurables por tipo. Lightbox. Historial admin con rollback.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• PDF completo con todos los datos de la auditoría</li>
-                    <li className="text-sm text-foreground/80">• Firma digital incluida y verificable</li>
-                    <li className="text-sm text-foreground/80">• Tabla de equipos no localizados con valores</li>
-                    <li className="text-sm text-foreground/80">• Resumen de movimientos (altas, bajas, transferencias)</li>
+                    <li className="text-sm text-foreground/80">• Fotos condicionales: toggle separado para ALTAS, BAJAS y TRANSFERENCIAS</li>
+                    <li className="text-sm text-foreground/80">• Lightbox para visualizar fotos en historial de auditorías</li>
+                    <li className="text-sm text-foreground/80">• Historial de acciones de administrador con rollback</li>
+                    <li className="text-sm text-foreground/80">• Búsqueda avanzada de equipos por serie, descripción, marca</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix13" ? null : "fix13")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -1315,58 +1358,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix13</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-10</span>
+                      <span className="text-xs text-muted-foreground">2026-03-09 — Firmas digitales y cifrado</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Logs de auditoría de seguridad, firmas digitales HMAC-SHA256 por auditoría, cifr...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Firmas HMAC-SHA256 por auditoría. Cifrado Fernet para campos sensibles...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix13" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix13" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Logs de auditoría de seguridad, firmas digitales HMAC-SHA256 por auditoría, cifrado de campos sensibles (serie y factura) con Fernet.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Firmas HMAC-SHA256 por auditoría. Cifrado Fernet para campos sensibles.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Logs de seguridad con niveles INFO/WARNING/CRITICAL</li>
-                    <li className="text-sm text-foreground/80">• Firmas digitales HMAC-SHA256 por auditoría</li>
-                    <li className="text-sm text-foreground/80">• Cifrado de campos sensibles con Fernet (serie, factura)</li>
-                    <li className="text-sm text-foreground/80">• Verificación automática de integridad</li>
+                    <li className="text-sm text-foreground/80">• Firma digital HMAC-SHA256 al completar cada auditoría</li>
+                    <li className="text-sm text-foreground/80">• Cifrado Fernet para campos serie y factura en MongoDB</li>
+                    <li className="text-sm text-foreground/80">• Endpoint GET /audits/{id}/verify-signature</li>
+                    <li className="text-sm text-foreground/80">• PDF del manual de usuario dinámico por perfil</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
-                  onClick={() => setExpandedFix(expandedFix === "fix11-fix12" ? null : "fix11-fix12")}
-                >
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <Wrench className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold font-mono text-sm text-primary">fix11-fix12</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-09 – 2026-03-10</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Implementación de sesión única por usuario con detección de conflicto mostrando ...</p>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix11-fix12" ? "rotate-180" : ""}`} />
-                </button>
-                {expandedFix === "fix11-fix12" && (
-                  <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Implementación de sesión única por usuario con detección de conflicto mostrando IP, dispositivo y user-agent. Cierre forzoso de otras sesiones activas.</p>
-                    <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Sesión única por usuario enforced</li>
-                    <li className="text-sm text-foreground/80">• Diálogo de conflicto de sesión con IP y dispositivo</li>
-                    <li className="text-sm text-foreground/80">• Cierre forzoso de sesiones activas</li>
-                    <li className="text-sm text-foreground/80">• Registro de eventos de sesión en logs de seguridad</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-              <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix10" ? null : "fix10")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -1375,57 +1387,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix10</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-09</span>
+                      <span className="text-xs text-muted-foreground">2026-03-08 — Sesión única y conflicto por IP/UA</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Mejoras de UX: rendimiento general, filtros avanzados optimizados y correcciones...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Sistema de sesión única por usuario. Detección de conflicto con IP/UA....</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix10" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix10" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Mejoras de UX: rendimiento general, filtros avanzados optimizados y correcciones de interfaz.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Sistema de sesión única por usuario. Detección de conflicto con IP/UA. Logs de seguridad.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Rendimiento de carga mejorado</li>
-                    <li className="text-sm text-foreground/80">• Filtros avanzados optimizados</li>
-                    <li className="text-sm text-foreground/80">• Correcciones de interfaz de usuario</li>
+                    <li className="text-sm text-foreground/80">• Sesión única por usuario (una sesión activa a la vez)</li>
+                    <li className="text-sm text-foreground/80">• Detección de conflicto de sesión con IP y User-Agent</li>
+                    <li className="text-sm text-foreground/80">• Logs de seguridad con niveles INFO/WARNING/CRITICAL</li>
+                    <li className="text-sm text-foreground/80">• Flujo de desbloqueo de cuenta</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
-                  onClick={() => setExpandedFix(expandedFix === "fix8-fix9" ? null : "fix8-fix9")}
-                >
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <Wrench className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold font-mono text-sm text-primary">fix8-fix9</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-09</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Columnas Serie y Depreciado en bitácoras, resize del diálogo de auditoría, PDF e...</p>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix8-fix9" ? "rotate-180" : ""}`} />
-                </button>
-                {expandedFix === "fix8-fix9" && (
-                  <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Columnas Serie y Depreciado en bitácoras, resize del diálogo de auditoría, PDF específico por perfil de usuario, corrección de prioridad del badge En Progreso.</p>
-                    <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Columnas Serie y Depreciado en bitácoras</li>
-                    <li className="text-sm text-foreground/80">• Resize del diálogo de auditoría</li>
-                    <li className="text-sm text-foreground/80">• PDF diferente según perfil (Admin/Socio/SuperAdmin)</li>
-                    <li className="text-sm text-foreground/80">• Prioridad de badge En Progreso sobre Auditada</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-              <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix7" ? null : "fix7")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -1434,29 +1416,27 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix7</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-09</span>
+                      <span className="text-xs text-muted-foreground">2026-03-07 — UX y Badge En Progreso</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Fix badge 'En Progreso' en dashboard, corrección de estados de auditoría en back...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Mejoras UX, badge 'En Progreso', pdf_generator.py, columnas Serie y De...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix7" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix7" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Fix badge 'En Progreso' en dashboard, corrección de estados de auditoría en backend, reescritura completa de pdf_generator.py con Manual de Usuario y Presentación ejecutiva.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Mejoras UX, badge 'En Progreso', pdf_generator.py, columnas Serie y Depreciado.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Badge 'En Progreso' en dashboard corregido</li>
-                    <li className="text-sm text-foreground/80">• Estados de auditoría actualizados en backend</li>
-                    <li className="text-sm text-foreground/80">• pdf_generator.py reescrito completamente</li>
-                    <li className="text-sm text-foreground/80">• Manual de Usuario con diseño profesional</li>
-                    <li className="text-sm text-foreground/80">• Presentación ejecutiva para stakeholders</li>
+                    <li className="text-sm text-foreground/80">• Badge visual 'En Progreso' en tarjetas de tienda</li>
+                    <li className="text-sm text-foreground/80">• Creación de pdf_generator.py (base para manuales y reportes)</li>
+                    <li className="text-sm text-foreground/80">• Columnas Serie y Depreciado en tablas de equipos</li>
+                    <li className="text-sm text-foreground/80">• Mejoras generales de UX en el Dashboard</li>
                     </ul>
                   </div>
                 )}
               </div>
+
               <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
+                <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
                   onClick={() => setExpandedFix(expandedFix === "fix6" ? null : "fix6")}
                 >
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -1465,58 +1445,26 @@ export default function SystemLogsPage({ defaultTab = "app" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold font-mono text-sm text-primary">fix6</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-09</span>
+                      <span className="text-xs text-muted-foreground">2026-03-06 — Release inicial</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Mejoras en tabla de equipos móvil, campo serie para sobrante, overlay de finaliz...</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Deploy inicial en Railway. Cámara de escaneo, sobrante desconocido bás...</p>
                   </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix6" ? "rotate-180" : ""}`} />
                 </button>
                 {expandedFix === "fix6" && (
                   <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Mejoras en tabla de equipos móvil, campo serie para sobrante, overlay de finalización, fotos en resumen de auditoría, filtros por tipo y exportación Excel con fotos.</p>
+                    <p className="text-sm text-muted-foreground mb-2">Deploy inicial en Railway. Cámara de escaneo, sobrante desconocido básico, tablas móviles, exportación Excel.</p>
                     <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Tabla de equipos móvil optimizada</li>
-                    <li className="text-sm text-foreground/80">• Campo serie obligatorio para sobrante desconocido</li>
-                    <li className="text-sm text-foreground/80">• Overlay de carga al finalizar auditoría</li>
-                    <li className="text-sm text-foreground/80">• Fotos de formatos en resumen de auditoría</li>
-                    <li className="text-sm text-foreground/80">• Exportación Excel del historial con fotos</li>
+                    <li className="text-sm text-foreground/80">• Deploy inicial en Railway (Frontend React + Backend FastAPI + MongoDB Atlas)</li>
+                    <li className="text-sm text-foreground/80">• Módulo de cámara para escaneo de equipos</li>
+                    <li className="text-sm text-foreground/80">• Registro básico de sobrante desconocido</li>
+                    <li className="text-sm text-foreground/80">• Tablas responsivas para móvil</li>
+                    <li className="text-sm text-foreground/80">• Exportación a Excel con fotos embebidas</li>
                     </ul>
                   </div>
                 )}
               </div>
-              <div className="border-b last:border-0">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition text-left"
-                  onClick={() => setExpandedFix(expandedFix === "fix1-fix5" ? null : "fix1-fix5")}
-                >
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <Wrench className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold font-mono text-sm text-primary">fix1-fix5</span>
-                      
-                      <span className="text-xs text-muted-foreground">2026-03-06 – 2026-03-07</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">Deploy inicial en Railway, implementación de cámara de escaneo, registro de sobr...</p>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedFix === "fix1-fix5" ? "rotate-180" : ""}`} />
-                </button>
-                {expandedFix === "fix1-fix5" && (
-                  <div className="px-4 pb-4 bg-muted/20">
-                    <p className="text-sm text-muted-foreground mb-2">Deploy inicial en Railway, implementación de cámara de escaneo, registro de sobrante desconocido, tablas móvil responsivas, exportación Excel con imágenes incrustadas, filtros de movimientos.</p>
-                    <ul className="space-y-1">
-                    <li className="text-sm text-foreground/80">• Deploy inicial FastAPI + React en Railway</li>
-                    <li className="text-sm text-foreground/80">• Cámara de escaneo de códigos de barras</li>
-                    <li className="text-sm text-foreground/80">• Registro de sobrante desconocido con campos personalizados</li>
-                    <li className="text-sm text-foreground/80">• Tablas móvil con scroll horizontal</li>
-                    <li className="text-sm text-foreground/80">• Exportación Excel con imágenes incrustadas</li>
-                    <li className="text-sm text-foreground/80">• Filtros de movimientos (transferencias, bajas, altas)</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
+
             </CardContent>
           </Card>
                 </TabsContent>

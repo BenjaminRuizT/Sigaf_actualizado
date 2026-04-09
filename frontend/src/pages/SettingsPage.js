@@ -30,7 +30,10 @@ import {
   Server,
   Lock,
   RefreshCw,
-  Wrench
+  Wrench,
+  AlertTriangle,
+  CheckCircle2,
+  Loader2
 } from "lucide-react";
 
 const APP_VERSION = "3.0.0";
@@ -60,6 +63,10 @@ export default function SettingsPage() {
   const { theme, palette, toggleTheme, setPalette } = useTheme();
   const { t, language, changeLanguage } = useLanguage();
   const { user, api } = useAuth();
+  const [reconLoading, setReconLoading] = useState(false);
+  const [reconData, setReconData] = useState(null);
+  const [reconFixing, setReconFixing] = useState(false);
+  const [reconExpanded, setReconExpanded] = useState(false);
 
   const [nombre, setNombre] = useState(user?.nombre || "");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -69,7 +76,56 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [showDeploy, setShowDeploy] = useState(false);
 
-  const handleSaveProfile = async () => {
+  const handleCheckInconsistencies = async () => {
+    setReconLoading(true);
+    setReconData(null);
+    try {
+      const res = await api.get("/admin/audit-inconsistencies");
+      setReconData(res.data);
+      setReconExpanded(true);
+      if (res.data.total === 0) {
+        toast.success("No se encontraron inconsistencias en las auditorías");
+      } else {
+        toast.warning(`Se encontraron ${res.data.total} equipos con inconsistencias`);
+      }
+    } catch {
+      toast.error("Error al verificar inconsistencias");
+    } finally {
+      setReconLoading(false);
+    }
+  };
+
+  const handleFixAllInconsistencies = async () => {
+    setReconFixing(true);
+    try {
+      const res = await api.post("/admin/fix-all-audit-inconsistencies");
+      toast.success(`Corregidos ${res.data.fixed_scans} equipos en ${res.data.audits_recalculated} auditorías`);
+      setReconData(null);
+      setReconExpanded(false);
+    } catch {
+      toast.error("Error al corregir inconsistencias");
+    } finally {
+      setReconFixing(false);
+    }
+  };
+
+  const handleFixSingle = async (item) => {
+    try {
+      await api.post("/admin/fix-audit-inconsistency", null, {
+        params: {
+          equipment_id: item.equipment_id,
+          origin_audit_id: item.origin_audit_id,
+          resolved_by_audit: item.resolved_by_audit || "",
+        }
+      });
+      toast.success(`Corregido: ${item.codigo_barras || item.descripcion}`);
+      await handleCheckInconsistencies();
+    } catch {
+      toast.error("Error al corregir el equipo");
+    }
+  };
+
+    const handleSaveProfile = async () => {
     if (!nombre.trim() && !password.trim()) return;
     // Require current password if changing password
     if (password.trim() && !currentPassword.trim()) {
@@ -359,6 +415,108 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           )}
+        </Card>
+      )}
+      {/* ── Reconciliación de Auditorías (Solo Super Admin) ── */}
+      {user?.perfil === "Super Administrador" && (
+        <Card data-testid="audit-reconciliation-card" className="border-amber-500/30">
+          <CardHeader>
+            <div className="flex items-start gap-3">
+              <div className="h-9 w-9 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <CardTitle className="text-base">Revisión de Inconsistencias en Auditorías</CardTitle>
+                <CardDescription className="text-sm mt-0.5">
+                  Detecta y corrige equipos marcados como No Localizado en una auditoría que
+                  posteriormente fueron encontrados (transferidos) en otra auditoría posterior.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3 text-xs text-muted-foreground space-y-1">
+              <p className="font-semibold text-amber-700">¿Cuándo ocurre este escenario?</p>
+              <p>1. Tienda A audita y un equipo no se encuentra → queda como No Localizado + Baja generada</p>
+              <p>2. Días después, Tienda B audita y encuentra ese equipo → se registra como Transferencia</p>
+              <p>3. La Baja original queda cancelada pero el conteo de No Localizados en Tienda A no se actualiza</p>
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                onClick={handleCheckInconsistencies}
+                disabled={reconLoading || reconFixing}
+                variant="outline"
+                className="gap-2 border-amber-500/40 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950"
+              >
+                {reconLoading
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <AlertTriangle className="h-4 w-4" />}
+                Verificar Auditorías
+              </Button>
+
+              {reconData && reconData.total > 0 && (
+                <Button
+                  onClick={handleFixAllInconsistencies}
+                  disabled={reconFixing || reconLoading}
+                  className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  {reconFixing
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <CheckCircle2 className="h-4 w-4" />}
+                  Corregir Todas ({reconData.total})
+                </Button>
+              )}
+
+              {reconData && reconData.total === 0 && (
+                <div className="flex items-center gap-2 text-emerald-600 text-sm font-medium">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Todas las auditorías están consistentes
+                </div>
+              )}
+            </div>
+
+            {reconData && reconData.total > 0 && reconExpanded && (
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-amber-500/10 px-4 py-2 flex items-center justify-between border-b">
+                  <span className="text-sm font-semibold text-amber-700">
+                    {reconData.total} equipo{reconData.total !== 1 ? "s" : ""} con inconsistencia
+                  </span>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs"
+                    onClick={() => setReconExpanded(false)}>
+                    Ocultar
+                  </Button>
+                </div>
+                <div className="divide-y max-h-80 overflow-y-auto">
+                  {reconData.inconsistencies.map((item, idx) => (
+                    <div key={idx} className="px-4 py-3 flex items-start gap-3">
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs font-bold">{item.codigo_barras || "—"}</span>
+                          <span className="text-xs text-muted-foreground">{item.descripcion}</span>
+                          {item.marca && <span className="text-xs text-muted-foreground">· {item.marca}</span>}
+                          {item.valor_real > 0 && (
+                            <span className="text-xs font-mono text-red-600">${Number(item.valor_real).toFixed(2)}</span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          <span className="text-red-600 font-medium">No Localizado en:</span> {item.origin_tienda}
+                          {item.resolved_to_tienda && (
+                            <span> → <span className="text-emerald-600 font-medium">Encontrado en:</span> {item.resolved_to_tienda}</span>
+                          )}
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline"
+                        className="shrink-0 h-7 text-xs gap-1 border-emerald-500/40 text-emerald-700 hover:bg-emerald-50"
+                        onClick={() => handleFixSingle(item)}>
+                        <CheckCircle2 className="h-3 w-3" /> Corregir
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
         </Card>
       )}
     </div>
