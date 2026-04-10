@@ -72,6 +72,7 @@ export default function LogsPage() {
   const [dupLoading, setDupLoading] = useState(false);
   const [dupData, setDupData] = useState([]);
   const [dupDeleting, setDupDeleting] = useState(null);
+  const [dupError, setDupError] = useState(null);
   const [crossConfFilter, setCrossConfFilter] = useState("all");
 
   const classSort = useSortable("scanned_at");
@@ -218,6 +219,7 @@ export default function LogsPage() {
   const handleFetchDuplicates = async () => {
     setDupLoading(true);
     setDupData([]);
+    setDupError(null);
     try {
       const res = await api.get("/admin/duplicate-audits");
       setDupData(res.data.groups || []);
@@ -226,8 +228,18 @@ export default function LogsPage() {
       } else {
         toast.warning(`Se encontraron ${res.data.groups.length} tienda(s) con auditorías duplicadas`);
       }
-    } catch { toast.error("Error al buscar auditorías duplicadas"); }
-    finally { setDupLoading(false); }
+    } catch (err) {
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail;
+      if (status === 404) {
+        setDupError("Endpoint no disponible. Verifica que el backend esté actualizado en Railway.");
+      } else if (status === 403) {
+        setDupError("Sin permisos. Solo Super Administrador puede usar esta función.");
+      } else {
+        setDupError(detail || "Error al buscar auditorías duplicadas. Intenta de nuevo.");
+      }
+      toast.error("Error al buscar auditorías duplicadas");
+    } finally { setDupLoading(false); }
   };
 
   const handleDeleteDuplicate = async (auditId) => {
@@ -1006,7 +1018,7 @@ ${(a.photo_ab || a.photo_transf) ? `
       </Dialog>
 
       {/* ══ Dialog: Auditorías Duplicadas ══ */}
-      <Dialog open={dupDialog} onOpenChange={v => { setDupDialog(v); if (!v) setDupData([]); }}>
+      <Dialog open={dupDialog} onOpenChange={v => { setDupDialog(v); if (!v) { setDupData([]); setDupError(null); } }}>
         <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="font-heading uppercase tracking-tight flex items-center gap-2">
@@ -1025,13 +1037,25 @@ ${(a.photo_ab || a.photo_transf) ? `
                 <span className="text-sm">Buscando auditorías duplicadas…</span>
               </div>
             )}
-            {!dupLoading && dupData.length === 0 && (
+            {!dupLoading && dupError && (
+              <div className="flex flex-col items-center justify-center py-12 gap-3 text-center px-4">
+                <XCircle className="h-8 w-8 text-red-500" />
+                <div>
+                  <p className="text-sm font-semibold text-red-600">No se pudo obtener la información</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm">{dupError}</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleFetchDuplicates} className="gap-2 mt-1">
+                  <RefreshCw className="h-3.5 w-3.5" /> Reintentar
+                </Button>
+              </div>
+            )}
+            {!dupLoading && !dupError && dupData.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
                 <CheckCircle className="h-8 w-8 text-emerald-500" />
                 <p className="text-sm font-medium text-emerald-600">No se encontraron auditorías duplicadas</p>
               </div>
             )}
-            {!dupLoading && dupData.map((group, gi) => (
+            {!dupLoading && !dupError && dupData.map((group, gi) => (
               <div key={gi} className="border rounded-lg overflow-hidden">
                 <div className="bg-orange-500/10 px-4 py-2 flex items-center justify-between border-b">
                   <div className="flex items-center gap-2">
@@ -1093,7 +1117,7 @@ ${(a.photo_ab || a.photo_transf) ? `
           </div>
 
           <DialogFooter className="pt-2 border-t">
-            <Button variant="outline" onClick={() => { setDupDialog(false); setDupData([]); }}>
+            <Button variant="outline" onClick={() => { setDupDialog(false); setDupData([]); setDupError(null); }}>
               Cerrar
             </Button>
             <Button variant="outline" onClick={handleFetchDuplicates} disabled={dupLoading} className="gap-2">
