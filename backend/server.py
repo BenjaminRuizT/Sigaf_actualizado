@@ -2371,6 +2371,19 @@ async def export_to_excel(export_type: str, token: Optional[str] = None, authori
             else:
                 plaza_col = item.get("plaza", "") or eq.get("plaza", "")
 
+            # For ALTA movements: the equipment was registered in to_tienda (no origin).
+            # Show to_cr/to_tienda as "Origen" so the row is not blank.
+            mov_type = item.get("type", "")
+            if export_type == "movements-ab" and mov_type == "alta":
+                display_cr     = to_cr or item.get("to_cr_tienda", "") or eq.get("cr_tienda", "")
+                display_tienda = item.get("to_tienda", "") or item.get("from_tienda", "") or eq.get("tienda", "")
+                # Also fix plaza if empty
+                if not plaza_col:
+                    plaza_col = item.get("plaza", "") or eq.get("plaza", "") or await get_store_plaza(display_cr)
+            else:
+                display_cr     = from_cr
+                display_tienda = item.get("from_tienda", "")
+
             row_vals = [
                 plaza_col,
                 tipo,
@@ -2382,8 +2395,8 @@ async def export_to_excel(export_type: str, token: Optional[str] = None, authori
                 eq.get("modelo", ""),
                 eq.get("año_adquisicion", ""),
                 eq.get("serie", ""),
-                from_cr,
-                item.get("from_tienda", ""),
+                display_cr,
+                display_tienda,
             ]
             if merge_cols >= 14:
                 row_vals += [to_cr, item.get("to_tienda", "")]
@@ -3320,55 +3333,6 @@ async def fix_all_inconsistencies(user=Depends(get_current_user)):
         "fixed_scans": fixed,
         "audits_recalculated": len(audits_to_recalc),
         "audit_ids": list(audits_to_recalc)
-    }
-
-
-@api_router.get("/admin/duplicate-audits")
-async def get_duplicate_audits(user=Depends(get_current_user)):
-    """
-    Detect stores that have 2 or more audits registered.
-    Returns groups of audits per store for Super Admin review.
-    """
-    if user["perfil"] != "Super Administrador":
-        raise HTTPException(403, "Solo Super Administrador")
-
-    # Pull all audits with relevant fields
-    all_audits = await db.audits.find(
-        {},
-        {
-            "_id": 0, "id": 1, "cr_tienda": 1, "tienda": 1, "plaza": 1,
-            "auditor_id": 1, "auditor_name": 1, "status": 1,
-            "started_at": 1, "finished_at": 1,
-            "located_count": 1, "not_found_count": 1,
-        }
-    ).sort("started_at", 1).to_list(10000)
-
-    # Group by cr_tienda
-    from collections import defaultdict
-    groups_map = defaultdict(list)
-    for audit in all_audits:
-        cr = audit.get("cr_tienda") or "SIN_CR"
-        groups_map[cr].append(audit)
-
-    # Keep only stores with 2+ audits
-    duplicate_groups = []
-    for cr, audits in groups_map.items():
-        if len(audits) >= 2:
-            duplicate_groups.append({
-                "cr_tienda": cr,
-                "tienda": audits[0].get("tienda", ""),
-                "plaza": audits[0].get("plaza", ""),
-                "audits": audits,
-            })
-
-    # Sort by tienda name
-    duplicate_groups.sort(key=lambda g: (g.get("plaza") or "", g.get("tienda") or ""))
-
-    return {
-        "ok": True,
-        "total_stores": len(duplicate_groups),
-        "total_audits": sum(len(g["audits"]) for g in duplicate_groups),
-        "groups": duplicate_groups,
     }
 
 
